@@ -13,9 +13,10 @@ coverage display.
 Produce a defensible, reproducible area-level outlook from weather and crop context, with
 honest coverage and freshness, and present it separately from observed reports.
 
-**v1 stance:** a **nowcast** (risk given the last 10 days) is preferred over a 7-day
-outlook unless D2 is resolved otherwise. A validated rules model is the baseline; ML is an
-overlay only after at least two seasons of verified outcomes.
+**v1 stance (D2 decided, 2026-11-06):** v1 ships a **nowcast** over the last 10 days. A
+7-day outlook is deferred until at least one season of verified outcomes exists. A validated
+rules model is the baseline; ML is an overlay only after at least two seasons of verified
+outcomes.
 
 ---
 
@@ -23,16 +24,15 @@ overlay only after at least two seasons of verified outcomes.
 
 | Field | Value | Status |
 |---|---|---|
-| Crop | 1 supported crop | Blocked on D1 |
-| Target | 3–5 supported conditions | Blocked on D1 |
-| Geography | block/mandal level | Blocked on D1 |
-| Horizon | nowcast (default) or 7 days | Blocked on D2 |
+| Crop | Open catalogue; scored only for the validated allowlist | Policy decided (ADR-011); first allowlist = D1a |
+| Target | Validated allowlist entries for the supported crop | D1a (before Gate 3) |
+| Geography | block/mandal level | Policy decided; pilot zone = D4 |
+| Horizon | **nowcast, last 10 days** | Decided (D2) |
 | Issue cadence | daily (proposed) | Proposed |
-| Event definition | first evidence-eligible case (D7); exact outcome per D1/D5 | Decided — D7 |
-| Negative definition | verified absence from pre-registered sentinel-panel visits; never "no report" or "no visit" | Decided — D7 |
-| Label eligibility | `confirmed` or `probable` with evidence tier; `verified_at <= cutoff` and event date `<= cutoff`; all other states excluded | Decided — D7 |
-| Spatial unit | smallest unit inputs support | Blocked on D1 |
-| Primary consumer | extension worker + farmer SMS | Proposed |
+| Event definition | first verified case / incidence threshold / escalation | **Blocked on D7** |
+| Negative definition | verified absence within coverage, not "no report" | Required |
+| Spatial unit | smallest unit inputs support | Decided: block/mandal, never farm |
+| Primary consumer | extension worker + farmer (channel per config) | Proposed |
 
 **Event definition rule:** write it before feature engineering. Keep different event types
 as separate tasks. "No report" is never a negative label.
@@ -46,7 +46,7 @@ as separate tasks. "No report" is never a negative label.
 | Weather | rainfall, temp min/max, RH, consecutive wet days, leaf-wetness proxy | Must exist at issue time; store `source_timestamp` |
 | Crop context | crop, stage, planting window, variety, irrigation | From crop cycle / calendar |
 | Seasonal | week of year, monsoon period, days since planting | Deterministic |
-| Historical pressure | lagged eligible labels, nearby verified reports, prior-season occurrence | Eligible labels only (D7) |
+| Historical pressure | lagged verified reports, nearby verified reports, prior-season occurrence | Verified only |
 | Coverage | active reporters, visits, data completeness | Required for no-score gate |
 | Boundaries | versioned admin geometry | Version recorded with forecast |
 
@@ -112,7 +112,7 @@ scheduled job (daily, per crop × target × area)
   ├─ check model approval + config validity
   ├─ load weather snapshots (freshness check)
   ├─ load crop stage + calendar
-  ├─ load lagged eligible labels (confirmed + probable with tier, as-of cutoff)
+  ├─ load lagged verified reports (verified only)
   ├─ compute coverage
   ├─ if gate fails → persist insufficient_data row (reason, coverage)
   ├─ else compute features → persist feature_snapshot (immutable)
@@ -210,22 +210,6 @@ Rules:
 Report sample counts and per-area results. Never report a single aggregate without the
 class/area breakdown.
 
-**Negative-class rule (D7):** discrimination and calibration are computed only where verified
-negatives exist — on the pre-registered sentinel panel. Training on presence-only data is a
-positive-unlabelled design and does not license PR-AUC, precision/recall, Brier or ECE.
-Report panel sample size per area/target; if it is below the D8 minimum, report the metric as
-underpowered and do not gate on it. Never treat an unvisited area or a missing report as a
-negative.
-
-**Pre-registered floors (D8):** before the frozen test season is opened, the evaluator and
-product lead record forecast floors in `progress-tracker.md` §4 (D8): minimum share of
-area-days carrying a scored band, maximum `insufficient_data` rate, minimum lift over the
-climatology/naive baseline, and maximum Brier and calibration error on sentinel-panel
-negatives, each broken down by coverage stratum. The floors are measured on validation data
-only. Opening the test set once and reporting at the shipped operating point is the last step;
-floors written after that opening are void. Any unmet floor fails Gate 4 and the model is not
-approved. No floor value is chosen in this document.
-
 ---
 
 ## 10. Alert hand-off
@@ -245,8 +229,6 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 | Boundary version mismatch | `insufficient_data` with `boundary_mismatch`; ops alert |
 | Crop calendar missing | `insufficient_data` with `calendar_missing` |
 | Zero verified reports but good coverage | Valid low/moderate score; coverage shown; never "disease-free" |
-| No sentinel visit in the window | Not a negative; excluded from evaluation and coverage shown |
-| Sentinel panel below D8 minimum | Metrics marked underpowered; no discrimination or calibration claim |
 | High reports, low coverage | Band capped or `insufficient_data`; coverage shown |
 | Model not approved | No forecast generated; job fails loudly |
 | Duplicate run | Idempotent; no duplicate current forecast |
@@ -264,13 +246,6 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 - [ ] Re-running a forecast from its snapshot reproduces the same band.
 - [ ] No-score gate returns `insufficient_data` for each of the five failure conditions.
 - [ ] Unverified reports are excluded from features (test with an inserted unverified row).
-- [ ] A label is eligible only when `verified_at <= cutoff` and the event date is `<= cutoff` (test).
-- [ ] `probable` enters features only with its evidence tier recorded; `needs_visit`,
-      `duplicate`, `unresolved` and `rejected` never enter (test each).
-- [ ] A negative exists only for a scheduled sentinel visit inside the window; a missing visit
-      is not a negative (test).
-- [ ] Discrimination and calibration are reported only on sentinel-panel negatives, with
-      sample counts and an underpowered flag when below the D8 minimum.
 - [ ] `probability` is null unless calibration is approved.
 - [ ] Forecast response includes issue/validity, coverage, drivers, model version.
 - [ ] Map layers are independently toggleable and never merged server-side.
@@ -278,11 +253,6 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 - [ ] Expired forecasts are marked stale in API and UI.
 - [ ] Demo forecasts are labelled and excluded from operational alerts.
 - [ ] Evaluation report includes temporal + spatial holdout, calibration and sample counts.
-- [ ] The D8 forecast floors were pre-registered before the frozen test season was opened, and
-      every floor is met (share of area-days scored, `insufficient_data` rate, baseline lift,
-      Brier and calibration error), with coverage-stratum breakdowns.
-- [ ] A floor not met fails Gate 4; a re-tune after opening the test set requires a new
-      pre-registration.
 
 ---
 
@@ -299,13 +269,14 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 
 ## 14. Open questions
 
-1. D1/D2 outcomes (crop, targets, horizon) — everything above depends on them.
-2. Which validated rules model applies to the chosen crop? (e.g. BLITECAST/SimCast for
+1. **D1a** — the first validated crop/target allowlist — must be fixed before Gate 3.
+2. **D7** — the exact event definition and negative class — must be frozen before Gate 4.
+3. Which validated rules model applies to each allowlist entry? (e.g. BLITECAST/SimCast for
    potato late blight; Mills table is apple-specific and not transferable.)
-3. Is daily issue cadence supportable by the weather provider's update frequency?
-4. What is the minimum coverage threshold that still permits a scored outlook?
-5. Does the partner need a 7-day outlook for operational planning even if only a nowcast is
-   defensible? If so, label it as experimental.
+4. Is daily issue cadence supportable by the weather provider's update frequency?
+5. What is the minimum coverage threshold that still permits a scored outlook? (D9)
+6. Does the partner need a 7-day outlook for operational planning even if only a nowcast is
+   defensible? If so, label it as experimental and out of v1.
 
 ---
 

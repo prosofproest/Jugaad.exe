@@ -21,12 +21,16 @@ in under two minutes, and escalate the rest with full context preserved.
 
 ## 2. Roles in this feature
 
-| Role | Can do |
+| Role / permission | Can do |
 |---|---|
-| `extension_worker` | Work assigned area queue; set `probable`, `needs_visit`, `duplicate`, `unresolved`; request pathologist confirmation; record scheduled sentinel visits |
-| `pathologist` | All extension actions + `confirmed`, label correction, severity, lab evidence, taxonomy questions |
-| `agronomist` | Read-only area queue and case evidence for advisory and risk context; **cannot** set verification status or correct labels |
-| `admin` | Configure queue rules and SLA; reassign; manage the sentinel panel and visit schedule; **cannot** set verification status |
+| `extension_worker` | Work assigned area queue; set `probable`, `needs_visit`, `duplicate`, `rejected`, `unresolved`; request confirmation from a `can_confirm` holder |
+| `extension_worker` + `can_confirm` | All extension actions + `confirmed`, label correction, severity, lab evidence, taxonomy questions |
+| `extension_worker` + `can_approve_advisory` | Approve advisory content for the area (second approver for high-risk content) |
+| `admin` | Configure queue rules and SLA; reassign; grant `can_confirm` / `can_approve_advisory`; **cannot** set verification status |
+
+`can_confirm` and `can_approve_advisory` are scoped permissions, not roles (ADR-010). If
+no account in an area holds `can_confirm`, cases stop at `probable` and the queue shows a
+visible "no confirmer in area" warning.
 
 ---
 
@@ -37,40 +41,27 @@ Queue (triage)
   ├─ filters: area, crop, target, age, urgency, status, assigned-to-me
   ├─ sort: urgency → uncertainty → age
   └─ open case
-       ├─ Evidence (blind): original image(s), metadata, quality flags,
-       │            assessment version
+       ├─ Evidence: original image(s), metadata, quality flags, model candidates,
+       │            assessment version, forecast context at report time
        ├─ Field context: crop, stage, area (approximate), notes, prior cases
        ├─ Contact: request better image / request field details (logged)
-       ├─ Decision (recorded before any model or forecast context is shown)
-       │    ├─ confirmed        (pathologist only; evidence required)
-       │    ├─ probable         (evidence required)
-       │    ├─ rejected         (evidence required; reason code)
-       │    ├─ duplicate        (link to canonical case)
-       │    ├─ needs_visit      (assign field visit; reason required)
-       │    └─ unresolved       (insufficient evidence; reason required)
-       │         └─ optional: correct label, severity, field observations,
-       │                      lab confirmation (separate evidence tier)
-       └─ Reveal: model candidates and forecast context at report time,
-                  read-only, after the decision is stored
+       └─ Decision
+            ├─ confirmed        (`can_confirm` only; evidence required)
+            ├─ probable         (evidence required)
+            ├─ rejected         (evidence required; reason code)
+            ├─ duplicate        (link to canonical case)
+            ├─ needs_visit      (assign field visit; reason required)
+            └─ unresolved       (insufficient evidence; reason required)
+                 └─ optional: correct label, severity, field observations,
+                              lab confirmation (separate evidence tier)
 ```
-
-**Blinding rules (D7):**
-
-- The primary reviewer records the label before seeing model candidates or the forecast at
-  report time. Those are revealed only after the decision is committed and cannot be edited
-  into the decision.
-- A pre-defined double-read subset is labelled independently by a second reviewer; the pair
-  is used to report inter-rater agreement. Subset size and agreement threshold are set under
-  D8.
-- This is a labelling-integrity control, not a queue-efficiency feature: without it, the same
-  reviews that produce the frozen test labels are contaminated by the model's own output.
 
 ---
 
 ## 4. Verification state machine
 
 ```
-                 ┌────────────► confirmed ◄──── (pathologist only)
+                 ┌────────────► confirmed ◄──── (`can_confirm` only)
                  │                  │
 pending_review ──┼────────────► probable
                  │                  │
@@ -87,7 +78,7 @@ Rules:
 
 - `pending_review` is the default for every submitted report; model output never changes it.
 - Transitions are server-enforced; the client receives the allowed next states.
-- `confirmed` requires `pathologist` role **and** at least one evidence item.
+- `confirmed` requires the `can_confirm` permission **and** at least one evidence item.
 - `duplicate` requires a canonical observation reference.
 - Every transition appends to `review_events`; the current status is a projection.
 - Re-opening a decided case requires a reason and creates a new review event; history is
@@ -116,7 +107,7 @@ urgency = f(severity_hint, model_uncertainty, age, crop_value, area_risk, duplic
 Queue views:
 
 - **My area** (default for extension workers).
-- **Escalations** (pathologist).
+- **Escalations** (`can_confirm` holders and area leads).
 - **Overdue** (any role, read-only for non-owners).
 - **Unassigned** (admin/lead).
 
@@ -132,12 +123,12 @@ the next reviewer or stay unassigned. The cap exists to prevent silent backlog g
 | FR-04-01 | Queue supports filter by area, crop, target, age, status, assignee, urgency | MUST |
 | FR-04-02 | Default sort is urgency → uncertainty → age, with stable tie-breaking | MUST |
 | FR-04-03 | Reviewer can claim/unclaim a case; assignment is audited | MUST |
-| FR-04-04 | Case detail shows original image(s) at full resolution, metadata, quality flags, assessment version and prior evidence before the decision; model candidates and forecast context are hidden until the decision is recorded, then shown read-only | MUST |
+| FR-04-04 | Case detail shows original image(s) at full resolution, metadata, quality flags, candidates, model version, forecast context at report time | MUST |
 | FR-04-05 | Case detail shows prior cases from the same area/user (privacy-scoped) | SHOULD |
 | FR-04-06 | Reviewer can request a better image or more field detail; request is logged and visible to the farmer | MUST |
 | FR-04-07 | Reviewer records one decision from the server-provided state list | MUST |
 | FR-04-08 | Required evidence enforced per decision type | MUST |
-| FR-04-09 | Pathologist-only transitions enforced server-side | MUST |
+| FR-04-09 | `can_confirm`-gated transitions enforced server-side | MUST |
 | FR-04-10 | Label correction records previous label, new label, reviewer, reason | MUST |
 | FR-04-11 | Severity recorded using crop-specific criteria, not a generic scale | SHOULD |
 | FR-04-12 | Lab confirmation is a separate, optional evidence tier | SHOULD |
@@ -146,13 +137,9 @@ the next reviewer or stay unassigned. The cap exists to prevent silent backlog g
 | FR-04-15 | Queue shows backlog, median age and overdue count | MUST |
 | FR-04-16 | Re-opening a decided case requires a reason | MUST |
 | FR-04-17 | Case is locked while another reviewer is editing; lock expires | MUST |
-| FR-04-18 | Reviewer can escalate to pathologist with a note | MUST |
+| FR-04-18 | Reviewer can escalate to a `can_confirm` holder with a note | MUST |
 | FR-04-19 | Verified projection updates atomically with the decision | MUST |
 | FR-04-20 | Reviewer cannot see precise farm coordinates unless role permits | MUST |
-| FR-04-21 | Primary decision is recorded before model candidates and forecast context are revealed; reveal is read-only | MUST |
-| FR-04-22 | A pre-defined double-read subset is labelled independently and inter-rater agreement is reported | MUST |
-| FR-04-23 | An extension worker or partner can record a scheduled sentinel visit (site, target, present/absent/indeterminate, evidence); only scheduled in-window visits can become forecast negatives | MUST |
-| FR-04-24 | Sentinel site membership and visit schedule are pre-registered and versioned; the client cannot create a site ad hoc | MUST |
 
 ---
 
@@ -160,7 +147,7 @@ the next reviewer or stay unassigned. The cap exists to prevent silent backlog g
 
 | Decision | Minimum evidence |
 |---|---|
-| `confirmed` | Pathologist role + image review note + (field observation or lab evidence) |
+| `confirmed` | `can_confirm` permission + image review note + (field observation or lab evidence) |
 | `probable` | Image review note + at least one supporting observation |
 | `rejected` | Reason code (`not_a_plant`, `healthy`, `abiotic`, `different_pest`, `poor_image`, `other`) + note |
 | `duplicate` | Canonical observation ID |
@@ -178,16 +165,14 @@ Required blocks, in order:
 
 1. **Header:** case ID, crop, area, submitted time, current status, SLA/overdue.
 2. **Image:** original at full resolution, zoom, quality flags, capture metadata.
-3. **Field context:** growth stage, variety, notes, prior cases.
-4. **History:** submissions, review requests, prior decisions, corrections.
-5. **Decision panel:** allowed decisions, required evidence, submit.
-6. **After the decision is stored:** model candidates with qualitative confidence,
-   abstention state, model version and generated time, plus the area forecast at report
-   time. Read-only; never editable into the decision (D7).
+3. **Model view:** candidates with qualitative confidence, abstention state, model
+   version, generated time, "not a diagnosis" reminder.
+4. **Context:** growth stage, variety, notes, prior cases, forecast at report time
+   (clearly labelled as area-level).
+5. **History:** submissions, review requests, prior decisions, corrections.
+6. **Decision panel:** allowed decisions, required evidence, submit.
 
-Do not hide model limitations behind a tooltip; they belong in the model block. But the
-block appears only after the primary label is recorded, so the label cannot be anchored to
-the model's answer.
+Do not hide model limitations behind a tooltip; they belong in the model block.
 
 ---
 
@@ -200,11 +185,9 @@ the model's answer.
 | `POST` | `/v1/reviews/{observation_id}/claim` | Claim/unclaim |
 | `GET` | `/v1/reviews/{observation_id}` | Case detail + allowed transitions |
 | `POST` | `/v1/reviews/{observation_id}/decisions` | Record decision |
-| `POST` | `/v1/reviews/{observation_id}/escalate` | Escalate to pathologist |
+| `POST` | `/v1/reviews/{observation_id}/escalate` | Escalate to a `can_confirm` holder |
 | `POST` | `/v1/reviews/{observation_id}/request-info` | Ask farmer for retake/details |
 | `GET` | `/v1/reviews/{observation_id}/events` | Immutable history |
-| `GET` | `/v1/sentinel/sites` | Pre-registered panel and visit schedule for the reviewer's area |
-| `POST` | `/v1/sentinel/visits` | Record a scheduled sentinel visit (present/absent/indeterminate) |
 
 ### Decision request
 
@@ -278,7 +261,8 @@ version.
 
 - [ ] Queue default sort is urgency → uncertainty → age, with a documented formula.
 - [ ] An extension worker sees only their assigned area.
-- [ ] An extension worker cannot submit `confirmed` (403) — tested.
+- [ ] An extension worker without `can_confirm` cannot submit `confirmed` (403) — tested.
+- [ ] An extension worker with `can_confirm` can submit `confirmed` — tested.
 - [ ] `confirmed` without evidence is rejected by the server — tested.
 - [ ] A decision writes exactly one review event and one audit event.
 - [ ] `duplicate` requires a valid canonical ID and updates aggregate counts.
@@ -286,12 +270,6 @@ version.
 - [ ] Concurrent edit is prevented by a soft lock with expiry.
 - [ ] Re-opening a case requires a reason and preserves history.
 - [ ] Backlog, median age and overdue counts match the underlying data.
-- [ ] Model candidates and forecast context are hidden until a decision is recorded (test).
-- [ ] `probable` decisions retain their evidence tier; `unverified` never enters the
-      forecast projection (test).
-- [ ] A double-read subset is labelled independently and agreement is reported.
-- [ ] A scheduled sentinel visit can be recorded; an unscheduled or out-of-window visit is
-      never counted as a negative (test).
 - [ ] A verified decision updates the forecast-visible projection atomically.
 - [ ] No precise coordinates are exposed to a role without permission.
 
@@ -320,13 +298,11 @@ escalation rate, duplicate rate, correction rate, backlog trend.
 
 ## 16. Open questions
 
-1. What is the daily review capacity per extension worker, and what SLA is realistic?
-2. ~~Does `probable` count as verified for forecast features, or only `confirmed`?~~
-   **Resolved by D7 (2026-11-06):** `probable` is eligible with an evidence tier;
-   `confirmed` is eligible; `unverified`, `needs_visit`, `duplicate`, `unresolved` and
-   `rejected` never are.
-3. Should extension workers be able to set `confirmed` for a small, high-confidence target
-   list after training?
+1. What is the daily review capacity per extension worker, and what SLA is realistic? (D3b)
+2. Does `probable` count as verified for forecast features, or only `confirmed`?
+   (Recommendation: both, with an evidence tier; `unverified` never counts.) (D7)
+3. Which `extension_worker` accounts should receive `can_confirm` in each pilot area, and
+   how is that permission revoked when someone leaves? (D3b)
 4. Is a lab-confirmation integration in scope, or only manual entry of a result?
 
 ---
@@ -343,5 +319,6 @@ escalation rate, duplicate rate, correction rate, backlog trend.
 | App. F — Example test cases | §13 acceptance criteria |
 
 The rule that a model output is never copied into a decision comes from
-`../docs-context/AGENTS.md` R4. The rule that `confirmed` needs a pathologist and structured
-evidence is enforced in the database and service layers (`05-data-layer.md` §5).
+`../docs-context/AGENTS.md` R4. The rule that `confirmed` needs the `can_confirm` permission
+and structured evidence is enforced in the database and service layers
+(`05-data-layer.md` §5, ADR-010).

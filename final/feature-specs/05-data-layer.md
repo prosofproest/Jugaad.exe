@@ -58,7 +58,6 @@ growing_areas ── crop_cycles ── observations ─┬─ image_assets ─�
 observations ── observation_verification (projection)
 
 geographies (versioned boundaries)
-sentinel_sites ── sentinel_visits (forecast negatives, D7)
 weather_snapshots
 forecasts ── feature_snapshots
 advisories ── advisory_versions ── advisory_approvals
@@ -76,7 +75,8 @@ audit_events
 | Table | Key columns | Notes |
 |---|---|---|
 | `users` | id, phone_e164 (unique, nullable), email (unique, nullable), password_hash, status, locale, token_version, created_at, deleted_at | Farmer has phone; staff has email |
-| `roles` | code (`farmer`,`extension_worker`,`pathologist`,`agronomist`,`admin`), description | Seeded |
+| `roles` | code (`farmer`,`extension_worker`,`admin`), description | Seeded |
+| `user_permissions` | user_id, permission (`can_confirm`,`can_approve_advisory`), granted_by, granted_at, revoked_at | Scoped permissions; audited |
 | `user_roles` | user_id, role_code, granted_by, granted_at, revoked_at | History preserved |
 | `devices` | id, user_id, platform, app_version, last_seen_at, push_token | No advertising IDs |
 | `consents` | id, user_id, type, version, granted, text_hash, channel, created_at | Append-only |
@@ -101,7 +101,7 @@ audit_events
 | `observations` | id, client_report_id, user_id (creator), subject_user_id (on-behalf), growing_area_id, crop_code, variety, growth_stage, notes, captured_at, submitted_at, status, created_at | `unique(user_id, client_report_id)` |
 | `image_assets` | id, observation_id, storage_key, original_width, original_height, bytes, content_hash, mime, source (`camera`,`gallery`), compression (jsonb), upload_status, created_at | Private bucket |
 | `image_quality_results` | id, image_id, gate_version, result, flags (jsonb), thresholds (jsonb), created_at | Insert-only |
-| `image_predictions` | id, image_id, model_version, candidates (jsonb), probabilities (jsonb), confidence_band, calibrated (bool), calibration_version, abstained (bool), abstain_reason, decision_thresholds (jsonb: per-class `τ_c`, margin `m`, entropy `h`, `ood_max`), ood_score, generated_at | Insert-only; thresholds and OOD stored per row so the decision is reproducible (D8) |
+| `image_predictions` | id, image_id, model_version, candidates (jsonb), confidence_band, calibrated (bool), abstained (bool), abstain_reason, generated_at | Insert-only |
 | `review_requests` | id, observation_id, requested_by, reason, status, created_at | |
 
 Observation status values:
@@ -117,15 +117,6 @@ Observation status values:
 | `review_events` | id, observation_id, from_status, to_status, actor_id, reason, created_at | Immutable |
 | `observation_verification` | observation_id (PK), status, evidence_tier (`confirmed`,`probable`,`unverified`,`rejected`,`duplicate`,`needs_visit`,`unresolved`), verified_at, verified_by, review_id | Derived projection; rebuildable |
 | `review_assignments` | observation_id, user_id, assigned_at, expires_at | Soft lock |
-| `sentinel_sites` | id, crop_code, geo_code, precision, geom, active_from, active_to, panel_version, approved_by | Pre-registered absence-sampling panel (D7); no post-hoc selection |
-| `sentinel_visits` | id, site_id, visit_date, scheduled (bool), observer_id, target_code, observed (`present`,`absent`,`indeterminate`), evidence_ref, created_at | Sole source of forecast negatives; a missing visit is never a negative |
-
-**Forecast label eligibility (D7):** a case enters forecast features only when its status is
-`confirmed` or `probable`, `verified_at <= cutoff`, and its event date is `<= cutoff`.
-`probable` retains its `evidence_tier` as a lower-confidence flag. `unverified`,
-`needs_visit`, `duplicate`, `unresolved` and `rejected` are never eligible. A `sentinel_visits`
-row is a negative only when `scheduled = true`, `observed = 'absent'`, the target is
-supported, the visit is inside the label window, and the D9 coverage gate passed.
 
 ### 4.5 Forecast and weather
 
@@ -172,15 +163,6 @@ FOR EACH ROW EXECUTE FUNCTION reject_mutation();
 ALTER TABLE image_predictions
   ADD CONSTRAINT fk_prediction_image FOREIGN KEY (image_id) REFERENCES image_assets(id);
 
--- An abstention must carry a reason; the threshold set must be stored for reproduction
-ALTER TABLE image_predictions
-  ADD CONSTRAINT ck_abstain_has_reason
-    CHECK (abstained = false OR abstain_reason IS NOT NULL),
-  ADD CONSTRAINT ck_prediction_thresholds
-    CHECK (decision_thresholds IS NOT NULL),
-  ADD CONSTRAINT ck_calibration_version
-    CHECK (calibrated = false OR calibration_version IS NOT NULL);
-
 -- Idempotent observation creation
 ALTER TABLE observations
   ADD CONSTRAINT uq_observation_client UNIQUE (user_id, client_report_id);
@@ -204,7 +186,7 @@ Additional rules enforced in services:
 
 - A forecast with `coverage = 'low'` must be `insufficient_data`, not a scored band.
 - `confirmed` verification requires a review with a `lab_result` or `field_observation`
-  evidence row and a `pathologist` actor.
+  evidence row and an actor holding the `can_confirm` permission.
 - Advisory serving requires at least one `advisory_approvals` row and `valid_to` in the
   future.
 
@@ -240,25 +222,26 @@ Additional rules enforced in services:
 
 ---
 
-## 8. Object storage layout
+## 8. Image storage layout (Cloudinary)
 
 ```
-s3://<private-bucket>/
-  observations/<yyyy>/<mm>/<observation_id>/<image_id>/original.<ext>
-  observations/<yyyy>/<mm>/<observation_id>/<image_id>/preview.jpg
+crop-sentinel/
+  observations/<yyyy>/<mm>/<observation_id>/<image_id>/original
+  observations/<yyyy>/<mm>/<observation_id>/<image_id>/preview
   advisories/<advisory_id>/<version>/<file>
-  models/<kind>/<version>/<artefact>
   exports/<export_job_id>/<file>
 ```
 
 Rules:
 
-- Private bucket; access only via short-lived presigned URLs (≤ 10 min).
+- Private delivery; access only via short-lived signed URLs (≤ 10 min).
+- Store `public_id` + `version`; never treat a permanent delivery URL as truth.
 - Content-addressed checksum stored; duplicates detected by hash.
-- Original retained; derivatives separate and regenerable.
+- Original retained; derivatives generated by transformation and regenerable.
 - EXIF GPS stripped unless explicitly consented and needed.
-- Lifecycle policy per data class; deletion propagates to derivatives and previews.
-- No public read ACLs; no directory listing.
+- Deletion removes the asset and all derivatives; no orphaned assets.
+- No unsigned upload presets; no client-side listing; no public IDs enumerable across users.
+- Model artefacts live in a private model-artefact store, not in Cloudinary.
 
 ---
 
@@ -293,7 +276,7 @@ Rules:
 | Observations + images | Programme policy (TBD with legal) | Soft delete → hard delete job; derivatives removed |
 | Predictions/reviews/audit | Longer than case data; audit immutable | Never hard-deleted except legal order |
 | Weather/feature snapshots | Retain for forecast reproducibility | Archive after configured period |
-| Sessions/OTP/presigned URLs | Short TTL | Purged by job |
+| Sessions/OTP/signed URLs | Short TTL | Purged by job |
 | Exports | Short TTL | Deleted after download window |
 | Backups | Documented rotation | Deletion propagates on next restore cycle |
 
@@ -319,15 +302,7 @@ hard delete → retain audit and non-identifying aggregates → record completio
 - [ ] `unique(user_id, client_report_id)` prevents duplicate observations.
 - [ ] Update/delete on prediction, review and audit tables is rejected.
 - [ ] A forecast cannot be inserted without a feature snapshot and model version.
-- [ ] Forecast label queries exclude `unverified`, `needs_visit`, `duplicate`, `unresolved` and
-      `rejected`, include `confirmed` and `probable` with evidence tier, and enforce
-      `verified_at <= cutoff` plus event date `<= cutoff` (test).
-- [ ] A `sentinel_visits` row is a negative only when scheduled, absent, in-window and
-      coverage-passing; a missing visit is not a negative (test).
-- [ ] Every `image_predictions` row stores `decision_thresholds` (per-class `τ_c`, margin,
-      entropy, `ood_max`) and `ood_score`; the abstention decision is reproducible from them.
-- [ ] An abstained prediction has a reason code; a calibrated prediction has a
-      `calibration_version` (test the check constraints).
+- [ ] An unverified observation is excluded from forecast feature queries (test).
 - [ ] Precise geometry is absent from API responses for unauthorised roles (test).
 - [ ] Small-count suppression is enforced in the query layer (test).
 - [ ] Advisory retrieval fails when no approval exists (test).
@@ -351,9 +326,10 @@ hard delete → retain audit and non-identifying aggregates → record completio
 ## 15. Open questions
 
 1. Final retention periods (legal/programme decision).
-2. Do we need historical boundary versions beyond the current pilot period?
-3. What is the target RTO/RPO for the pilot?
-4. Is a read replica needed for dashboard load at pilot scale? (Likely no.)
+2. Is `probable` used as a positive label in forecast features, or only `confirmed`?
+3. Do we need historical boundary versions beyond the current pilot period?
+4. What is the target RTO/RPO for the pilot?
+5. Is a read replica needed for dashboard load at pilot scale? (Likely no.)
 
 ---
 

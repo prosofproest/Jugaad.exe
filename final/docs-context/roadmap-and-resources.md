@@ -130,7 +130,7 @@ The live register with IDs, likelihood, impact, owner and status is maintained i
 1. Who funds and owns the service after the pilot? (D4)
 2. What is the daily verification capacity and SLA? (D3)
 3. What is the legal position on advisory content? (D6)
-4. Which provider operates SMS/WhatsApp, and at what per-message cost?
+4. Which provider operates SMS (if any), and at what per-message cost?
 5. Is the pilot timed to the epidemic season?
 
 These are tracked in `./progress-tracker.md` §4 and must be resolved before the phases that

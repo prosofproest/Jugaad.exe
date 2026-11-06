@@ -78,9 +78,9 @@ Phase 6  Rollout
 
 | Work | Cannot start until | Why |
 |---|---|---|
-| Any schema code | D1 (crop/target/zone) | Entity choices, enums and config depend on the supported list |
+| Any schema code | D1 policy (decided in ADR-011); first allowlist D1a before scoring | Crop/target schema is open-ended, but no model may be served before the allowlist exists |
 | Image model training on field data | Permissioned dataset + frozen field test set | R6/R10: no training on undocumented data |
-| Forecast implementation | D1, D2, event definition | Target, horizon and labels define the task |
+| Forecast implementation | D1 policy (decided), D1a, D2 (decided), event definition | Target, horizon and labels define the task |
 | Operational alerts | Gate 5 | Silent phase must produce evidence first |
 | Expansion to a new crop/zone | Evidence + capacity review | Expansion rule in `project-overview.md` §8 |
 
@@ -101,32 +101,50 @@ pilot design. No code that depends on an unresolved decision may start.
 
 **Entry condition:** repository documentation baseline exists (current state).
 
-### 3.1 Resolve the six blocking decisions (D1–D6)
+### 3.1 Close the blocking decisions (D1–D6, D13–D15)
 
-- **D1 — Crop + 3–5 targets + agro-climatic zone.** Score candidate crops on economic
-  importance to smallholders, existing extension presence, visual distinctness of symptoms,
-  availability of approved advisory content, and existence of a validated weather-driven
-  risk model. Define the class list explicitly: targets, healthy, abiotic look-alike,
-  unknown/other. Name the differential look-alikes for each target.
-- **D2 — Nowcast or 7-day outlook.** Decide the v1 horizon, issue cadence, validity window
-  and what "expired" means. Record the reason: early forecasts need outcome history that
-  does not exist yet.
-- **D3 — Verifier role, capacity and SLA.** Name who verifies, expected cases/day, triage
-  rules, escalation path to a pathologist, workload cap, compensation and review SLA.
+**Decided 2026-11-06:**
+
+- **D1 — Crop/target policy.** Open, crop-agnostic catalogue with a validated-target
+  allowlist (ADR-011). Any crop is registrable; a photo is assessed only for allowlisted
+  `crop × target` pairs; everything else returns `unsupported_crop`, `unsupported_target` or
+  `insufficient_quality`.
+- **D2 — Horizon.** Nowcast over the last 10 days. A 7-day outlook is deferred until a
+  season of verified outcomes exists.
+- **D3 — Verifier model.** Extension-worker-first; `confirmed` requires the scoped
+  `can_confirm` permission; `admin` does not verify (ADR-010). Capacity, SLA and escalation
+  remain **D3b** and block Gate 0.
+- **D6 — Advisory content.** Non-chemical only; expert-approved, versioned, with mandatory
+  expiry. Legal review confirms wording before Gate 5.
+- **D13 — Languages.** English + Kannada, with a persisted language choice.
+- **D14 — Output semantics.** Qualitative confidence band plus abstention; numeric
+  probability only when calibration is approved for that allowlist entry; severity is an
+  expert-review field, not a model claim.
+- **D15 — Channels.** In-app mandatory; email for staff; SMS optional per partner;
+  WhatsApp, push and IVR deferred.
+
+**Still open and blocking Gate 0:**
+
+- **D1a — First validated allowlist.** One crop, 3–5 conditions, one agro-climatic zone.
+  Score candidates on economic importance to smallholders, existing extension presence,
+  visual distinctness of symptoms, availability of approved advisory content, and existence
+  of a validated weather-driven risk model. Define the class list explicitly: targets,
+  healthy, abiotic look-alike, unknown/other. Name the differential look-alikes.
+- **D3b — Verifier capacity and SLA.** Named verifiers per area, cases/day, triage rules,
+  escalation path to a `can_confirm` holder, workload cap, compensation and review SLA.
 - **D4 — Owning/paying institution.** Identify the post-pilot owner and funding path. Record
   data ownership, hosting responsibility and service-life assumptions.
 - **D5 — Primary outcome metric.** Pre-register one primary metric, recommended: median lead
   time from first farmer report to verified expert confirmation, versus the existing
   advisory baseline. Define baseline measurement and comparison method.
-- **D6 — Legal position on advisory content.** Confirm non-chemical-only guidance, legal
-  review route, disclaimer wording and escalation policy.
 
 ### 3.2 Partners, governance and ethics
 
 - Draft MoUs/LOIs with extension services, plant clinics, universities and the data owner.
 - Agree data-sharing, image ownership, publication rights, retention and deletion.
 - Open the DPIA and ethics/IRB process; confirm consent wording in the local language.
-- Name the field operations lead, agronomist/pathologist reviewer and data owner.
+- Name the field operations lead, a `can_confirm` holder, a `can_approve_advisory` holder and
+  the data owner.
 - Build the stakeholder responsibility matrix (who collects, verifies, approves, responds).
 
 ### 3.3 Agronomic groundwork
@@ -245,7 +263,7 @@ its gate.
   reviews, alerts, audit, consent and model registry.
 - Use stable IDs, foreign keys, status constraints, source timestamps and append-only
   prediction/review/audit rows. Use PostGIS only where spatial queries are needed.
-- Set up migrations (Alembic), object-storage layout, presigned URL rules and backup design.
+- Set up migrations (Alembic), Cloudinary image layout, signed-URL rules and backup design.
 - Seed only clearly labelled `is_demo` data.
 
 ### 4.6 Weather, boundaries and historical records
@@ -291,7 +309,7 @@ its gate.
 
 - Documented permission for every dataset used.
 - Ingestion is reproducible from raw source to model-ready version.
-- Label handbook approved by a pathologist.
+- Label handbook approved by a `can_confirm` holder and an agronomist.
 - Data dictionary and quality checks exist for every field.
 - Field test set frozen before model selection.
 - Unverified reports are excluded from forecast features (tested).
@@ -317,8 +335,9 @@ Phase 3 supplies the real model.
 
 ### 5.1 Engineering foundation
 
-- Scaffold `backend/`, `mobile/`, `web/`, `database/` and `deploy/` with the approved stack.
-- Stand up three coordinated deliverables: FastAPI backend, Next.js web app and Flutter
+- Scaffold `backend/`, `frontend/web/`, `frontend/mobile/`, `database/` and `deploy/` with
+  the approved stack.
+- Stand up three coordinated deliverables: FastAPI backend, Next.js web app and React Native
   mobile app, all consuming the same `/v1` API.
 - Set up CI, linting, test runners, migrations, local compose, `dev`/`staging` environments,
   secret management and structured logging.
@@ -327,17 +346,19 @@ Phase 3 supplies the real model.
 
 ### 5.2 Identity, roles, consent and privacy
 
-- Implement phone-OTP registration for farmers; provisioned accounts for extension workers,
-  pathologists, agronomists and admins.
-- Five roles only; deny by default; object-level access checks; MFA for
-  pathologist/agronomist/admin.
+- Implement phone-OTP registration for farmers; provisioned accounts for extension workers
+  and admins.
+- Three roles only (farmer, extension_worker, admin); `can_confirm` and
+  `can_approve_advisory` as scoped permissions (ADR-010); deny by default; object-level
+  access checks; MFA for admin and `can_confirm` holders.
 - Capture consent in plain language; record consent version and timestamp.
 - Add privacy-request handling, retention jobs and account deletion procedures.
 - Audit role changes, admin record views and exports with a recorded reason.
 
 ### 5.3 Mobile context and capture
 
-- Onboarding, language preference, supported-crop list and approximate-area selection.
+- Onboarding, language preference (English/Kannada), open crop catalogue with assessment
+  status and approximate-area selection.
 - Crop-cycle setup with optional variety, growth stage and notes; "unknown" is first-class.
 - Camera/gallery capture with framing, lighting and distance guidance.
 - On-device pre-check for blur, exposure, resolution and plant presence; retake without
@@ -357,7 +378,8 @@ Phase 3 supplies the real model.
 
 ### 5.5 Observation and media backend
 
-- Create observation before upload; presigned upload URLs; validate type, size and corruption.
+- Create observation before upload; signed Cloudinary upload descriptors; validate type,
+  size and corruption.
 - Enforce duplicate prevention and append-only observation history.
 - Store approximate location only; restrict exact geometry by role.
 - Case retrieval, pagination, structured errors, rate limits and idempotent endpoints.
@@ -370,7 +392,7 @@ Phase 3 supplies the real model.
 - Case detail: original image, crop context, capture date, image quality, model candidates
   (placeholder until Phase 3), prior reviews and forecast context.
 - Verification states: confirmed, probable, rejected, duplicate, needs-visit, unresolved.
-  `confirmed` requires the pathologist role.
+  `confirmed` requires the `can_confirm` permission.
 - Evidence notes required for high-impact decisions; label correction with revision history.
 - "Needs better image" and "needs field visit" actions.
 - Governance: reviewer identity, timestamps, edits and advisory approvals logged.
@@ -380,7 +402,7 @@ Phase 3 supplies the real model.
 - Build a `conversations` module in the backend: threads, append-only messages, attachments,
   events and idempotent send.
 - Ship the chat surface on **both** frontends:
-  - Flutter: `ChatList` and `ChatThread`, camera/gallery attach, offline queue.
+  - React Native: `ChatList` and `ChatThread`, camera/gallery attach, offline queue.
   - Next.js: `/chat` and `/chat/[conversationId]`, file picker/drag-drop, optimistic send.
 - Composer: image plus optional crop, growth stage, approximate area and short note.
 - Reply is a structured `AssessmentMessage` (`assessment`, `abstained`, `unsupported_crop`,
@@ -393,7 +415,7 @@ Phase 3 supplies the real model.
 
 ### 5.8 Admin configuration
 
-- Manage crops, targets, geographies and boundary versions.
+- Manage crop catalogue, targets, the validated allowlist and geographies/boundary versions.
 - Manage users, roles and partner assignments.
 - Configure threshold and alert-policy placeholders without inline numbers in code.
 - Export controls: role check, purpose, row limit, PII exclusion, audit.
@@ -420,8 +442,8 @@ Phase 3 supplies the real model.
 
 ### Deliverables
 
-- Flutter mobile app (field-staff ready, with chat), FastAPI monolith (with `conversations`
-  module), Next.js web app (chat, review portal and admin console).
+- React Native mobile app (field-staff ready, with chat), FastAPI monolith (with
+  `conversations` module), Next.js web app (chat, review portal and admin console).
 - Migrated schema slices and seed data labelled `is_demo`.
 - Test matrix with executed evidence.
 - Audit trail and telemetry events.
@@ -484,32 +506,18 @@ explain itself. It assists a human; it never diagnoses.
 
 ### 6.4 Calibration, confidence and abstention
 
-- Calibrate with temperature scaling on a dedicated calibration split, separate from the
-  model-selection validation split; isotonic only if sample size supports it. If a separate
-  split is not supportable, calibration is not approved and only qualitative bands are shown
-  (D8).
-- Implement the D8 decision function: per-class `τ_c`, top-1/top-2 margin, entropy and an
-  explicit out-of-distribution score, plus quality-gate and unsupported-crop states.
-- Choose thresholds on validation using hard negatives; never optimise them on the test set.
-- Set the operating point safety-first: per-class recall floors take precedence over coverage;
-  a coverage floor prevents an abstain-everything model from passing.
-- Measure risk–coverage curves per class and subgroup; pre-register the D8 image floors in
-  `progress-tracker.md` before opening the frozen test set.
-- Define confidence bands from calibrated probabilities and the wording for each; if
-  calibration is not approved, bands are qualitative only.
-- Define unsupported-crop and out-of-domain behaviour, including held-out-class evaluation.
-- Audit the score vector, threshold set (including OOD), calibration version, model version
-  and explanation metadata.
-- No user-facing control changes a model output; manual review decisions are separate and
-  audited.
+- Calibrate scores on representative validation data; otherwise use qualitative bands.
+- Choose abstention thresholds on validation using hard negatives; never optimise them on the
+  test set.
+- Define confidence bands and the wording for each.
+- Define unsupported-crop and out-of-domain behaviour.
+- Audit the score vector, threshold, model version and explanation metadata.
 
 ### 6.5 Evaluation
 
-- Report macro F1, per-class precision/recall, confusion matrix, top-k, calibration
-  (ECE/reliability, Brier) and OOD (unknown-vs-known AUROC, false-accept rate) on the frozen
-  field test set.
-- Report the abstention rate and performance **at the shipped threshold**, with sample counts,
-  and confirm every pre-registered D8 floor is met.
+- Report macro F1, per-class precision/recall, confusion matrix, top-k and calibration
+  (ECE/reliability) on the frozen field test set.
+- Report the abstention rate and performance **at the shipped threshold**, with sample counts.
 - Break down by variety, geography, season, device, lighting and image quality.
 - Test robustness: blur, shadow, background, leaf age, distance.
 - Record limitations and failure modes explicitly; no aggregate metric without breakdown.
@@ -530,20 +538,16 @@ explain itself. It assists a human; it never diagnoses.
   result screen; one source of truth, no chat-only variant.
 - Show up to three candidates, qualitative confidence, quality flags, model version and
   generated time.
-- Abstention shows the machine reason code in plain language, retake path and escalation; no
-  candidate list and no risk colour.
+- Abstention shows the reason, retake path and escalation; no candidate list.
 - Unsupported crop shows the supported list and escalation; never a forced class.
 - Include "not a diagnosis" wording and a route to expert review.
-- No control changes a model output; retake creates a new assessment and escalation opens
-  review (D8).
 - Keep all strings externalised for translation.
 
 ### Deliverables
 
 - Quality-gate module with reason codes and tests.
 - Trained image model, preprocessing config and experiment record.
-- Evaluation report on the frozen field test set, including abstention, calibration, OOD and
-  subgroups, with the D8 floors pre-registered before the set was opened.
+- Evaluation report on the frozen field test set, including abstention and subgroups.
 - ONNX artefact and approved registry entry.
 - Versioned inference endpoint and append-only prediction records.
 - Assessment result card with abstention, quality flags and escalation.
@@ -551,13 +555,11 @@ explain itself. It assists a human; it never diagnoses.
 ### Exit gate — Gate 3
 
 - Performance is reported at the shipped abstention threshold on a field-only test set, with
-  sample counts and subgroup breakdowns; the pre-registered D8 floors are **met**.
-- Abstention works on hard negatives and unsupported inputs; calibration and OOD are
-  evaluated, and OOD is measured on held-out classes.
-- No unsupported percentage confidence is displayed; `not_calibrated` is a word, not a number.
-- No user-facing control overrides a model output.
-- The model is registered, approved and version-pinned in served predictions, and the
-  prediction row carries the threshold set used.
+  sample counts and subgroup breakdowns.
+- Abstention works on hard negatives and unsupported inputs.
+- Quality gate failures return actionable reasons and never block submission.
+- No unsupported percentage confidence is displayed.
+- The model is registered, approved and version-pinned in served predictions.
 
 ### Not in this phase
 
@@ -575,8 +577,7 @@ explain itself. It assists a human; it never diagnoses.
 **Objective:** produce a transparent, reproducible area outlook with an explicit no-score
 state, show it separately from observed reports, and connect approved guidance and alerts.
 
-**Entry condition:** Gate 3 met; D1, D2 and D7 (event, negative class, label eligibility)
-recorded, with the sentinel panel and visit schedule committed under D3.
+**Entry condition:** Gate 3 met; D1a, D2 and the event definition (D7) are recorded.
 
 ### 7.1 Task definition and event semantics
 
@@ -584,14 +585,7 @@ recorded, with the sentinel panel and visit schedule committed under D3.
   threshold, escalation or another operational outcome.
 - Fix crop × target × geography × issue time × horizon; define the smallest defensible
   spatial unit.
-- Define negative labels as verified absence from pre-registered sentinel-panel visits inside
-  the label window, never "no report" and never "no visit" (D7).
-- Define label eligibility: `confirmed` or `probable` with evidence tier, `verified_at <=
-  cutoff` and event date `<= cutoff`; every other verification state is excluded (D7).
-- Register the sentinel panel, visit cadence, observers and coverage condition before the
-  season; no post-hoc site selection.
-- Record the primary review blind, then reveal candidates and forecast context; run the
-  double-read subset for agreement (D7).
+- Define negative labels as verified absence within coverage, never "no report".
 - Define issue cadence, validity and expiry; keep different event types as separate tasks.
 - Document the surveillance-bias treatment and how coverage is represented.
 
@@ -610,7 +604,7 @@ recorded, with the sentinel panel and visit schedule committed under D3.
 - Weather windows: rolling rainfall, temperature ranges, humidity and consecutive wet days.
 - Crop: type, stage, planting window, variety and irrigation context.
 - Seasonal: week of year, monsoon period, days since planting, local crop calendar.
-- Historical pressure: lagged eligible labels, nearby verified reports, prior-season
+- Historical pressure: lagged verified cases, nearby verified reports, prior-season
   occurrence.
 - Coverage: active reporters, visits, completeness and data freshness.
 - Enforce the leakage rule: every feature must be computable at `issue_time`.
@@ -632,9 +626,7 @@ recorded, with the sentinel panel and visit schedule committed under D3.
 ### 7.5 Calibration, thresholds and validation
 
 - Assess reliability diagrams, Brier score and log loss on a temporal holdout; spatial
-  holdout where data allows. Report discrimination and calibration only on sentinel-panel
-  negatives; if the panel is below the D8 minimum, mark the metric underpowered and do not
-  gate on it (D7).
+  holdout where data allows.
 - Set band thresholds from validated probabilities or a documented expert-approved score.
 - Balance false alarms against missed events using the cost of each error.
 - Review thresholds when the crop calendar, reporting patterns or calibration change.
@@ -646,7 +638,7 @@ recorded, with the sentinel panel and visit schedule committed under D3.
   boundaries.
 - Filters: crop, target, date/horizon, risk band, verification status, admin level.
 - Legend, issue time, expiry, horizon, drivers and plain-language explanation always visible.
-- Aggregate to the supported admin unit; suppress small counts; no exact farm points.
+- Aggregate to the configured admin unit; suppress small counts; no exact farm points.
 - Summary panels: new reports, verified cases, forecast distribution, freshness and backlog.
 - Use server-side aggregation or vector tiles when data volume requires it.
 - Never merge reports and predictions into one undifferentiated heatmap.
@@ -664,7 +656,8 @@ recorded, with the sentinel panel and visit schedule committed under D3.
 
 - Trigger only on validated risk threshold + data freshness + minimum coverage.
 - Deduplicate repeated signals for the same area/target; severity-specific cooldowns.
-- Channels: SMS/WhatsApp (and push only where justified); per-user preference.
+- Channels (D15): in-app mandatory, email for staff, SMS optional per partner; WhatsApp,
+  push and IVR deferred; per-user preference.
 - Include area, crop, target, valid period, reason and next action.
 - Never label a forecast as a confirmed outbreak.
 - Track delivery status, acknowledgement, feedback and opt-out.
@@ -679,8 +672,6 @@ recorded, with the sentinel panel and visit schedule committed under D3.
 ### Deliverables
 
 - Written task/event definition and spatial-unit decision.
-- Sentinel-panel protocol: site list, visit schedule, observer assignment, coverage condition
-  and label-window definition.
 - Expert-approved, versioned rules baseline.
 - Feature pipeline with immutable snapshots and lineage.
 - Forecast generation job with no-score behaviour and idempotency.
@@ -693,10 +684,6 @@ recorded, with the sentinel panel and visit schedule committed under D3.
 
 - A forecast is reproducible from a stored snapshot.
 - The no-score path is verified and visible.
-- Sentinel-panel membership and visit schedule are frozen; label eligibility (`verified_at`
-  and event date `<= cutoff`, `confirmed`/`probable` only) is enforced in the query and tested.
-- Discrimination and calibration are reported only on sentinel-panel negatives, with sample
-  counts and an underpowered flag where applicable.
 - The map never merges reports and predictions; coverage is always visible.
 - Band thresholds and actions are approved by an agronomist with a review date.
 - Advisory content is approved, versioned and non-chemical.
@@ -740,7 +727,8 @@ aligns with the epidemic window.
 
 - Run the review queue with the agreed SLA, triage rules and workload cap.
 - Track backlog, time-to-review, escalation rate and reviewer load.
-- Escalate pathologist-only decisions; record evidence and corrections.
+- Escalate `can_confirm`-gated decisions to a qualified holder; record evidence and
+  corrections.
 - Hold weekly review of queue health and data coverage; adjust staffing, not verification
   standards.
 
