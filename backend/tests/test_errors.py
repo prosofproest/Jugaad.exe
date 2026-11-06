@@ -1,7 +1,10 @@
 """Every failure path returns the same problem-details envelope."""
 
 from app.main import app
+from app.modules.identity.dependencies import set_identity_service
 from fastapi.testclient import TestClient
+
+from tests.support_identity import bootstrap_admin, login, make_identity_service
 
 client = TestClient(app)
 
@@ -20,7 +23,18 @@ def test_unknown_route_returns_problem_details() -> None:
 
 
 def test_validation_error_lists_fields() -> None:
-    response = client.post("/v1/conversations", json={"title": "x" * 200})
+    service_instance, _sender, clock = make_identity_service()
+    bootstrap_admin(service_instance)
+    set_identity_service(service_instance)
+    try:
+        tokens = login(service_instance, clock)
+        response = client.post(
+            "/v1/conversations",
+            json={"title": "x" * 200},
+            headers={"Authorization": f"Bearer {tokens.access_token}"},
+        )
+    finally:
+        set_identity_service(None)
 
     assert response.status_code == 422
     body = response.json()

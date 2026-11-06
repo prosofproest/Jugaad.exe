@@ -1,4 +1,8 @@
-import { publicAssetUrl, type Message } from "@/lib/api";
+"use client";
+
+import { useEffect, useState } from "react";
+
+import { authenticatedBlobUrl, type Message } from "@/lib/api";
 
 import { AssessmentCard } from "@/components/assessment-card";
 
@@ -37,6 +41,27 @@ export function MessageBubble({
   reviewing?: boolean;
 }) {
   const isUser = message.role === "user";
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewError, setPreviewError] = useState(false);
+
+  useEffect(() => {
+    if (!message.image) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+    (async () => {
+      try {
+        const fetched = await authenticatedBlobUrl(message.image!.preview_url);
+        objectUrl = fetched;
+        if (!cancelled) setPreviewUrl(fetched);
+      } catch {
+        if (!cancelled) setPreviewError(true);
+      }
+    })();
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [message.image]);
 
   return (
     <li className={isUser ? "message message-user" : "message"}>
@@ -54,12 +79,18 @@ export function MessageBubble({
 
         {message.image ? (
           <figure className="message-photo">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={publicAssetUrl(message.image.preview_url)}
-              alt={`Uploaded plant photo: ${message.image.filename}`}
-              loading="lazy"
-            />
+            {previewUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={previewUrl}
+                alt={`Uploaded plant photo: ${message.image.filename}`}
+                loading="lazy"
+              />
+            ) : previewError ? (
+              <p className="small muted">Preview unavailable.</p>
+            ) : (
+              <p className="small muted">Loading preview…</p>
+            )}
             <figcaption className="small muted">
               {message.image.filename} · {message.image.width}×
               {message.image.height} · {qualityText(message.image)}

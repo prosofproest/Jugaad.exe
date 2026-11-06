@@ -10,10 +10,12 @@ withdrawal require authenticated roles, which arrive with Phase 2 identity.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Depends, Query
 
 from app.modules.advisories.registry import AdvisoryRegistry
 from app.modules.advisories.schemas import AdvisoryQueryResponse
+from app.modules.identity.dependencies import get_current_context
+from app.modules.identity.service import AuthContext
 
 router = APIRouter(prefix="/advisories", tags=["advisories"])
 
@@ -40,6 +42,7 @@ def list_advisories(
     target: str = Query(..., min_length=1, max_length=80),
     geo: str = Query(..., min_length=1, max_length=80),
     language: str = Query(..., min_length=2, max_length=16),
+    _context: AuthContext = Depends(get_current_context),
 ) -> AdvisoryQueryResponse:
     result = get_advisory_registry().retrieve(
         crop=crop,

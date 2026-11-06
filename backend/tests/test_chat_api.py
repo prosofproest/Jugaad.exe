@@ -30,13 +30,41 @@ from app.modules.conversations.engine import (
 )
 from app.modules.conversations.orm import MessageEventRow
 from app.modules.conversations.validator import VALIDATOR_VERSION
+from app.modules.identity.dependencies import set_identity_service
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.support_identity import (
+    bootstrap_admin,
+    farmer_tokens,
+    login,
+    make_identity_service,
+)
+
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_client():
+    """Install a test identity service and authenticate as the bootstrap admin.
+
+    Chat rows are owner-scoped to the token principal, so the shared TestClient
+    carries the admin bearer token for every request in this file.
+    """
+    service_instance, _sender, clock = make_identity_service()
+    bootstrap_admin(service_instance)
+    set_identity_service(service_instance)
+    tokens = login(service_instance, clock)
+    client.headers["Authorization"] = f"Bearer {tokens.access_token}"
+    try:
+        yield tokens
+    finally:
+        if "Authorization" in client.headers:
+            del client.headers["Authorization"]
+        set_identity_service(None)
 
 
 def _noise_image(size: int = 512) -> Image.Image:
@@ -494,3 +522,50 @@ def test_provider_engine_reply_is_persisted(session_factory, monkeypatch) -> Non
             "score": 0.91,
         }
     ]
+
+
+def test_demo_routes_require_authentication(session_factory) -> None:
+    anonymous = TestClient(app)
+    for path in (
+        "/v1/conversations",
+        "/v1/conversations/conv_x",
+        "/v1/videos/vid_x",
+        "/v1/assessments",
+        "/v1/advisories?crop=c&target=t&geo=g&language=en",
+        "/v1/map/layers/coverage",
+    ):
+        assert anonymous.get(path).status_code == 401, path
+    assert anonymous.post("/v1/conversations", json={"title": "x"}).status_code == 401
+    assert (
+        anonymous.post(
+            "/v1/uploads", files={"file": ("leaf.png", b"data", "image/png")}
+        ).status_code
+        == 401
+    )
+
+
+def test_conversation_is_invisible_to_another_user(session_factory, authenticated_client) -> None:
+    conversation = _conversation(client)
+    descriptor = _upload(client, _png(_noise_image()))
+
+    # A second identity (farmer via OTP) must not see the admin's rows.
+    service_instance, sender, _clock = make_identity_service()
+    bootstrap_admin(service_instance)
+    set_identity_service(service_instance)
+    farmer = farmer_tokens(service_instance, sender)
+    farmer_client = TestClient(app)
+    farmer_headers = {"Authorization": f"Bearer {farmer.access_token}"}
+
+    assert farmer_client.get("/v1/conversations", headers=farmer_headers).json() == []
+    assert (
+        farmer_client.get(
+            f"/v1/conversations/{conversation['conversation_id']}", headers=farmer_headers
+        ).status_code
+        == 404
+    )
+    assert (
+        farmer_client.get(
+            f"/v1/uploads/{descriptor['upload_id']}", headers=farmer_headers
+        ).status_code
+        == 404
+    )

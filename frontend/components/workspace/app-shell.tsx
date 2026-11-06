@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { clearSession, readSession } from "@/lib/auth";
+import { logoutSession } from "@/lib/api";
 import { translate, type NavKey } from "@/lib/i18n";
 import { useWorkspace } from "@/lib/workspace/store";
 import type { Language, Role } from "@/lib/workspace/types";
@@ -12,65 +14,60 @@ import { Icon, type IconName } from "./ui";
 
 interface NavItem {
   href: string;
-  key: NavKey;
+  label?: string;
+  key?: NavKey;
   icon: IconName;
   roles?: Role[];
   badge?: "queue" | "reviews";
 }
 
 interface NavGroup {
-  key: NavKey;
+  label: string;
   items: NavItem[];
 }
 
 const NAV: NavGroup[] = [
   {
-    key: "nav.workspace",
+    label: "Workspace",
     items: [
-      { href: "/", key: "nav.dashboard", icon: "dashboard" },
-      { href: "/farms", key: "nav.farms", icon: "farm" },
-      { href: "/scan", key: "nav.scan", icon: "scan", badge: "queue" },
-      { href: "/analysis", key: "nav.analysis", icon: "analysis" },
-      { href: "/assistant", key: "nav.assistant", icon: "assistant" },
+      { href: "/", label: "Overview", icon: "dashboard" },
+      { href: "/chat", label: "Photo Assessment", icon: "camera" },
+      { href: "/scan", label: "Scan & Capture", icon: "scan" },
+      { href: "/analysis", label: "Observations & AI", icon: "analysis" },
+      { href: "/farms", label: "Farms & Plots", icon: "farm" },
     ],
   },
   {
-    key: "nav.intelligence",
+    label: "Intelligence",
     items: [
-      { href: "/map", key: "nav.farmMap", icon: "map" },
-      { href: "/hotspots", key: "nav.hotspots", icon: "hotspot" },
-      { href: "/monitoring", key: "nav.monitoring", icon: "monitoring" },
+      { href: "/outlook", label: "Area Outlook", icon: "map" },
+      { href: "/map", label: "GIS Health Map", icon: "map" },
+      { href: "/hotspots", label: "Pest Hotspots", icon: "hotspot" },
+      { href: "/monitoring", label: "Field Visits", icon: "monitoring" },
     ],
   },
   {
-    key: "nav.operations",
+    label: "Operations",
     items: [
       {
-        href: "/expert",
-        key: "nav.expert",
+        href: "/review",
+        label: "Review Queue",
         icon: "expert",
         roles: ["expert", "agent", "admin"],
-        badge: "reviews",
       },
-      { href: "/notifications", key: "nav.notifications", icon: "bell" },
-      { href: "/help", key: "nav.help", icon: "help" },
+      { href: "/notifications", label: "Alerts", icon: "bell" },
+      { href: "/help", label: "Help & Safety", icon: "help" },
     ],
   },
   {
-    key: "nav.account",
+    label: "Account",
     items: [
-      { href: "/profile", key: "nav.profile", icon: "user" },
-      { href: "/settings", key: "nav.settings", icon: "settings" },
+      { href: "/admin", label: "Administration", icon: "settings", roles: ["admin"] },
+      { href: "/profile", label: "Profile & Privacy", icon: "user" },
+      { href: "/settings", label: "Settings", icon: "settings" },
     ],
   },
 ];
-
-const ROLE_LABEL: Record<Role, string> = {
-  farmer: "Farmer",
-  expert: "Agricultural expert",
-  agent: "Field agent",
-  admin: "Administrator",
-};
 
 const LANGUAGES: { value: Language; label: string }[] = [
   { value: "en", label: "English" },
@@ -86,10 +83,10 @@ function isActive(pathname: string, href: string): boolean {
 function currentTitle(pathname: string, t: (key: NavKey) => string): string {
   for (const group of NAV) {
     for (const item of group.items) {
-      if (isActive(pathname, item.href)) return t(item.key);
+      if (isActive(pathname, item.href)) return item.label || (item.key ? t(item.key) : "CropSentinel");
     }
   }
-  if (pathname.startsWith("/chat")) return "Photo assessment (legacy)";
+  if (pathname.startsWith("/chat")) return "Photo assessment";
   if (pathname.startsWith("/login")) return "Sign in";
   if (pathname.startsWith("/register")) return "Create account";
   return "CropSentinel";
@@ -97,7 +94,8 @@ function currentTitle(pathname: string, t: (key: NavKey) => string): string {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-  const { state, role, setRole, setLanguage, markAllNotificationsRead } = useWorkspace();
+  const router = useRouter();
+  const { state, role, setLanguage, markAllNotificationsRead } = useWorkspace();
   const [navOpen, setNavOpen] = useState(false);
   const [menu, setMenu] = useState<"none" | "profile" | "notifications" | "language">("none");
   const menuRef = useRef<HTMLDivElement>(null);
@@ -107,10 +105,12 @@ export function AppShell({ children }: { children: ReactNode }) {
   const queued = state.captures.filter((item) => item.syncState !== "synced").length;
   const pendingReviews = state.analyses.filter((item) => item.reviewStatus === "pending").length;
 
-  useEffect(() => {
+  const [prevPathname, setPrevPathname] = useState(pathname);
+  if (prevPathname !== pathname) {
+    setPrevPathname(pathname);
     setNavOpen(false);
     setMenu("none");
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (menu === "none") return;
@@ -160,10 +160,10 @@ export function AppShell({ children }: { children: ReactNode }) {
         </div>
 
         <div className="ws-farm-switcher">
-          <span className="ws-farm-switcher-label">Active farm</span>
-          <strong>{state.farms[0]?.name ?? "No farm yet"}</strong>
+          <span className="ws-farm-switcher-label">Regional unit</span>
+          <strong>{state.currentUser.district || "Krishnagiri Area"}</strong>
           <span className="ws-farm-switcher-meta">
-            {state.farms[0]?.village}, {state.farms[0]?.district}
+            Administrative block surveillance
           </span>
         </div>
 
@@ -172,8 +172,8 @@ export function AppShell({ children }: { children: ReactNode }) {
             const items = group.items.filter((item) => !item.roles || item.roles.includes(role));
             if (items.length === 0) return null;
             return (
-              <div key={group.key} className="ws-nav-group">
-                <p className="ws-nav-heading">{t(group.key)}</p>
+              <div key={group.label} className="ws-nav-group">
+                <p className="ws-nav-heading">{group.label}</p>
                 <ul>
                   {items.map((item) => {
                     const active = isActive(pathname, item.href);
@@ -187,7 +187,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                           aria-current={active ? "page" : undefined}
                         >
                           <Icon name={item.icon} size={18} />
-                          <span>{t(item.key)}</span>
+                          <span>{item.label || (item.key ? t(item.key) : "")}</span>
                           {count > 0 ? <span className="ws-nav-count">{count}</span> : null}
                         </Link>
                       </li>
@@ -201,17 +201,33 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="ws-sidebar-foot">
           <div className="ws-role-card">
-            <span className="ws-avatar ws-avatar-sm">{state.currentUser.initials}</span>
+            <span className="ws-avatar ws-avatar-sm">{readSession() ? readSession()?.role.slice(0, 2).toUpperCase() : "GU"}</span>
             <div>
-              <strong>{state.currentUser.name}</strong>
-              <span>{ROLE_LABEL[role]}</span>
+              <strong>{readSession() ? readSession()?.role : "Guest"}</strong>
+              <span>{readSession() ? `ID: ${readSession()?.userId.slice(0, 10)}` : "Unauthenticated"}</span>
             </div>
-            <Link href="/login" className="ws-icon-button" aria-label={t("action.signOut")}>
-              <Icon name="logout" size={16} />
-            </Link>
+            {readSession() ? (
+              <button
+                type="button"
+                className="ws-icon-button"
+                aria-label="Sign out"
+                onClick={() => {
+                  const s = readSession();
+                  if (s) logoutSession(s.accessToken).catch(() => undefined);
+                  clearSession();
+                  router.push("/login");
+                }}
+              >
+                <Icon name="logout" size={16} />
+              </button>
+            ) : (
+              <Link href="/login" className="ws-icon-button" aria-label="Sign in">
+                <Icon name="user" size={16} />
+              </Link>
+            )}
           </div>
           <p className="ws-demo-note">
-            <span>Demo</span> Data is stored on this device. Existing API client is preserved.
+            <span>Decision support</span> Connected to FastAPI & PostgreSQL.
           </p>
         </div>
       </aside>
@@ -346,41 +362,52 @@ export function AppShell({ children }: { children: ReactNode }) {
                 aria-expanded={menu === "profile"}
                 onClick={() => setMenu(menu === "profile" ? "none" : "profile")}
               >
-                <span className="ws-avatar">{state.currentUser.initials}</span>
+                <span className="ws-avatar">{readSession() ? readSession()?.role.slice(0, 2).toUpperCase() : "GU"}</span>
                 <span className="ws-avatar-meta">
-                  <strong>{state.currentUser.name}</strong>
-                  <small>{ROLE_LABEL[role]}</small>
+                  <strong>{readSession() ? readSession()?.role : "Guest"}</strong>
+                  <small>{readSession() ? "Signed in" : "Unauthenticated"}</small>
                 </span>
               </button>
               {menu === "profile" ? (
                 <div className="ws-menu" role="menu">
-                  <p className="ws-menu-heading">Switch demo role</p>
-                  {(Object.keys(ROLE_LABEL) as Role[]).map((option) => (
-                    <button
-                      key={option}
-                      type="button"
-                      role="menuitemradio"
-                      aria-checked={role === option}
-                      className={role === option ? "ws-menu-item ws-menu-item-active" : "ws-menu-item"}
-                      onClick={() => {
-                        setRole(option);
-                        setMenu("none");
-                      }}
-                    >
-                      {ROLE_LABEL[option]}
-                      {role === option ? <Icon name="check" size={15} /> : null}
-                    </button>
-                  ))}
-                  <div className="ws-menu-divider" />
-                  <Link href="/profile" className="ws-menu-item" onClick={() => setMenu("none")}>
-                    <Icon name="user" size={16} /> Profile
-                  </Link>
-                  <Link href="/settings" className="ws-menu-item" onClick={() => setMenu("none")}>
-                    <Icon name="settings" size={16} /> Settings
-                  </Link>
-                  <Link href="/login" className="ws-menu-item" onClick={() => setMenu("none")}>
-                    <Icon name="logout" size={16} /> {t("action.signOut")}
-                  </Link>
+                  {readSession() ? (
+                    <>
+                      <p className="ws-menu-heading">Signed in as {readSession()?.role}</p>
+                      <p className="ws-small ws-muted" style={{ padding: "0 1rem 0.5rem" }}>
+                        ID: {readSession()?.userId}
+                      </p>
+                      <div className="ws-menu-divider" />
+                      <Link href="/profile" className="ws-menu-item" onClick={() => setMenu("none")}>
+                        <Icon name="user" size={16} /> Profile & Consents
+                      </Link>
+                      <Link href="/settings" className="ws-menu-item" onClick={() => setMenu("none")}>
+                        <Icon name="settings" size={16} /> Settings
+                      </Link>
+                      <button
+                        type="button"
+                        className="ws-menu-item"
+                        onClick={() => {
+                          const s = readSession();
+                          if (s) logoutSession(s.accessToken).catch(() => undefined);
+                          clearSession();
+                          setMenu("none");
+                          router.push("/login");
+                        }}
+                      >
+                        <Icon name="logout" size={16} /> {t("action.signOut")}
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <p className="ws-menu-heading">Account</p>
+                      <Link href="/login" className="ws-menu-item" onClick={() => setMenu("none")}>
+                        <Icon name="user" size={16} /> Sign in
+                      </Link>
+                      <Link href="/settings" className="ws-menu-item" onClick={() => setMenu("none")}>
+                        <Icon name="settings" size={16} /> Settings
+                      </Link>
+                    </>
+                  )}
                 </div>
               ) : null}
             </div>

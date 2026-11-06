@@ -3,72 +3,121 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 
-import { AnalysisReport } from "@/components/workspace/analysis-report";
 import {
   Badge,
   EmptyState,
   Icon,
-  Modal,
   PageHeader,
-  PhotoTile,
-  ProgressBar,
-  SeverityPill,
   StatCard,
   Tabs,
 } from "@/components/workspace/ui";
-import { formatDateTime, relativeTime } from "@/lib/format";
-import { useWorkspace } from "@/lib/workspace/store";
-import type { Analysis } from "@/lib/workspace/types";
+import { formatDateTime } from "@/lib/format";
+import {
+  ApiError,
+  listObservations,
+  getObservationAssessment,
+  requestObservationReview,
+  type Assessment,
+  type ObservationRecord,
+} from "@/lib/api";
+import { readSession } from "@/lib/auth";
 
-type Filter = "all" | "pending" | "verified" | "high";
+type Filter = "all" | "pending" | "verified";
 
 export default function AnalysisPage() {
-  const { state, createAnalysis } = useWorkspace();
+  const [observations, setObservations] = useState<ObservationRecord[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<Filter>("all");
-  const [activeId, setActiveId] = useState<string | null>(state.analyses[0]?.id ?? null);
-  const [compareOpen, setCompareOpen] = useState(false);
+  const [activeId, setActiveId] = useState<string | null>(null);
+  const [activeAssessment, setActiveAssessment] = useState<Assessment | null>(null);
+  const [loadedAssessmentObsId, setLoadedAssessmentObsId] = useState<string | null>(null);
+  const [reviewedId, setReviewedId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const focus = params.get("focus");
-    if (focus && state.analyses.some((analysis) => analysis.id === focus)) {
-      setActiveId(focus);
-    }
-  }, [state.analyses]);
-
-  const filtered = useMemo(
-    () =>
-      state.analyses.filter((analysis) => {
-        if (filter === "pending") return analysis.reviewStatus === "pending";
-        if (filter === "verified") return analysis.reviewStatus === "verified" || analysis.reviewStatus === "corrected";
-        if (filter === "high") return analysis.severity === "high" || analysis.severity === "critical";
-        return true;
-      }),
-    [state.analyses, filter],
+  const active = useMemo(
+    () => observations.find((obs) => obs.id === activeId) ?? observations[0] ?? null,
+    [observations, activeId],
   );
 
-  const active = state.analyses.find((analysis) => analysis.id === activeId) ?? filtered[0] ?? state.analyses[0];
-  const pending = state.analyses.filter((analysis) => analysis.reviewStatus === "pending");
-  const unsyncedAnalyses = state.captures.filter((capture) => !capture.analysisId);
+  const assessmentLoading = Boolean(active?.id && loadedAssessmentObsId !== active.id);
 
-  function select(analysis: Analysis) {
-    setActiveId(analysis.id);
-    window.history.replaceState(null, "", `/analysis?focus=${analysis.id}`);
-  }
+  useEffect(() => {
+    let ignore = false;
+    listObservations()
+      .then((response) => {
+        if (!ignore) {
+          setObservations(response.items || []);
+          if (response.items && response.items.length > 0) {
+            setActiveId(response.items[0]?.id ?? null);
+          }
+          setLoading(false);
+        }
+      })
+      .catch((err) => {
+        if (!ignore) {
+          if (err instanceof ApiError && err.status === 401) {
+            setError("unauthorized");
+          } else {
+            setError(err instanceof Error ? err.message : "Failed to load observations");
+          }
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
-  const previous = active
-    ? state.analyses.find(
-        (analysis) =>
-          analysis.subjectId === active.subjectId && analysis.createdAt < active.createdAt,
-      ) ?? state.analyses.find((analysis) => analysis.subjectId === active.subjectId && analysis.id !== active.id)
-    : undefined;
+  useEffect(() => {
+    if (!active?.id) return;
+    const targetObsId = active.id;
+    let ignore = false;
+    getObservationAssessment(targetObsId)
+      .then((assessment) => {
+        if (!ignore) {
+          setActiveAssessment(assessment);
+          setLoadedAssessmentObsId(targetObsId);
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setActiveAssessment(null);
+          setLoadedAssessmentObsId(targetObsId);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [active?.id]);
+
+  const filtered = useMemo(() => {
+    return observations.filter((obs) => {
+      if (filter === "pending") return obs.verification.status === "unverified" || obs.verification.status === "needs_visit";
+      if (filter === "verified") return obs.verification.status === "confirmed" || obs.verification.status === "probable";
+      return true;
+    });
+  }, [observations, filter]);
+
+  const handleRequestReview = async () => {
+    if (!active) return;
+    try {
+      await requestObservationReview(active.id, "Requested review from Analysis view");
+      setReviewedId(active.id);
+      const updated = await listObservations();
+      setObservations(updated.items || []);
+    } catch {
+      // Failed to request review
+    }
+  };
+
+  const isAuth = !!readSession();
 
   return (
     <div className="ws-page">
       <PageHeader
-        eyebrow="AI analysis"
-        title="Explainable photo & video triage"
-        lede="See the detected pest or disease, visible symptoms, affected parts, severity, confidence band, possible causes, alternatives and one safe next step."
+        eyebrow="AI analysis & observations"
+        title="Verified Observations & Model Assessments"
+        lede="Inspect actual observations recorded by farmers and extension workers with calibrated quality gates, confidence bands, and human verification trails."
         actions={
           <Link href="/scan" className="ws-button ws-button-primary">
             <Icon name="camera" size={17} /> New capture
@@ -77,190 +126,236 @@ export default function AnalysisPage() {
       />
 
       <div className="ws-stat-grid">
-        <StatCard label="Assessments" value={state.analyses.length} detail="Images and videos" icon="analysis" tone="brand" />
-        <StatCard label="Awaiting verification" value={pending.length} detail="Expert review requested" icon="expert" tone="warn" />
-        <StatCard label="High or critical" value={state.analyses.filter((item) => item.severity === "high" || item.severity === "critical").length} detail="Field follow-up prioritised" icon="alert" tone="bad" />
-        <StatCard label="Expert verified" value={state.analyses.filter((item) => item.reviewStatus === "verified" || item.reviewStatus === "corrected").length} detail="Human-confirmed records" icon="shield" tone="ok" />
+        <StatCard
+          label="Total observations"
+          value={observations.length}
+          detail="Relational database records"
+          icon="analysis"
+          tone="brand"
+        />
+        <StatCard
+          label="Pending review"
+          value={observations.filter((o) => o.verification.status === "unverified" || o.verification.status === "needs_visit").length}
+          detail="Awaiting human expert"
+          icon="expert"
+          tone="warn"
+        />
+        <StatCard
+          label="Confirmed cases"
+          value={observations.filter((o) => o.verification.status === "confirmed").length}
+          detail="Pathologist verified"
+          icon="shield"
+          tone="ok"
+        />
       </div>
 
-      {unsyncedAnalyses.length > 0 ? (
+      {!isAuth && (
         <div className="ws-banner ws-banner-info">
-          <Icon name="scan" size={18} />
+          <Icon name="user" size={18} />
           <div>
-            <strong>{unsyncedAnalyses.length} capture{unsyncedAnalyses.length === 1 ? "" : "s"} not analysed yet</strong>
-            <p>Run an assistive assessment on a saved photo or video. The result is labelled as demo content.</p>
+            <strong>Viewing public observation list</strong>
+            <p>
+              Sign in with a staff or farmer account to submit new observations or access private report details.
+            </p>
           </div>
           <div className="ws-banner-actions">
-            {unsyncedAnalyses.slice(0, 2).map((capture) => (
-              <button
-                key={capture.id}
-                type="button"
-                className="ws-button ws-button-secondary"
-                onClick={() => {
-                  const analysis = createAnalysis(capture.id);
-                  if (analysis) {
-                    setActiveId(analysis.id);
-                    setCompareOpen(false);
-                  }
-                }}
-              >
-                Analyse {capture.subjectLabel}
-              </button>
-            ))}
-            <Link href="/scan" className="ws-link">Open scan & capture</Link>
+            <Link href="/login" className="ws-button ws-button-secondary">
+              Sign in
+            </Link>
           </div>
         </div>
-      ) : null}
+      )}
+
+      {error && error !== "unauthorized" && (
+        <div className="ws-banner ws-banner-bad">
+          <Icon name="alert" size={18} />
+          <div>
+            <strong>Error connecting to backend</strong>
+            <p>{error}. Ensure the FastAPI server is running on port 8000.</p>
+          </div>
+          <div className="ws-banner-actions">
+            <button
+              type="button"
+              className="ws-button ws-button-secondary"
+              onClick={() => {
+                setLoading(true);
+                listObservations()
+                  .then((res) => {
+                    setObservations(res.items || []);
+                    setLoading(false);
+                  })
+                  .catch(() => setLoading(false));
+              }}
+            >
+              Retry
+            </button>
+          </div>
+        </div>
+      )}
 
       <Tabs
-        label="Analysis filters"
+        label="Observation filters"
         value={filter}
-        onChange={setFilter}
+        onChange={(val) => setFilter(val as Filter)}
         tabs={[
-          { value: "all", label: "All", count: state.analyses.length },
-          { value: "pending", label: "Needs review", count: pending.length },
-          { value: "verified", label: "Verified", count: state.analyses.filter((item) => item.reviewStatus === "verified" || item.reviewStatus === "corrected").length },
-          { value: "high", label: "High severity", count: state.analyses.filter((item) => item.severity === "high" || item.severity === "critical").length },
+          { value: "all", label: "All records", count: observations.length },
+          {
+            value: "pending",
+            label: "Pending verification",
+            count: observations.filter((o) => o.verification.status === "unverified" || o.verification.status === "needs_visit").length,
+          },
+          {
+            value: "verified",
+            label: "Verified",
+            count: observations.filter((o) => o.verification.status === "confirmed" || o.verification.status === "probable").length,
+          },
         ]}
       />
 
-      <div className="ws-analysis-layout">
-        <aside className="ws-panel ws-analysis-list">
-          <div className="ws-panel-head">
-            <h2>Assessments</h2>
-            <Badge tone="neutral">{filtered.length}</Badge>
-          </div>
-          <ul className="ws-analysis-items">
-            {filtered.map((analysis) => (
-              <li key={analysis.id}>
+      {loading ? (
+        <div className="ws-panel">
+          <p className="ws-muted">Loading observations from backend API...</p>
+        </div>
+      ) : filtered.length === 0 ? (
+        <EmptyState
+          title="No observations found"
+          body="There are currently no observations matching this filter in the PostgreSQL database. Capture an image or start a photo assessment to create one."
+          action={
+            <Link href="/scan" className="ws-button ws-button-primary">
+              Scan or upload
+            </Link>
+          }
+        />
+      ) : (
+        <div className="ws-two-col">
+          <div className="ws-analysis-list">
+            {filtered.map((obs) => {
+              const selected = obs.id === active?.id;
+              return (
                 <button
+                  key={obs.id}
                   type="button"
-                  className={analysis.id === active?.id ? "ws-analysis-item ws-analysis-item-active" : "ws-analysis-item"}
-                  onClick={() => select(analysis)}
+                  className={selected ? "ws-analysis-card ws-analysis-card-active" : "ws-analysis-card"}
+                  onClick={() => setActiveId(obs.id)}
                 >
-                  <PhotoTile tone={analysis.imageTone} mediaType={analysis.mediaType} label={analysis.subjectLabel} size="sm" />
-                  <span className="ws-analysis-item-body">
-                    <span className="ws-analysis-item-top">
-                      <strong>{analysis.pest ?? analysis.disease ?? "No specific match"}</strong>
-                      <SeverityPill severity={analysis.severity} />
-                    </span>
-                    <span className="ws-small ws-muted">{analysis.subjectLabel} · {relativeTime(analysis.createdAt)}</span>
-                    <span className="ws-chip-row">
-                      <span className="ws-chip">{analysis.confidenceBand} confidence</span>
-                      {analysis.reviewStatus !== "not_requested" ? <span className="ws-chip">{analysis.reviewStatus.replace("_", " ")}</span> : null}
-                    </span>
-                  </span>
+                  <div className="ws-analysis-card-meta">
+                    <span className="ws-crop-pill">{obs.crop_code}</span>
+                    <Badge tone={obs.verification.status === "confirmed" ? "ok" : obs.verification.status === "probable" ? "warn" : "neutral"}>
+                      {obs.verification.status}
+                    </Badge>
+                  </div>
+                  <strong className="ws-analysis-title">Report #{obs.client_report_id.slice(0, 12)}</strong>
+                  <p className="ws-analysis-sub">
+                    Area: {obs.area_code} · {obs.variety ? `Variety: ${obs.variety}` : "Standard"}
+                  </p>
+                  <span className="ws-analysis-time">{formatDateTime(obs.submitted_at)}</span>
                 </button>
-              </li>
-            ))}
-          </ul>
-          {filtered.length === 0 ? <p className="ws-empty-inline">No assessments match this filter.</p> : null}
-        </aside>
+              );
+            })}
+          </div>
 
-        <div className="ws-stack">
-          {active ? (
-            <>
-              <AnalysisReport
-                analysis={active}
-                onCompare={previous ? () => setCompareOpen(true) : undefined}
-              />
-
+          <div className="ws-analysis-detail">
+            {active ? (
               <section className="ws-panel">
                 <div className="ws-panel-head">
-                  <div><p className="ws-eyebrow">Observation context</p><h2>Why this result is cautious</h2></div>
-                  <Badge tone="info">Safety boundary</Badge>
+                  <div>
+                    <p className="ws-eyebrow">Observation #{active.id.slice(0, 8)}</p>
+                    <h2>{active.crop_code.toUpperCase()} — {active.area_code}</h2>
+                  </div>
+                  <Badge tone={active.verification.status === "confirmed" ? "ok" : "warn"}>
+                    {active.verification.status}
+                  </Badge>
                 </div>
-                <div className="ws-context-grid">
+
+                <dl className="ws-detail-list">
                   <div>
-                    <span>Image quality</span>
-                    <strong>Good · sharp, daylight</strong>
-                    <ProgressBar value={82} label="Quality gate score" tone="ok" />
+                    <dt>Client report ID</dt>
+                    <dd>{active.client_report_id}</dd>
                   </div>
                   <div>
-                    <span>Calibration state</span>
-                    <strong>Not yet calibrated</strong>
-                    <p className="ws-small ws-muted">Bands are shown instead of numeric probability until calibration is approved.</p>
+                    <dt>Area code</dt>
+                    <dd>{active.area_code}</dd>
                   </div>
                   <div>
-                    <span>Human review</span>
-                    <strong>{active.reviewStatus === "pending" ? "Queued with an expert" : active.reviewStatus === "not_requested" ? "Not requested" : "Completed"}</strong>
-                    <p className="ws-small ws-muted">A person has {active.reviewer ? `reviewed this case (${active.reviewer})` : "not reviewed this case"}.</p>
+                    <dt>Variety</dt>
+                    <dd>{active.variety || "Not specified"}</dd>
+                  </div>
+                  <div>
+                    <dt>Growth stage</dt>
+                    <dd>{active.growth_stage || "Not recorded"}</dd>
+                  </div>
+                  <div>
+                    <dt>Submitted at</dt>
+                    <dd>{formatDateTime(active.submitted_at)}</dd>
+                  </div>
+                  <div>
+                    <dt>Evidence tier</dt>
+                    <dd>{active.verification.evidence_tier}</dd>
+                  </div>
+                </dl>
+
+                {active.notes && (
+                  <div className="ws-notice ws-notice-info">
+                    <strong>Field notes:</strong> {active.notes}
+                  </div>
+                )}
+
+                <div className="ws-panel-head" style={{ marginTop: "1.5rem" }}>
+                  <div>
+                    <p className="ws-eyebrow">Assistive AI assessment</p>
+                    <h3>Model triage & confidence</h3>
                   </div>
                 </div>
-                <div className="ws-notice">
-                  This card never changes the stored prediction. Retaking a photo creates a new
-                  assessment; requesting review opens a separate human workflow.
+
+                {assessmentLoading ? (
+                  <p className="ws-muted ws-small">Loading model assessment...</p>
+                ) : activeAssessment ? (
+                  <div>
+                    <p className="ws-small">
+                      <strong>State:</strong> {activeAssessment.state} · <strong>Model:</strong> {activeAssessment.model_version}
+                    </p>
+                    {activeAssessment.candidates && activeAssessment.candidates.length > 0 ? (
+                      <div className="ws-stat-grid" style={{ marginTop: "0.5rem" }}>
+                        {activeAssessment.candidates.map((cand) => (
+                          <StatCard
+                            key={cand.label}
+                            label={cand.display_name || cand.label}
+                            value={`${Math.round(cand.score * 100)}%`}
+                            detail={`Confidence band: ${activeAssessment.confidence_band || "Uncalibrated"}`}
+                            icon="leaf"
+                            tone="brand"
+                          />
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="ws-muted ws-small">{activeAssessment.reason_text || "No candidates detected."}</p>
+                    )}
+                  </div>
+                ) : (
+                  <p className="ws-muted ws-small">No automated assessment attached to this observation record.</p>
+                )}
+
+                <div className="ws-banner-actions" style={{ marginTop: "1.5rem" }}>
+                  {reviewedId === active.id ? (
+                    <Badge tone="ok">Review requested with expert queue</Badge>
+                  ) : (
+                    <button
+                      type="button"
+                      className="ws-button ws-button-secondary"
+                      onClick={() => void handleRequestReview()}
+                    >
+                      <Icon name="expert" size={16} /> Request expert verification
+                    </button>
+                  )}
+                  <Link href={`/review`} className="ws-link">
+                    Open expert queue
+                  </Link>
                 </div>
               </section>
-
-              {previous ? (
-                <section className="ws-panel">
-                  <div className="ws-panel-head">
-                    <div><p className="ws-eyebrow">Previous vs current</p><h2>Observation comparison</h2></div>
-                    <button type="button" className="ws-button ws-button-secondary" onClick={() => setCompareOpen(true)}>
-                      <Icon name="monitoring" size={15} /> Open comparison
-                    </button>
-                  </div>
-                  <div className="ws-compare-strip">
-                    <div>
-                      <PhotoTile tone={previous.imageTone} mediaType={previous.mediaType} label="Previous capture" />
-                      <span className="ws-small ws-muted">Previous · {formatDateTime(previous.createdAt)}</span>
-                    </div>
-                    <Icon name="arrow" size={20} />
-                    <div>
-                      <PhotoTile tone={active.imageTone} mediaType={active.mediaType} label="Current capture" />
-                      <span className="ws-small ws-muted">Current · {formatDateTime(active.createdAt)}</span>
-                    </div>
-                    <div className="ws-compare-summary">
-                      <Badge tone={active.severity === previous.severity ? "warn" : "info"}>
-                        {active.severity === previous.severity ? "Similar severity" : "Severity changed"}
-                      </Badge>
-                      <p className="ws-small">Compare the same plant and plant part. Lighting and distance can change how a symptom looks.</p>
-                    </div>
-                  </div>
-                </section>
-              ) : null}
-            </>
-          ) : (
-            <EmptyState
-              title="No assessments yet"
-              body="Capture a photo from Scan & capture, then run an assistive assessment."
-              action={<Link href="/scan" className="ws-button ws-button-primary">Scan a plant</Link>}
-            />
-          )}
-        </div>
-      </div>
-
-      <Modal open={compareOpen} onClose={() => setCompareOpen(false)} title="Compare observations">
-        {active && previous ? (
-          <div className="ws-compare-modal">
-            <div className="ws-compare-col">
-              <p className="ws-eyebrow">Previous</p>
-              <PhotoTile tone={previous.imageTone} mediaType={previous.mediaType} label="Previous observation" size="lg" />
-              <dl className="ws-detail-list">
-                <div><dt>Date</dt><dd>{formatDateTime(previous.createdAt)}</dd></div>
-                <div><dt>Match</dt><dd>{previous.pest ?? previous.disease ?? "None"}</dd></div>
-                <div><dt>Severity</dt><dd>{previous.severity}</dd></div>
-                <div><dt>Confidence</dt><dd>{previous.confidenceBand}</dd></div>
-              </dl>
-            </div>
-            <div className="ws-compare-col">
-              <p className="ws-eyebrow">Current</p>
-              <PhotoTile tone={active.imageTone} mediaType={active.mediaType} label="Current observation" size="lg" />
-              <dl className="ws-detail-list">
-                <div><dt>Date</dt><dd>{formatDateTime(active.createdAt)}</dd></div>
-                <div><dt>Match</dt><dd>{active.pest ?? active.disease ?? "None"}</dd></div>
-                <div><dt>Severity</dt><dd>{active.severity}</dd></div>
-                <div><dt>Confidence</dt><dd>{active.confidenceBand}</dd></div>
-              </dl>
-            </div>
-            <p className="ws-disclaimer">
-              Visual comparison is not proof of treatment effectiveness. Confirm change with a
-              field inspection and expert review when the case is high impact.
-            </p>
+            ) : null}
           </div>
-        ) : null}
-      </Modal>
+        </div>
+      )}
     </div>
   );
 }

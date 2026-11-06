@@ -5,11 +5,28 @@ from pathlib import Path
 import pytest
 from app.api.v1 import assessments as assessment_routes
 from app.main import app
+from app.modules.identity.dependencies import set_identity_service
 from fastapi.testclient import TestClient
 
 from tests.support import FakeAdapter, make_registry, make_request, make_service
+from tests.support_identity import bootstrap_admin, login, make_identity_service
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_client():
+    service_instance, _sender, clock = make_identity_service()
+    bootstrap_admin(service_instance)
+    set_identity_service(service_instance)
+    tokens = login(service_instance, clock)
+    client.headers["Authorization"] = f"Bearer {tokens.access_token}"
+    try:
+        yield tokens
+    finally:
+        if "Authorization" in client.headers:
+            del client.headers["Authorization"]
+        set_identity_service(None)
 
 
 @pytest.fixture(autouse=True)

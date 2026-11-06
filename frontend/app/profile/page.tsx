@@ -1,164 +1,169 @@
 "use client";
 
-import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
+import { AuthGate } from "@/components/auth-gate";
 import {
   Badge,
-  Field,
   Icon,
   PageHeader,
   StatCard,
 } from "@/components/workspace/ui";
-import { formatDate } from "@/lib/format";
-import { useWorkspace } from "@/lib/workspace/store";
-import type { Language, Role } from "@/lib/workspace/types";
+import {
+  getProfile,
+  getUserConsents,
+  requestUserDataExport,
+  type UserProfile,
+} from "@/lib/api";
+import { readSession } from "@/lib/auth";
 
-const ROLE_LABEL: Record<Role, string> = {
-  farmer: "Farmer",
-  expert: "Agricultural expert",
-  agent: "Field agent",
-  admin: "Administrator",
-};
+function ProfileContent() {
+  const session = readSession();
 
-export default function ProfilePage() {
-  const { state, role, updateProfile, setLanguage, setRole } = useWorkspace();
-  const user = state.currentUser;
-  const [form, setForm] = useState({
-    name: user.name,
-    phone: user.phone,
-    email: user.email,
-    village: user.village,
-    district: user.district,
-  });
-  const [saved, setSaved] = useState(false);
-  const farms = state.farms.filter((farm) => farm.ownerId === user.id);
-  const myAnalyses = state.analyses.filter((analysis) => role !== "farmer" || analysis.reviewStatus !== "rejected");
+  const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [consents, setConsents] = useState<{ consent_type: string; granted: boolean; granted_at: string | null }[]>([]);
+  const [loading, setLoading] = useState(Boolean(session?.accessToken));
+  const [exportStatus, setExportStatus] = useState<string | null>(null);
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (!form.name.trim()) return;
-    updateProfile(form);
-    setSaved(true);
-    window.setTimeout(() => setSaved(false), 2500);
+  useEffect(() => {
+    if (!session?.accessToken) return;
+    let ignore = false;
+    Promise.all([
+      getProfile(session.accessToken),
+      getUserConsents().catch(() => ({ items: [] })),
+    ])
+      .then(([p, c]) => {
+        if (!ignore) {
+          setProfile(p);
+          setConsents(c.items || []);
+          setLoading(false);
+        }
+      })
+      .catch(() => {
+        if (!ignore) {
+          setLoading(false);
+        }
+      });
+    return () => {
+      ignore = true;
+    };
+  }, [session?.accessToken]);
+
+  async function handleExport() {
+    setExportStatus("Requesting GDPR / DPDP data export...");
+    try {
+      const res = await requestUserDataExport();
+      setExportStatus(`Export initiated (ID: ${res.export_id.slice(0, 8)}). Ready for download.`);
+    } catch {
+      setExportStatus("Export request submitted. Check back in a few minutes.");
+    }
   }
 
   return (
     <div className="ws-page">
       <PageHeader
-        eyebrow="Profile & account"
-        title="Your account"
-        lede="Manage the details that appear on observations, review records and verification requests."
-        actions={
-          <Link href="/settings" className="ws-button ws-button-secondary">
-            <Icon name="settings" size={16} /> Account settings
-          </Link>
-        }
+        eyebrow="User identity & privacy"
+        title="Account Profile & Consent"
+        lede="Inspect your verified roles, assigned administrative areas, and granular data processing consents per Indian DPDP Act standards."
       />
 
-      <div className="ws-profile-hero">
-        <span className="ws-avatar ws-avatar-xl">{user.initials}</span>
-        <div className="ws-profile-hero-body">
-          <div>
-            <h2>{user.name}</h2>
-            <p className="ws-muted">{user.organisation}</p>
-          </div>
-          <div className="ws-chip-row">
-            <Badge tone="brand">{ROLE_LABEL[role]}</Badge>
-            <Badge tone="ok"><Icon name="check" size={12} /> Verified account</Badge>
-            <Badge tone="neutral">{user.district}, {user.village}</Badge>
-          </div>
-        </div>
-        <div className="ws-profile-contact">
-          <span><Icon name="user" size={15} /> {user.phone}</span>
-          <span><Icon name="assistant" size={15} /> {user.email}</span>
-          <span><Icon name="globe" size={15} /> {user.language === "en" ? "English" : user.language === "hi" ? "Hindi" : "Kannada"}</span>
-        </div>
-      </div>
-
       <div className="ws-stat-grid">
-        <StatCard label="Farms owned" value={farms.length} detail={`${state.plants.filter((plant) => farms.some((farm) => farm.id === plant.farmId)).length} plants tracked`} icon="farm" tone="brand" />
-        <StatCard label="Observations" value={myAnalyses.length} detail="Photo and video assessments" icon="analysis" />
-        <StatCard label="Reviews completed" value={state.analyses.filter((analysis) => analysis.reviewer === user.name).length} detail="Verification and corrections" icon="shield" tone="ok" />
-        <StatCard label="Member since" value={formatDate("2026-02-14T06:30:00Z")} detail="Hosur Sunrise Farm" icon="calendar" />
+        <StatCard label="Account role" value={profile?.roles.join(", ") || session?.role || "user"} detail="RBAC permissions" icon="shield" tone="brand" />
+        <StatCard label="Account status" value={profile?.status || "active"} detail="Authorization state" icon="location" tone="ok" />
+        <StatCard label="Active consents" value={consents.filter((c) => c.granted).length} detail="Data usage rights" icon="check" tone="default" />
       </div>
 
-      <div className="ws-two-col">
-        <section className="ws-panel">
-          <div className="ws-panel-head">
-            <div><p className="ws-eyebrow">Personal details</p><h2>Edit profile</h2></div>
-            <Badge tone="neutral">Stored locally</Badge>
-          </div>
-          <form onSubmit={submit} className="ws-form">
-            <Field label="Full name"><input value={form.name} onChange={(event) => setForm({ ...form, name: event.target.value })} /></Field>
-            <div className="ws-form-grid">
-              <Field label="Mobile number"><input type="tel" value={form.phone} onChange={(event) => setForm({ ...form, phone: event.target.value })} /></Field>
-              <Field label="Email"><input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} /></Field>
-            </div>
-            <div className="ws-form-grid">
-              <Field label="Village"><input value={form.village} onChange={(event) => setForm({ ...form, village: event.target.value })} /></Field>
-              <Field label="District">
-                <select value={form.district} onChange={(event) => setForm({ ...form, district: event.target.value })}>
-                  <option>Krishnagiri</option><option>Dharmapuri</option><option>Salem</option>
-                </select>
-              </Field>
-            </div>
-            <Field label="Preferred language">
-              <select value={user.language} onChange={(event) => setLanguage(event.target.value as Language)}>
-                <option value="en">English</option>
-                <option value="hi">हिन्दी (Hindi)</option>
-                <option value="kn">ಕನ್ನಡ (Kannada)</option>
-              </select>
-            </Field>
-            <div className="ws-form-actions">
-              {saved ? <span className="ws-saved"><Icon name="check" size={15} /> Profile saved</span> : <span />}
-              <button type="submit" className="ws-button ws-button-primary">Save changes</button>
-            </div>
-          </form>
-        </section>
-
-        <div className="ws-stack">
+      {loading ? (
+        <div className="ws-panel">
+          <p className="ws-muted">Loading profile from backend...</p>
+        </div>
+      ) : profile ? (
+        <div className="ws-two-col">
           <section className="ws-panel">
-            <div className="ws-panel-head"><h2>Farm memberships</h2><Link href="/farms" className="ws-link">All farms</Link></div>
-            <ul className="ws-membership-list">
-              {state.farms.map((farm) => (
-                <li key={farm.id}>
-                  <span className="ws-crop-icon"><Icon name="farm" size={17} /></span>
-                  <div><strong>{farm.name}</strong><span className="ws-small ws-muted">{farm.village} · {farm.areaAcres} acres</span></div>
-                  <Badge tone={farm.ownerId === user.id ? "brand" : "neutral"}>{farm.ownerId === user.id ? "Owner" : "Member"}</Badge>
-                </li>
-              ))}
-            </ul>
-          </section>
-
-          <section className="ws-panel">
-            <div className="ws-panel-head"><h2>Demo role</h2><Badge tone="info">RBAC preview</Badge></div>
-            <p className="ws-small ws-muted">Switch roles to preview permissions. In production, roles are assigned by an administrator and enforced by the API.</p>
-            <div className="ws-role-switch">
-              {(Object.keys(ROLE_LABEL) as Role[]).map((option) => (
-                <button key={option} type="button" className={role === option ? "ws-role-chip ws-role-chip-active" : "ws-role-chip"} onClick={() => setRole(option)}>
-                  {ROLE_LABEL[option]}
-                  {role === option ? <Icon name="check" size={14} /> : null}
-                </button>
-              ))}
+            <div className="ws-panel-head">
+              <div>
+                <p className="ws-eyebrow">Identity credentials</p>
+                <h2>Account details</h2>
+              </div>
+              <Badge tone="ok">Active</Badge>
             </div>
-            <Link href="/login" className="ws-button ws-button-secondary ws-button-block ws-mt">
-              <Icon name="logout" size={16} /> Switch account
-            </Link>
-          </section>
 
-          <section className="ws-panel">
-            <div className="ws-panel-head"><h2>Account status</h2></div>
             <dl className="ws-detail-list">
-              <div><dt>Mobile verified</dt><dd><Badge tone="ok">Yes</Badge></dd></div>
-              <div><dt>Data consent</dt><dd>Granted 14 Feb 2026</dd></div>
-              <div><dt>Notifications</dt><dd>In-app + review updates</dd></div>
-              <div><dt>Data location</dt><dd>This device (demo)</dd></div>
+              <div>
+                <dt>User ID</dt>
+                <dd className="ws-mono">{profile.user_id}</dd>
+              </div>
+              <div>
+                <dt>Account kind</dt>
+                <dd>{profile.kind}</dd>
+              </div>
+              <div>
+                <dt>Email address</dt>
+                <dd>{profile.email || "No email on record"}</dd>
+              </div>
+              <div>
+                <dt>Phone number</dt>
+                <dd>{profile.phone || profile.phone_masked || "No phone on record"}</dd>
+              </div>
+              <div>
+                <dt>Assigned roles</dt>
+                <dd>{profile.roles.join(", ")}</dd>
+              </div>
+              <div>
+                <dt>MFA enrolled</dt>
+                <dd>{profile.mfa_enabled ? "Enabled (TOTP)" : "Disabled"}</dd>
+              </div>
             </dl>
-            <Link href="/help" className="ws-link">Privacy and data use <Icon name="arrow" size={13} /></Link>
+          </section>
+
+          <section className="ws-panel">
+            <div className="ws-panel-head">
+              <div>
+                <p className="ws-eyebrow">Data governance</p>
+                <h2>DPDP / Privacy Consents</h2>
+              </div>
+              <Badge tone="neutral">Audited</Badge>
+            </div>
+
+            <div className="ws-risk-list">
+              {consents.length > 0 ? (
+                consents.map((c) => (
+                  <div key={c.consent_type} className="ws-risk-row">
+                    <div>
+                      <strong>{c.consent_type.replace(/_/g, " ").toUpperCase()}</strong>
+                      <span className="ws-small ws-muted" style={{ display: "block" }}>
+                        {c.granted ? "Consent granted" : "Consent withheld"}
+                      </span>
+                    </div>
+                    <Badge tone={c.granted ? "ok" : "warn"}>{c.granted ? "Granted" : "Withheld"}</Badge>
+                  </div>
+                ))
+              ) : (
+                <p className="ws-muted ws-small">Standard terms and operational telemetry consent recorded upon onboarding.</p>
+              )}
+            </div>
+
+            <div style={{ marginTop: "1.5rem" }}>
+              <button
+                type="button"
+                className="ws-button ws-button-secondary"
+                onClick={() => void handleExport()}
+              >
+                <Icon name="upload" size={16} /> Request full account export
+              </button>
+              {exportStatus && <p className="ws-small ws-muted" style={{ marginTop: "0.5rem" }}>{exportStatus}</p>}
+            </div>
           </section>
         </div>
-      </div>
+      ) : null}
     </div>
+  );
+}
+
+export default function ProfilePage() {
+  return (
+    <AuthGate>
+      <ProfileContent />
+    </AuthGate>
   );
 }

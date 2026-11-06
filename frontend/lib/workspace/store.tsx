@@ -4,19 +4,17 @@ import {
   createContext,
   useCallback,
   useContext,
-  useEffect,
   useMemo,
   useState,
   type ReactNode,
 } from "react";
 
-import { seedState } from "./seed";
+import { readSession } from "@/lib/auth";
 import type {
   Analysis,
   Capture,
   ChatMessage,
   ChatThread,
-  CropGroup,
   Farm,
   Health,
   Inspection,
@@ -30,7 +28,34 @@ import type {
   WorkspaceState,
 } from "./types";
 
-const STORAGE_KEY = "ps03.workspace.v1";
+const LANGUAGE_KEY = "ps03.language.v1";
+
+export const emptyWorkspaceState: WorkspaceState = {
+  currentUser: {
+    id: "guest",
+    name: "Guest User",
+    role: "farmer",
+    phone: "",
+    email: "",
+    language: "en",
+    village: "",
+    district: "",
+    organisation: "",
+    initials: "GU",
+  },
+  users: [],
+  farms: [],
+  plots: [],
+  cropGroups: [],
+  plants: [],
+  captures: [],
+  analyses: [],
+  threads: [],
+  inspections: [],
+  riskRegions: [],
+  cases: [],
+  notifications: [],
+};
 
 function newId(prefix: string): string {
   const random =
@@ -175,47 +200,47 @@ function assistantReply(text: string, state: WorkspaceState): ChatMessage {
 }
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<WorkspaceState>(seedState);
-  const [hydrated, setHydrated] = useState(false);
-
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw) as WorkspaceState;
-        if (parsed && parsed.currentUser && parsed.farms) {
-          setState(parsed);
+  const [state, setState] = useState<WorkspaceState>(() => {
+    const base = { ...emptyWorkspaceState };
+    if (typeof window !== "undefined") {
+      try {
+        const savedLang = window.localStorage.getItem(LANGUAGE_KEY) as Language | null;
+        if (savedLang === "en" || savedLang === "hi" || savedLang === "kn") {
+          base.currentUser = { ...base.currentUser, language: savedLang };
         }
+        const session = readSession();
+        if (session) {
+          const validRole: Role =
+            session.role === "admin" || session.role === "expert" || session.role === "agent"
+              ? session.role
+              : "farmer";
+          base.currentUser = {
+            ...base.currentUser,
+            id: session.userId,
+            role: validRole,
+            name: session.userId,
+            initials: session.userId.slice(0, 2).toUpperCase(),
+          };
+        }
+      } catch {
+        // Fall back cleanly
       }
-    } catch {
-      // A corrupt local cache must not block the demo; fall back to seed.
     }
-    setHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!hydrated) {
-      return;
-    }
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    } catch {
-      // Storage can be full or blocked; the in-memory state still works.
-    }
-  }, [state, hydrated]);
+    return base;
+  });
 
   const setRole = useCallback((role: Role) => {
-    setState((current) => {
-      const user = current.users.find((item) => item.role === role);
-      return user ? { ...current, currentUser: user } : current;
-    });
+    setState((current) => ({
+      ...current,
+      currentUser: { ...current.currentUser, role },
+    }));
   }, []);
 
   const signIn = useCallback((role: Role) => {
-    setState((current) => {
-      const user = current.users.find((item) => item.role === role);
-      return user ? { ...current, currentUser: user } : current;
-    });
+    setState((current) => ({
+      ...current,
+      currentUser: { ...current.currentUser, role },
+    }));
   }, []);
 
   const updateProfile = useCallback<WorkspaceContextValue["updateProfile"]>((patch) => {
@@ -236,6 +261,13 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setLanguage = useCallback((language: Language) => {
+    if (typeof window !== "undefined") {
+      try {
+        window.localStorage.setItem(LANGUAGE_KEY, language);
+      } catch {
+        // Safe fallback
+      }
+    }
     setState((current) => ({
       ...current,
       currentUser: { ...current.currentUser, language },
@@ -755,7 +787,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const resetDemo = useCallback(() => {
-    setState(seedState);
+    setState(emptyWorkspaceState);
   }, []);
 
   const value = useMemo<WorkspaceContextValue>(

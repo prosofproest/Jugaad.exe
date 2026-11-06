@@ -2,7 +2,7 @@
 
 A clip is uploaded once, then read on demand. Reading is explicit rather than
 implicit so the client controls when the (bounded) decode and model work runs.
-Video bytes and previews are owner-scoped; there is no public URL.
+Videos are owner-scoped to the authenticated caller; there is no public URL.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.session import get_session
+from app.modules.identity.dependencies import get_current_context
+from app.modules.identity.service import AuthContext
 from app.modules.video import service
 from app.modules.video.extractor import VideoValidationError
 from app.modules.video.models import VideoDescriptor, VideoDetail, VideoReading
@@ -55,6 +57,7 @@ async def _read_bounded(file: UploadFile, limit: int) -> bytes:
 async def create_video(
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
+    context: AuthContext = Depends(get_current_context),
 ) -> VideoDescriptor:
     settings = get_settings()
     try:
@@ -62,6 +65,7 @@ async def create_video(
         return service.create_video_upload(
             session,
             settings=settings,
+            owner_id=context.user.user_id,
             filename=file.filename or "video",
             content_type=file.content_type or "",
             data=data,
@@ -71,18 +75,26 @@ async def create_video(
 
 
 @router.get("/{video_id}", response_model=VideoDetail)
-def get_video(video_id: str, session: Session = Depends(get_session)) -> VideoDetail:
+def get_video(
+    video_id: str,
+    session: Session = Depends(get_session),
+    context: AuthContext = Depends(get_current_context),
+) -> VideoDetail:
     try:
-        return service.get_video(session, video_id)
+        return service.get_video(session, video_id, context.user.user_id)
     except service.VideoNotFoundError as error:
         raise _not_found() from error
 
 
 @router.get("/{video_id}/preview")
-def get_preview(video_id: str, session: Session = Depends(get_session)) -> Response:
+def get_preview(
+    video_id: str,
+    session: Session = Depends(get_session),
+    context: AuthContext = Depends(get_current_context),
+) -> Response:
     settings = get_settings()
     try:
-        data = service.preview_bytes(session, settings, video_id)
+        data = service.preview_bytes(session, settings, video_id, context.user.user_id)
     except service.VideoNotFoundError as error:
         raise _not_found() from error
     except VideoValidationError as error:
@@ -99,9 +111,18 @@ def get_preview(video_id: str, session: Session = Depends(get_session)) -> Respo
     response_model=VideoReading,
     status_code=status.HTTP_201_CREATED,
 )
-def read_video(video_id: str, session: Session = Depends(get_session)) -> VideoReading:
+def read_video(
+    video_id: str,
+    session: Session = Depends(get_session),
+    context: AuthContext = Depends(get_current_context),
+) -> VideoReading:
     settings = get_settings()
     try:
-        return service.read_video(session, settings=settings, video_id=video_id)
+        return service.read_video(
+            session,
+            settings=settings,
+            video_id=video_id,
+            owner_id=context.user.user_id,
+        )
     except service.VideoNotFoundError as error:
         raise _not_found() from error

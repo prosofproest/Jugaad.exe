@@ -38,7 +38,6 @@ from app.modules.conversations.models import (
 from app.modules.conversations.orm import ConversationRow, ImageUploadRow, MessageRow
 from app.modules.conversations.validator import validate_reply
 
-OWNER_ID = "demo_user"
 NOT_A_DIAGNOSIS = "Assistive photo assessment — not a diagnosis."
 SAFE_WITHHELD_TEXT = (
     "The reply was withheld because it did not pass the content-safety check. "
@@ -134,36 +133,36 @@ def _message(session: Session, row: MessageRow) -> Message:
     )
 
 
-def _require_conversation(session: Session, conversation_id: str) -> ConversationRow:
-    row = repo.get_conversation(session, conversation_id=conversation_id, owner_id=OWNER_ID)
+def _require_conversation(session: Session, conversation_id: str, owner_id: str) -> ConversationRow:
+    row = repo.get_conversation(session, conversation_id=conversation_id, owner_id=owner_id)
     if row is None:
         raise ConversationNotFoundError(conversation_id)
     return row
 
 
-def create_conversation(session: Session, title: str | None) -> Conversation:
+def create_conversation(session: Session, owner_id: str, title: str | None) -> Conversation:
     row = repo.create_conversation(
         session,
-        owner_id=OWNER_ID,
+        owner_id=owner_id,
         title=title or "New conversation",
     )
     return _conversation(row)
 
 
-def list_conversations(session: Session) -> list[Conversation]:
-    return [_conversation(row) for row in repo.list_conversations(session, owner_id=OWNER_ID)]
+def list_conversations(session: Session, owner_id: str) -> list[Conversation]:
+    return [_conversation(row) for row in repo.list_conversations(session, owner_id=owner_id)]
 
 
-def get_conversation(session: Session, conversation_id: str) -> Conversation:
-    return _conversation(_require_conversation(session, conversation_id))
+def get_conversation(session: Session, conversation_id: str, owner_id: str) -> Conversation:
+    return _conversation(_require_conversation(session, conversation_id, owner_id))
 
 
-def delete_conversation(session: Session, conversation_id: str) -> None:
-    repo.delete_conversation(session, _require_conversation(session, conversation_id))
+def delete_conversation(session: Session, conversation_id: str, owner_id: str) -> None:
+    repo.delete_conversation(session, _require_conversation(session, conversation_id, owner_id))
 
 
-def list_messages(session: Session, conversation_id: str) -> list[Message]:
-    _require_conversation(session, conversation_id)
+def list_messages(session: Session, conversation_id: str, owner_id: str) -> list[Message]:
+    _require_conversation(session, conversation_id, owner_id)
     return [
         _message(session, row)
         for row in repo.list_messages(session, conversation_id=conversation_id)
@@ -199,10 +198,11 @@ def send_message(
     conversation_id: str,
     payload: MessageCreate,
     idempotency_key: str,
+    owner_id: str,
     *,
     engine: AssessmentEngine | None = None,
 ) -> SendResult:
-    conversation = _require_conversation(session, conversation_id)
+    conversation = _require_conversation(session, conversation_id, owner_id)
 
     existing = repo.find_turn(
         session,
@@ -222,7 +222,7 @@ def send_message(
         upload_row = repo.get_upload(
             session,
             upload_id=payload.image.upload_id,
-            owner_id=OWNER_ID,
+            owner_id=owner_id,
         )
         if upload_row is None:
             raise UploadNotFoundError(payload.image.upload_id)
@@ -353,14 +353,16 @@ def send_message(
     )
 
 
-def retry_message(session: Session, conversation_id: str, message_id: str) -> Message:
+def retry_message(
+    session: Session, conversation_id: str, message_id: str, owner_id: str
+) -> Message:
     """Return the stored message. A retry never fabricates a new result.
 
     Re-running an assessment is a new user turn (a retake), not an edit of the
     append-only assistant reply.
     """
 
-    _require_conversation(session, conversation_id)
+    _require_conversation(session, conversation_id, owner_id)
     row = repo.get_message(session, conversation_id=conversation_id, message_id=message_id)
     if row is None:
         raise MessageNotFoundError(message_id)
@@ -372,8 +374,9 @@ def request_review(
     conversation_id: str,
     message_id: str,
     reason: str | None,
+    owner_id: str,
 ) -> ReviewRequestOut:
-    _require_conversation(session, conversation_id)
+    _require_conversation(session, conversation_id, owner_id)
     message = repo.get_message(session, conversation_id=conversation_id, message_id=message_id)
     if message is None:
         raise MessageNotFoundError(message_id)
@@ -384,7 +387,7 @@ def request_review(
         session,
         conversation_id=conversation_id,
         message_id=message_id,
-        owner_id=OWNER_ID,
+        owner_id=owner_id,
         reason=reason,
     )
     if created:
@@ -402,17 +405,18 @@ def create_upload(
     session: Session,
     *,
     settings: Settings,
+    owner_id: str,
     filename: str,
     content_type: str,
     data: bytes,
 ) -> UploadDescriptor:
     inspected = inspect_image(data, content_type)
     upload_id = _id("up")
-    storage_path = store_image(settings, OWNER_ID, upload_id, content_type, data)
+    storage_path = store_image(settings, owner_id, upload_id, content_type, data)
     row = repo.create_upload(
         session,
         upload_id=upload_id,
-        owner_id=OWNER_ID,
+        owner_id=owner_id,
         filename=filename[:255] or "upload",
         content_type=content_type,
         size_bytes=len(data),
@@ -449,8 +453,8 @@ def upload_descriptor(row: ImageUploadRow) -> UploadDescriptor:
     )
 
 
-def get_upload_row(session: Session, upload_id: str) -> ImageUploadRow:
-    row = repo.get_upload(session, upload_id=upload_id, owner_id=OWNER_ID)
+def get_upload_row(session: Session, upload_id: str, owner_id: str) -> ImageUploadRow:
+    row = repo.get_upload(session, upload_id=upload_id, owner_id=owner_id)
     if row is None:
         raise UploadNotFoundError(upload_id)
     return row

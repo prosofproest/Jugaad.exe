@@ -19,6 +19,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.modules.conversations.engine import EngineResult
+from app.modules.identity.dependencies import set_identity_service
 from app.modules.video import repository as video_repo
 from app.modules.video import service
 from app.modules.video.extractor import first_frame_jpeg
@@ -27,7 +28,24 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from tests.support_identity import bootstrap_admin, login, make_identity_service
+
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_client():
+    service_instance, _sender, clock = make_identity_service()
+    bootstrap_admin(service_instance)
+    set_identity_service(service_instance)
+    tokens = login(service_instance, clock)
+    client.headers["Authorization"] = f"Bearer {tokens.access_token}"
+    try:
+        yield tokens
+    finally:
+        if "Authorization" in client.headers:
+            del client.headers["Authorization"]
+        set_identity_service(None)
 
 
 def _write_clip(path: Path, *, kind: str = "growing", frames: int = 60, size: int = 320) -> bytes:
@@ -297,6 +315,12 @@ def test_missing_video_is_404(video_env: sessionmaker[Session]) -> None:
     assert client.get("/v1/videos/vid_missing").status_code == 404
     assert client.get("/v1/videos/vid_missing/preview").status_code == 404
     assert client.post("/v1/videos/vid_missing/read").status_code == 404
+
+
+def test_video_routes_require_authentication(video_env: sessionmaker[Session]) -> None:
+    anonymous = TestClient(app)
+    assert anonymous.get("/v1/videos/vid_missing").status_code == 401
+    assert anonymous.post("/v1/videos/vid_missing/read").status_code == 401
 
 
 def test_settings_defaults_are_bounded() -> None:

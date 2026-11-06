@@ -4,7 +4,6 @@ import Link from "next/link";
 import { useState } from "react";
 
 import { Badge, Field, Icon, PageHeader } from "@/components/workspace/ui";
-import { useWorkspace } from "@/lib/workspace/store";
 
 const FAQS = [
   {
@@ -34,7 +33,6 @@ const FAQS = [
 ];
 
 export default function HelpPage() {
-  const { state } = useWorkspace();
   const [sent, setSent] = useState(false);
   const [topic, setTopic] = useState("Using the app");
 
@@ -81,7 +79,7 @@ export default function HelpPage() {
         <section className="ws-panel">
           <div className="ws-panel-head"><div><p className="ws-eyebrow">Contact</p><h2>Reach a human</h2></div></div>
           <div className="ws-contact-list">
-            <div><Icon name="user" size={17} /><div><strong>District plant health clinic</strong><span className="ws-small ws-muted">Mon–Sat, 09:00–17:00 · {state.currentUser.district}</span></div><Badge tone="ok">Available</Badge></div>
+            <div><Icon name="user" size={17} /><div><strong>District plant health clinic</strong><span className="ws-small ws-muted">Mon–Sat, 09:00–17:00 · Krishnagiri District</span></div><Badge tone="ok">Available</Badge></div>
             <div><Icon name="location" size={17} /><div><strong>Block extension office</strong><span className="ws-small ws-muted">Walk-in support and field visits</span></div><Badge tone="ok">Available</Badge></div>
             <div><Icon name="assistant" size={17} /><div><strong>Kisan call centre</strong><span className="ws-small ws-muted">Local-language advice · 24×7</span></div><Badge tone="neutral">Phone</Badge></div>
           </div>

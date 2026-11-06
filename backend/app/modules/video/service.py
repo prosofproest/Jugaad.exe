@@ -71,7 +71,6 @@ from app.modules.video.summarizer import (
 )
 from app.modules.video.tracker import ByteTrackLiteTracker
 
-OWNER_ID = "demo_user"
 NOT_A_DIAGNOSIS = "Assistive video reading — not a diagnosis."
 
 
@@ -95,8 +94,8 @@ def _aware(value: datetime) -> datetime:
     return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
 
 
-def _require_video(session: Session, video_id: str) -> VideoUploadRow:
-    row = repo.get_video(session, video_id=video_id, owner_id=OWNER_ID)
+def _require_video(session: Session, video_id: str, owner_id: str) -> VideoUploadRow:
+    row = repo.get_video(session, video_id=video_id, owner_id=owner_id)
     if row is None:
         raise VideoNotFoundError(video_id)
     return row
@@ -142,6 +141,7 @@ def create_video_upload(
     session: Session,
     *,
     settings: Settings,
+    owner_id: str,
     filename: str,
     content_type: str,
     data: bytes,
@@ -164,7 +164,7 @@ def create_video_upload(
         )
 
     video_id = _id("vid")
-    storage_path = _store_video(settings, OWNER_ID, video_id, extension, data)
+    storage_path = _store_video(settings, owner_id, video_id, extension, data)
     source = resolve_stored_path(settings, storage_path)
     try:
         probe = probe_video(source, settings)
@@ -176,7 +176,7 @@ def create_video_upload(
     row = repo.create_video(
         session,
         video_id=video_id,
-        owner_id=OWNER_ID,
+        owner_id=owner_id,
         filename=(filename or "video")[:255],
         content_type=normalized,
         size_bytes=len(data),
@@ -191,17 +191,17 @@ def create_video_upload(
     return video_descriptor(row)
 
 
-def get_video(session: Session, video_id: str) -> VideoDetail:
-    row = _require_video(session, video_id)
-    reading_row = repo.latest_reading(session, video_id=video_id, owner_id=OWNER_ID)
+def get_video(session: Session, video_id: str, owner_id: str) -> VideoDetail:
+    row = _require_video(session, video_id, owner_id)
+    reading_row = repo.latest_reading(session, video_id=video_id, owner_id=owner_id)
     return VideoDetail(
         video=video_descriptor(row),
         reading=_reading(reading_row) if reading_row is not None else None,
     )
 
 
-def preview_bytes(session: Session, settings: Settings, video_id: str) -> bytes:
-    row = _require_video(session, video_id)
+def preview_bytes(session: Session, settings: Settings, video_id: str, owner_id: str) -> bytes:
+    row = _require_video(session, video_id, owner_id)
     try:
         source = resolve_stored_path(settings, row.storage_path)
         return first_frame_jpeg(source, settings)
@@ -245,6 +245,7 @@ def _persist_reading(
     session: Session,
     *,
     row: VideoUploadRow,
+    owner_id: str,
     state: str,
     reason_code: str | None,
     error_code: str | None,
@@ -259,7 +260,7 @@ def _persist_reading(
         session,
         reading_id=_id("vidr"),
         video_id=row.id,
-        owner_id=OWNER_ID,
+        owner_id=owner_id,
         state=state,
         reason_code=reason_code,
         error_code=error_code,
@@ -280,6 +281,7 @@ def _persist_failed(
     session: Session,
     *,
     row: VideoUploadRow,
+    owner_id: str,
     error_code: str,
     engine_version: str,
     detector_version: str,
@@ -288,6 +290,7 @@ def _persist_failed(
     return _persist_reading(
         session,
         row=row,
+        owner_id=owner_id,
         state="failed",
         reason_code=error_code,
         error_code=error_code,
@@ -305,9 +308,10 @@ def read_video(
     *,
     settings: Settings,
     video_id: str,
+    owner_id: str,
     engine: AssessmentEngine | None = None,
 ) -> VideoReading:
-    row = _require_video(session, video_id)
+    row = _require_video(session, video_id, owner_id)
     engine = engine or get_assessment_engine()
     detector = MotionRegionDetector(
         threshold=settings.video_motion_threshold,
@@ -327,6 +331,7 @@ def read_video(
             _persist_failed(
                 session,
                 row=row,
+                owner_id=owner_id,
                 error_code=error.code,
                 engine_version=engine.model_version,
                 detector_version=detector.version,
@@ -338,6 +343,7 @@ def read_video(
             _persist_failed(
                 session,
                 row=row,
+                owner_id=owner_id,
                 error_code="video_decode_failed",
                 engine_version=engine.model_version,
                 detector_version=detector.version,
@@ -370,6 +376,7 @@ def read_video(
             _persist_failed(
                 session,
                 row=row,
+                owner_id=owner_id,
                 error_code="video_decode_failed",
                 engine_version=engine.model_version,
                 detector_version=detector.version,
@@ -387,7 +394,7 @@ def read_video(
     frame_assessments: list[dict] = []
     engine_failures: list[str] = []
     for item in selected:
-        storage_path = _store_frame(settings, OWNER_ID, row.id, item.frame.index, item.frame.jpeg)
+        storage_path = _store_frame(settings, owner_id, row.id, item.frame.index, item.frame.jpeg)
         context = UploadContext(
             upload_id=row.id,
             sha256=hashlib.sha256(item.frame.jpeg).hexdigest(),
@@ -420,6 +427,7 @@ def read_video(
             _persist_failed(
                 session,
                 row=row,
+                owner_id=owner_id,
                 error_code=engine_failures[0],
                 engine_version=engine.model_version,
                 detector_version=detector.version,
@@ -451,6 +459,7 @@ def read_video(
             _persist_reading(
                 session,
                 row=row,
+                owner_id=owner_id,
                 state="failed",
                 reason_code="unsafe_content_blocked",
                 error_code="unsafe_content_blocked",
@@ -466,6 +475,7 @@ def read_video(
     reading_row = _persist_reading(
         session,
         row=row,
+        owner_id=owner_id,
         state=summary.state,
         reason_code=summary.reason_code,
         error_code=summary.error_code,

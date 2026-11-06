@@ -10,9 +10,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Path, Query
+from fastapi import APIRouter, Depends, Path, Query
 
 from app.core.errors import ApiError
+from app.modules.identity.dependencies import get_current_context
+from app.modules.identity.service import AuthContext
 from app.modules.mapping.models import (
     BBox,
     LayerName,
@@ -59,6 +61,7 @@ def get_layer(
     target: str | None = Query(default=None, min_length=1, max_length=80),
     on_date: date | None = Query(default=None, alias="date"),
     bbox: str | None = Query(default=None, max_length=200),
+    _context: AuthContext = Depends(get_current_context),
 ) -> MapLayerResponse:
     service = get_map_service()
     if service is None:

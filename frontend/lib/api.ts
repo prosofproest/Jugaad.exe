@@ -159,14 +159,68 @@ export function publicAssetUrl(path: string): string {
   return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+/**
+ * Fetch an owner-scoped binary (stored image preview) with the bearer token.
+ * `<img src>` cannot send an Authorization header, so stored previews are
+ * loaded as blobs. Returns a `blob:` URL; the caller must revoke it.
+ */
+export async function authenticatedBlobUrl(previewPath: string): Promise<string> {
+  const token = browserToken();
+  const url = publicAssetUrl(previewPath);
+  const response = await fetch(url, {
+    cache: "no-store",
+    headers: token
+      ? { Authorization: `Bearer ${token}` }
+      : undefined,
+  });
+  if (!response.ok) {
+    let problem: ProblemDetails | null = null;
+    const text = await response.text().catch(() => "");
+    try {
+      problem = JSON.parse(text) as ProblemDetails;
+    } catch {
+      problem = null;
+    }
+    throw new ApiError(response.status, problem);
+  }
+  const blob = await response.blob();
+  return URL.createObjectURL(blob);
+}
+
+/**
+ * Browser session token, when present. Server rendering has no session and
+ * therefore sends no Authorization header — protected routes return 401 and
+ * the UI shows the sign-in gate. Auth/health routes never take a token.
+ */
+function browserToken(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = window.sessionStorage.getItem("ps03.identity.session");
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { accessToken?: unknown };
+    return typeof parsed.accessToken === "string" && parsed.accessToken
+      ? parsed.accessToken
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+function needsAuth(path: string): boolean {
+  return path.startsWith("/v1/") && !path.startsWith("/v1/auth/");
+}
+
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const token = needsAuth(path) ? browserToken() : null;
+  const existing = (init.headers ?? {}) as Record<string, string>;
   const response = await fetch(`${apiBaseUrl()}${path}`, {
     ...init,
     cache: "no-store",
     headers: {
       Accept: "application/json",
       "X-Request-ID": crypto.randomUUID(),
-      ...init.headers,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...existing,
     },
   });
 
@@ -524,3 +578,257 @@ export function exportAggregates(
     body: JSON.stringify({ purpose, row_limit: rowLimit }),
   });
 }
+
+// ---------------------------------------------------------------------------
+// Real Workspace API Extensions (Observations, Assessments, Review, Alerts, Forecasts)
+// ---------------------------------------------------------------------------
+
+export interface ObservationVerification {
+  status: "unverified" | "probable" | "confirmed" | "rejected" | "duplicate" | "needs_visit" | "unresolved";
+  evidence_tier: string;
+}
+
+export interface ObservationRecord {
+  id: string;
+  client_report_id: string;
+  status: string;
+  crop_code: string;
+  area_code: string;
+  variety: string | null;
+  growth_stage: string | null;
+  notes: string | null;
+  captured_at: string | null;
+  submitted_at: string;
+  is_demo: boolean;
+  verification: ObservationVerification;
+  created_at: string;
+}
+
+export interface ObservationPage {
+  items: ObservationRecord[];
+  next_cursor?: string | null;
+}
+
+export interface CreateObservationInput {
+  client_report_id: string;
+  crop_code: string;
+  area_code: string;
+  variety?: string | null;
+  growth_stage?: string | null;
+  notes?: string | null;
+  captured_at?: string | null;
+  subject_user_id?: string | null;
+}
+
+export function listObservations(cursor?: string, limit = 50, status?: string): Promise<ObservationPage> {
+  const query = new URLSearchParams();
+  if (cursor) query.set("cursor", cursor);
+  if (limit) query.set("limit", String(limit));
+  if (status) query.set("status", status);
+  const qStr = query.toString();
+  return request<ObservationPage>(`/v1/observations${qStr ? `?${qStr}` : ""}`);
+}
+
+export function getObservation(observationId: string, reason?: string): Promise<ObservationRecord> {
+  const query = reason ? `?reason=${encodeURIComponent(reason)}` : "";
+  return request<ObservationRecord>(`/v1/observations/${observationId}${query}`);
+}
+
+export function createObservation(input: CreateObservationInput, idempotencyKey = crypto.randomUUID()): Promise<ObservationRecord> {
+  return request<ObservationRecord>("/v1/observations", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Idempotency-Key": idempotencyKey,
+    },
+    body: JSON.stringify(input),
+  });
+}
+
+export function getObservationAssessment(observationId: string): Promise<Assessment> {
+  return request<Assessment>(`/v1/observations/${observationId}/assessment`);
+}
+
+export function requestObservationReview(observationId: string, reason?: string): Promise<{ review_request_id: string; observation_id: string; status: string; submitted_at: string }> {
+  return request("/v1/observations/" + observationId + "/review-request", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ reason: reason || null }),
+  });
+}
+
+export interface ReviewQueueItem {
+  observation_id: string;
+  client_report_id: string;
+  crop_code: string;
+  area_code: string;
+  captured_at: string | null;
+  submitted_at: string;
+  status: string;
+  verification_status: string;
+  assigned_to: string | null;
+  overdue: boolean;
+  priority_score: number;
+}
+
+export interface ReviewQueueSummary {
+  total: number;
+  unassigned: number;
+  assigned_to_me: number;
+  overdue: number;
+  by_crop: Record<string, number>;
+}
+
+export interface ReviewQueueResponse {
+  items: ReviewQueueItem[];
+  summary?: ReviewQueueSummary;
+}
+
+export function listReviewQueue(params?: {
+  area_code?: string;
+  crop_code?: string;
+  status?: string;
+  assigned_to_me?: boolean;
+  overdue_only?: boolean;
+  limit?: number;
+}): Promise<ReviewQueueResponse> {
+  const query = new URLSearchParams();
+  if (params?.area_code) query.set("area_code", params.area_code);
+  if (params?.crop_code) query.set("crop_code", params.crop_code);
+  if (params?.status) query.set("status", params.status);
+  if (params?.assigned_to_me) query.set("assigned_to_me", "true");
+  if (params?.overdue_only) query.set("overdue_only", "true");
+  if (params?.limit) query.set("limit", String(params.limit));
+  const qStr = query.toString();
+  return request<ReviewQueueResponse>(`/v1/reviews/queue${qStr ? `?${qStr}` : ""}`);
+}
+
+export function getReviewQueueSummary(): Promise<ReviewQueueSummary> {
+  return request<ReviewQueueSummary>("/v1/reviews/queue/summary");
+}
+
+export function submitReviewDecision(
+  observationId: string,
+  input: {
+    decision: string;
+    corrected_label?: string | null;
+    severity?: string | null;
+    reason_code?: string | null;
+    note?: string | null;
+  },
+): Promise<{ observation_id: string; decision: string; status: string }> {
+  return request(`/v1/reviews/${observationId}/decisions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export interface AlertItem {
+  id: string;
+  target_code: string;
+  geo_code: string;
+  risk_band: string;
+  headline: string;
+  body: string;
+  sent_at: string;
+  channel: string;
+  delivery_id: string;
+}
+
+export function listAlerts(channel = "in_app", limit = 50): Promise<{ items: AlertItem[] }> {
+  const query = new URLSearchParams({ channel, limit: String(limit) });
+  return request<{ items: AlertItem[] }>(`/v1/alerts?${query.toString()}`);
+}
+
+export interface ForecastItem {
+  id: string;
+  crop_code: string;
+  target_code: string;
+  geo_code: string;
+  risk_band: "low" | "moderate" | "high" | "urgent" | "insufficient_data";
+  probability: number | null;
+  generated_at: string;
+  valid_from: string;
+  valid_until: string;
+  coverage_status: string;
+  is_demo: boolean;
+}
+
+export function listForecasts(params?: {
+  crop?: string;
+  target?: string;
+  geo?: string;
+  horizon_days?: number;
+}): Promise<{ items: ForecastItem[] }> {
+  const query = new URLSearchParams();
+  if (params?.crop) query.set("crop", params.crop);
+  if (params?.target) query.set("target", params.target);
+  if (params?.geo) query.set("geo", params.geo);
+  if (params?.horizon_days) query.set("horizon_days", String(params.horizon_days));
+  const qStr = query.toString();
+  return request<{ items: ForecastItem[] }>(`/v1/forecasts${qStr ? `?${qStr}` : ""}`);
+}
+
+export function getCoverage(geoCode: string): Promise<{ geo_code: string; coverage: string; verified_reports_count: number; message?: string }> {
+  return request(`/v1/coverage?geo=${encodeURIComponent(geoCode)}`);
+}
+
+export function listAreas(): Promise<{
+  geographies: { code: string; level: string; name: string; parent_code: string | null }[];
+  saved_areas: { id: string; geo_code: string; label: string }[];
+  assignment_scope: string[];
+}> {
+  return request("/v1/areas");
+}
+
+export function listCrops(): Promise<{
+  items: { code: string; common_name: string; scientific_name?: string }[];
+}> {
+  return request("/v1/config/crops");
+}
+
+export interface NotificationPreference {
+  channel: string;
+  target_code: string | null;
+  enabled: boolean;
+  quiet_start: string | null;
+  quiet_end: string | null;
+  language: string | null;
+}
+
+export function listNotificationPreferences(): Promise<{ preferences: NotificationPreference[] }> {
+  return request("/v1/notification-preferences");
+}
+
+export function updateNotificationPreference(input: {
+  channel: string;
+  target_code?: string | null;
+  enabled?: boolean;
+  quiet_start?: string | null;
+  quiet_end?: string | null;
+  language?: string | null;
+}): Promise<NotificationPreference> {
+  return request("/v1/notification-preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export function getUserConsents(): Promise<{ items: { consent_type: string; granted: boolean; granted_at: string | null }[] }> {
+  return request("/v1/me/consents");
+}
+
+export function postUserConsent(consentType: string, granted: boolean): Promise<Record<string, unknown>> {
+  return request("/v1/me/consents", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ consent_type: consentType, granted }),
+  });
+}
+
+export function requestUserDataExport(): Promise<{ export_id: string; download_url?: string; status: string }> {
+  return request("/v1/me/export");
+}
+

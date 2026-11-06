@@ -41,6 +41,11 @@ jobs:
         run: |
           alembic upgrade head --sql > "${RUNNER_TEMP}/migrations.sql"
           test -s "${RUNNER_TEMP}/migrations.sql"
+      - name: Fresh migration + schema drift check
+        run: |
+          APP_DATABASE_URL="sqlite:///${RUNNER_TEMP}/ci.db" alembic upgrade head
+          APP_DATABASE_URL="sqlite:///${RUNNER_TEMP}/ci.db" python scripts/check_schema_drift.py
+          APP_DATABASE_URL="sqlite:///${RUNNER_TEMP}/ci.db" alembic check
 
   frontend:
     name: Web (typecheck, lint, build)

@@ -9,9 +9,11 @@ from __future__ import annotations
 import pytest
 from app.api.v1 import map as map_routes
 from app.main import app
+from app.modules.identity.dependencies import set_identity_service
 from app.modules.mapping.store import MapDataStore
 from fastapi.testclient import TestClient
 
+from tests.support_identity import bootstrap_admin, login, make_identity_service
 from tests.support_mapping import (
     BOUNDARY_VERSION,
     NOW,
@@ -21,6 +23,21 @@ from tests.support_mapping import (
 )
 
 client = TestClient(app)
+
+
+@pytest.fixture(autouse=True)
+def authenticated_client():
+    service_instance, _sender, clock = make_identity_service()
+    bootstrap_admin(service_instance)
+    set_identity_service(service_instance)
+    tokens = login(service_instance, clock)
+    client.headers["Authorization"] = f"Bearer {tokens.access_token}"
+    try:
+        yield tokens
+    finally:
+        if "Authorization" in client.headers:
+            del client.headers["Authorization"]
+        set_identity_service(None)
 
 
 @pytest.fixture(autouse=True)

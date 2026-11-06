@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 
 from app.core.config import get_settings
 from app.modules.assessments.explanation import NOT_A_DIAGNOSIS
@@ -23,6 +23,8 @@ from app.modules.assessments.schemas import (
 )
 from app.modules.assessments.service import AssessmentService
 from app.modules.assessments.store import InMemoryPredictionStore
+from app.modules.identity.dependencies import get_current_context
+from app.modules.identity.service import AuthContext
 
 router = APIRouter(prefix="/assessments", tags=["assessments"])
 
@@ -106,6 +108,7 @@ def set_assessment_service(service: ServiceLike | None) -> None:
 def create_assessment(
     payload: AssessmentRequest,
     idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1),
+    _context: AuthContext = Depends(get_current_context),
 ) -> AssessmentResponse:
     if idempotency_key != payload.client_assessment_id:
         raise HTTPException(
@@ -119,6 +122,7 @@ def create_assessment(
 def list_assessments(
     limit: int = Query(default=20, ge=1, le=100),
     cursor: str | None = Query(default=None),
+    _context: AuthContext = Depends(get_current_context),
 ) -> AssessmentHistory:
     try:
         return get_assessment_service().history(limit=limit, cursor=cursor)
@@ -127,7 +131,10 @@ def list_assessments(
 
 
 @router.get("/{prediction_id}", response_model=AssessmentResponse)
-def get_assessment(prediction_id: str) -> AssessmentResponse:
+def get_assessment(
+    prediction_id: str,
+    _context: AuthContext = Depends(get_current_context),
+) -> AssessmentResponse:
     response = get_assessment_service().get(prediction_id)
     if response is None:
         raise HTTPException(status_code=404, detail="Assessment not found")

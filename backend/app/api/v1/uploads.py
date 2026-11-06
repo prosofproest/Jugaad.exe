@@ -2,8 +2,8 @@
 
 The upload endpoint is the only place raw bytes enter the system. It enforces a
 declared type allow-list, a size ceiling, a real decode and the demo quality
-gate before writing anything. The preview endpoint is owner-scoped; there is no
-public URL and no directory listing.
+gate before writing anything. Uploads and previews are owner-scoped to the
+authenticated caller; there is no public URL and no directory listing.
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from app.db.session import get_session
 from app.modules.conversations import service
 from app.modules.conversations.media import MediaValidationError, resolve_stored_path
 from app.modules.conversations.models import UploadDescriptor
+from app.modules.identity.dependencies import get_current_context
+from app.modules.identity.service import AuthContext
 
 router = APIRouter(prefix="/uploads", tags=["conversations"])
 
@@ -26,6 +28,7 @@ router = APIRouter(prefix="/uploads", tags=["conversations"])
 async def create_upload(
     file: UploadFile = File(...),
     session: Session = Depends(get_session),
+    context: AuthContext = Depends(get_current_context),
 ) -> UploadDescriptor:
     settings = get_settings()
     content_type = (file.content_type or "").split(";")[0].strip().lower()
@@ -49,6 +52,7 @@ async def create_upload(
         descriptor = service.create_upload(
             session,
             settings=settings,
+            owner_id=context.user.user_id,
             filename=file.filename or "upload",
             content_type=content_type,
             data=data,
@@ -67,10 +71,11 @@ async def create_upload(
 def get_upload(
     upload_id: str,
     session: Session = Depends(get_session),
+    context: AuthContext = Depends(get_current_context),
 ) -> FileResponse:
     settings = get_settings()
     try:
-        row = service.get_upload_row(session, upload_id)
+        row = service.get_upload_row(session, upload_id, context.user.user_id)
     except service.UploadNotFoundError as error:
         raise ApiError(
             code="upload_not_found",

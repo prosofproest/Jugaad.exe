@@ -101,8 +101,11 @@ privacy requests/self-export/soft deletion and audit events. Routes are
 `/v1/auth/*`, `/v1/me/*` and `/v1/admin/*`.
 
 This slice is **in memory** and has no Alembic migration yet; restarting the process
-clears users, sessions and consents. The pre-existing demo chat/assessment/advisory/map
-routes are still unauthenticated. Real SMS delivery and password reset need providers
+clears users, sessions and consents. The demo chat/video/assessment/advisory/map
+routes now require a bearer token (any active role via
+`get_current_context`) and scope records to the token principal — unauthenticated
+calls return `401 authentication_required`, and one user 404s on another's
+conversations/uploads/videos. Real SMS delivery and password reset need providers
 that are not chosen; production OTP delivery fails closed. Passwords use stdlib
 `scrypt` rather than Argon2id to avoid an unapproved dependency. D10 (retention) and
 D11 (on-behalf/offline sessions) remain open.
@@ -135,8 +138,9 @@ restart.
 Sends are idempotent per `Idempotency-Key`, so a retried request replays the
 stored turn. `DELETE /v1/conversations/{id}` is a soft delete (`deleted_at`);
 image files are not reclaimed yet because no retention job exists. The slice is
-unauthenticated and demo-only: `plant_presence` is a green-pixel heuristic, not a
-detector, and no real model is connected.
+authenticated and demo-only: `plant_presence` is a green-pixel heuristic, not a
+detector, and no real model is connected. Existing rows written under the old
+fixed `demo_user` owner are orphaned — each token principal starts empty.
 
 ### Real provider (OpenAI-compatible)
 

@@ -2,186 +2,61 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
 
-import { Icon, type IconName } from "@/components/workspace/ui";
-import { useWorkspace } from "@/lib/workspace/store";
-import type { Role } from "@/lib/workspace/types";
-
-const ROLES: { role: Role; label: string; detail: string; icon: IconName; demo: string }[] = [
-  {
-    role: "farmer",
-    label: "Farmer",
-    detail: "Scan plants, manage farms, track recovery",
-    icon: "plant",
-    demo: "Ravi Kumar · Hosur",
-  },
-  {
-    role: "expert",
-    label: "Agricultural expert",
-    detail: "Verify diagnoses and approve recommendations",
-    icon: "expert",
-    demo: "Dr. Meera Sundaram · Plant health clinic",
-  },
-  {
-    role: "agent",
-    label: "Field agent",
-    detail: "Run assigned inspections and farmer reports",
-    icon: "location",
-    demo: "Arun Prasad · Block extension office",
-  },
-  {
-    role: "admin",
-    label: "Administrator",
-    detail: "Coverage, backlog and regional oversight",
-    icon: "shield",
-    demo: "Lakshmi Narayanan · District office",
-  },
-];
+import { SignIn } from "@/components/sign-in";
+import { PageHeader } from "@/components/workspace/ui";
+import { readSession } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const { signIn, setLanguage } = useWorkspace();
-  const [role, setRole] = useState<Role>("farmer");
-  const [phone, setPhone] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const session = readSession();
 
-  function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (phone.replace(/\D/g, "").length < 10) {
-      setError("Enter a 10-digit mobile number, or use a demo account below.");
-      return;
-    }
-    if (password.length < 4) {
-      setError("Demo password must be at least 4 characters.");
-      return;
-    }
-    signIn(role);
+  function handleSuccess() {
     router.push("/");
   }
 
   return (
-    <div className="ws-auth">
-      <div className="ws-auth-visual">
-        <Link href="/login" className="ws-auth-brand">
-          <span className="ws-brand-mark"><Icon name="leaf" size={22} /></span>
-          <span><strong>CropSentinel</strong><small>Pest & disease network</small></span>
-        </Link>
-        <div>
-          <p className="ws-eyebrow">Field-ready decision support</p>
-          <h1>See what is happening on the farm before it spreads.</h1>
-          <p>
-            Photo triage, farm maps and verified regional signals in one workspace. Every result
-            shows its uncertainty, freshness and the next safe step.
-          </p>
-        </div>
-        <div className="ws-auth-points">
-          <span><Icon name="camera" size={17} /> Offline-first capture</span>
-          <span><Icon name="map" size={17} /> Plot and plant health maps</span>
-          <span><Icon name="expert" size={17} /> Human verification</span>
-        </div>
-        <p className="ws-auth-disclaimer">
-          Assistive decision support, not a diagnosis or a confirmed outbreak. Demo data is stored
-          on this device only.
-        </p>
-      </div>
+    <div className="ws-page" style={{ maxWidth: "600px", margin: "2rem auto" }}>
+      <PageHeader
+        eyebrow="Authentication"
+        title="Sign in to CropSentinel"
+        lede="Access the early pest warning system, submit field observations, or review verification queues."
+      />
 
-      <div className="ws-auth-panel">
-        <div className="ws-auth-card">
-          <div className="ws-auth-head">
-            <p className="ws-eyebrow">Welcome back</p>
-            <h2>Sign in to your workspace</h2>
-            <p className="ws-small ws-muted">Choose a role to see its dashboard and permissions.</p>
-          </div>
-
-          <div className="ws-role-picker" role="radiogroup" aria-label="Account role">
-            {ROLES.map((item) => (
-              <button
-                key={item.role}
-                type="button"
-                role="radio"
-                aria-checked={role === item.role}
-                className={role === item.role ? "ws-role-option ws-role-option-active" : "ws-role-option"}
-                onClick={() => setRole(item.role)}
-              >
-                <span className="ws-role-icon"><Icon name={item.icon} size={18} /></span>
-                <span>
-                  <strong>{item.label}</strong>
-                  <small>{item.detail}</small>
-                </span>
-                {role === item.role ? <Icon name="check" size={16} /> : null}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={submit} className="ws-form">
-            <label className="ws-field">
-              <span>Mobile number</span>
-              <input
-                type="tel"
-                inputMode="numeric"
-                placeholder="98420 11223"
-                value={phone}
-                onChange={(event) => setPhone(event.target.value)}
-                autoComplete="tel"
-              />
-            </label>
-            <label className="ws-field">
-              <span>Password</span>
-              <input
-                type="password"
-                placeholder="Demo password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                autoComplete="current-password"
-              />
-            </label>
-            {error ? <p className="ws-form-error" role="alert">{error}</p> : null}
-            <div className="ws-form-row">
-              <label className="ws-check">
-                <input type="checkbox" defaultChecked /> Remember this device
-              </label>
-              <button type="button" className="ws-link-button">Forgot password?</button>
+      {session ? (
+        <div className="ws-panel">
+          <div className="ws-panel-head">
+            <div>
+              <p className="ws-eyebrow">Active session</p>
+              <h2>Already signed in</h2>
             </div>
-            <button type="submit" className="ws-button ws-button-primary ws-button-block ws-button-large">
-              Sign in as {ROLES.find((item) => item.role === role)?.label}
-              <Icon name="arrow" size={17} />
-            </button>
-          </form>
-
-          <div className="ws-demo-accounts">
-            <p className="ws-eyebrow">One-tap demo accounts</p>
-            {ROLES.map((item) => (
-              <button
-                key={item.role}
-                type="button"
-                className="ws-demo-account"
-                onClick={() => {
-                  signIn(item.role);
-                  router.push("/");
-                }}
-              >
-                <span>
-                  <strong>{item.demo}</strong>
-                  <small>{item.label}</small>
-                </span>
-                <span className="ws-demo-use">Use <Icon name="arrow" size={13} /></span>
-              </button>
-            ))}
+            <span className="badge badge-primary">{session.role}</span>
           </div>
-
-          <p className="ws-auth-switch">
-            New here? <Link href="/register">Create a farmer account</Link>
-          </p>
-          <div className="ws-auth-lang">
-            <Icon name="globe" size={15} />
-            <button type="button" onClick={() => setLanguage("en")}>English</button>
-            <button type="button" onClick={() => setLanguage("hi")}>हिन्दी</button>
-            <button type="button" onClick={() => setLanguage("kn")}>ಕನ್ನಡ</button>
+          <p className="ws-muted">You are currently signed in as user ID: {session.userId}.</p>
+          <div className="ws-banner-actions" style={{ marginTop: "1rem" }}>
+            <Link href="/" className="ws-button ws-button-primary">
+              Go to Dashboard
+            </Link>
+            <Link href="/admin" className="ws-button ws-button-secondary">
+              Admin Portal
+            </Link>
           </div>
         </div>
-      </div>
+      ) : (
+        <div>
+          <SignIn onSuccess={handleSuccess} />
+
+          <div className="ws-notice ws-notice-info" style={{ marginTop: "1.5rem" }}>
+            <p className="ws-small ws-muted" style={{ margin: 0 }}>
+              Staff accounts (extension worker, pathologist, agronomist, admin) sign in with email and password. Farmer phone-OTP delivery is in development and has no live SMS gateway yet. Use a provisioned staff account to access protected surfaces.
+            </p>
+          </div>
+
+          <p className="ws-small ws-muted" style={{ textAlign: "center", marginTop: "1rem" }}>
+            Need an account? Contact your extension office or <Link href="/register" className="ws-link">view registration details</Link>.
+          </p>
+        </div>
+      )}
     </div>
   );
 }
