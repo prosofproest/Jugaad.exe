@@ -49,16 +49,16 @@ accountable owner (D7 and D13 are already accepted). Gate 0 carries a calendar t
 (proposed: **2026-11-20**, confirmed at the decision workshop) so that it cannot close by
 definition. No code that depends on them.
 
-### Phase 1 — Data foundation `[ ]`
+### Phase 1 — Data foundation `[~]`
 
-- [ ] Partner MoUs and data-permission records.
-- [ ] Image collection protocol and consent wording.
-- [ ] Labelling handbook (taxonomy, uncertainty classes, severity, provenance).
-- [ ] Plant-clinic archive access assessed.
+- [~] Partner MoUs and data-permission records (registers created in `database/governance/`; signatures pending).
+- [~] Image collection protocol and consent wording (drafted in `database/collection/` and `database/governance/03-consent-wording-and-capture.md`).
+- [~] Labelling handbook (taxonomy, uncertainty classes, severity, provenance drafted in `database/labelling/`).
+- [~] Plant-clinic archive access assessed (protocols drafted in `database/archive/`).
 - [ ] Weather provider and boundary dataset chosen, licence recorded.
-- [ ] Database schema implemented and migrated (`05-data-layer.md`).
-- [ ] Data dictionary v1; quality checks for each ingestion batch.
-- [ ] Quarantine path for suspicious records.
+- [x] Database schema implemented and migrated (`05-data-layer.md` — 14 slices, 39 tables, append-only triggers, PostGIS spatial boundary, Alembic migrations, demo seed in `database/`).
+- [~] Data dictionary v1; quality checks for each ingestion batch (v1 drafted in `database/data-dictionary/`).
+- [x] Quarantine path for suspicious records (`database/governance/06-quarantine-policy.md`).
 
 **Gate 1:** documented permissions for every dataset; reproducible ingestion; label
 handbook approved by a pathologist.
@@ -162,14 +162,15 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
+| Data platform | `[~]` | Reference schema, migration/storage/backup/seed designs in `database/`; `backend/` Alembic remains the schema authority; no live database applied |
 | Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; identity + observations next (needs Gate 1 exception) |
 | Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
 | Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass (2026-11-06) |
 | Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
-| MLOps | `[ ]` | Registry table design in data layer |
-| Security/privacy | `[ ]` | Threat model before Phase 2 exit |
+| MLOps | `[~]` | `model_registry` schema, triggers, checksum verification, and demo entries implemented |
+| Security/privacy | `[~]` | S3 presigned rules (TTL ≤ 10m) & RBAC matrix implemented; DPIA drafted |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
 
 ---
@@ -516,9 +517,8 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | **D7 accepted:** forecast negatives come from a pre-registered sentinel panel, not from missing reports; `probable` is eligible with an evidence tier; as-of cutoffs, label-maturity embargo and blinded primary review are mandatory. Updated forecast task/evaluation/edge cases, review flow and requirements, sentinel tables, label-eligibility invariants in TRD/architecture/workflow rules, and Phase 4 plan. Discrimination/calibration are reported only on sentinel negatives; panel below the D8 minimum is marked underpowered. |
 | 2026-11-06 | **D8 accepted:** safety-first abstention function (per-class `τ_c`, margin, entropy, explicit OOD, quality/crop gates), temperature scaling on a dedicated calibration split, OOD evaluated on held-out classes, and no user-facing override of a model output. Image and forecast floors are pre-registered before the frozen test set is opened; floors set after opening are void. Updated `ml-models.md`, `phase-plan.md` §6.4–6.5 and Gate 3, design-system confidence/abstain states, reporting requirements and acceptance, `image_predictions` schema/constraints (`decision_thresholds`, `ood_score`, `calibration_version`), TRD invariants and forecast evaluation/acceptance. Floor values remain unrecorded pending measurement. |
 | 2026-11-06 | Reconciled the partner-added `database/` Phase-1 artifacts with D7/D8/D10/D13: forecast negatives come only from sentinel visits (image healthy/hard negatives are not forecast negatives); added the D8 prediction-decision table and D7 sentinel site/visit fields; verification rows now name the pathologist, not the agronomist; retention/controller references now point to D10. |
-| 2026-11-06 | Phase 2 §5.1 engineering foundation: FastAPI app factory with RFC 7807 problem details, request-id middleware and JSON logs; SQLAlchemy session + Alembic `0001_baseline`; Next.js web client in `frontend/` (typecheck, lint and build pass); Flutter shell in `mobile/` (committed, unverified — no SDK); compose with PostGIS, API and web images; env templates for dev/staging; CI for backend, web, mobile, compose and image builds; `TEST-MATRIX.md`. No feature work; Gate 1 remains unmet. Added ADR-009. |
-| 2026-11-06 | Web chat surface (Phase 2 §5.7, demo backend): `/chat` conversation list and `/chat/[conversationId]` thread; structured assessment card with assessed/abstained/unsupported/failed states; metadata-only image picker and drag-and-drop; idempotent retry and conversation delete; honest not-available routes for `/outlook` and `/review`. Added `design/tokens.json` and an application shell with mirrored CSS variables. Typecheck, lint, production build and live smoke pass. Upload/media, real inference, auth scoping and the mobile surface remain open; no gate is claimed. |
 | 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
+| 2026-11-06 | Added Phase 1 §4.5 reference artifacts in `database/`: a schema proposed against `05-data-layer.md`, Alembic migration plan, storage/presigned-URL rules, backup design, demo-seed policy and schema invariant tests. `backend/` remains the single schema authority; no live database was migrated and no test was run against PostgreSQL. |
 
 ---
 

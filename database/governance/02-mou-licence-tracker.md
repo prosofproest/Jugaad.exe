@@ -32,7 +32,9 @@
 | Dataset ID | Agreement type | Counterparty | Status | Signed by | Effective | Expiry | Record location | Notes |
 |---|---|---|---|---|---|---|---|---|
 | DS-001 | MoU + data-sharing schedule | TBD | `not_started` | — | — | — | — | Partner-collected field images |
-| DS-002 | Archive access / licence | TBD | `not_started` | — | — | — | — | Plant-clinic or university archive |
+| DS-002 | Archive access / licence | TBD | `not_started` | — | — | — | — | Plant-clinic or university archive (family) |
+| ARC-001 | Archive access / data-sharing agreement | Plant-clinic institution (TBD) | `not_started` | — | — | — | — | Sub-register of DS-002; label mapping, provenance and provenance audit required |
+| ARC-002 | Archive access / data-sharing agreement | University pathology department (TBD) | `not_started` | — | — | — | — | Sub-register of DS-002; pathologist review and taxonomy version required |
 | DS-003 | Public dataset licence review | Publisher (TBD per dataset) | `not_started` | — | — | — | — | Verify each licence; no field validation |
 | DS-004 | Public dataset licence review | Publisher (TBD per dataset) | `not_started` | — | — | — | — | Pretraining/benchmarking only |
 | DS-005 | Consent + terms of use | Farmer / field staff | `not_started` | — | — | — | — | Consent wording pending approval |
@@ -41,6 +43,14 @@
 | DS-008 | Soil dataset terms (optional) | Provider (TBD) | `not_started` | — | — | — | — | Optional context only |
 | DS-010 | Historical records agreement | Record holder (TBD) | `not_started` | — | — | — | — | Permission and verification tier |
 | DS-011 | Internal advisory approval | Internal authors/approvers | `not_started` | — | — | — | — | Not a third-party licence |
+
+`DS-009` (Sentinel-2) is `not_acquired` and out of v1 scope, so no agreement is tracked.
+`DS-012` (demo/synthetic fixtures) is internal and requires no third-party agreement; its
+row is `restricted` in the register. Neither omission is an unrecorded permission.
+
+**Archive note:** `ARC-001` and `ARC-002` are sub-register rows under `DS-002`, not new
+dataset families. Each needs its own signed record; a DS-002 family-level entry is not
+sufficient to ingest from a specific institution.
 
 No counterparty names, dates or signatures are invented. All unknown fields are `TBD`.
 
@@ -69,6 +79,8 @@ the final wording; this checklist prevents omissions.
 - [ ] Redistribution rights for data, derivatives and trained models.
 - [ ] Publication rights for aggregate results and case studies.
 - [ ] Whether the counterparty can withdraw permission and what happens to derived work.
+- [ ] For archives: whether labels may be re-mapped to the project taxonomy, and whether
+      the mapped labels, provenance records and trained models may be retained and used.
 
 ### 3.3 Privacy and ethics
 
@@ -150,5 +162,9 @@ sufficient.
 - The pilot geography (D1) is unresolved, which affects boundary and archive sources.
 - Legal jurisdiction and the applicable data-protection regime are unresolved.
 - Weather, boundary and public-dataset licences have not been checked.
+- No archive institution has been identified, approached or granted permission; `ARC-001`
+  and `ARC-002` are `not_started`.
+- No archive permission wording has been reviewed for label re-mapping or derived-model
+  retention.
 - No signature authority has been recorded.
 - No record repository or retention schedule exists yet.

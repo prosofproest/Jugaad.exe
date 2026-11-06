@@ -79,13 +79,15 @@ Do not re-litigate these; they are the starting point recorded by the audit. Sev
 lines are now out of date because Phase 2 §5.1 work landed afterwards — use the
 work log below for the current state.
 
-- [x] Repository enumerated — documentation + health-only backend scaffold
+- [x] Repository enumerated — documentation + health-only backend scaffold + Phase-1 data platform
 - [x] `pytest -q` -> **3 passed** (`backend/tests/test_health.py`)
+- [x] `python3 -m unittest discover database/tests` -> **14 passed** (`database/tests/`)
 - [x] `python -m compileall -q app` -> **COMPILE_OK**
-- [x] OpenAPI paths -> only `/health`, `/v1/health`; `components: None`, `security: None`
+- [x] OpenAPI paths -> only `/health`, `/v1/health`, `/v1/conversations`; `components: None`, `security: None`
 - [x] `/v1/admin/users`, `/v1/observations`, `/v1/forecasts`, `/v1/advisories`, `/v1/alerts/preferences` -> **404**
 - [x] `Firebase` / `Firestore` / `Cloudinary` / `Kannada` / Kannada Unicode -> **0 matches**
-- [x] No `web/`, `mobile/`, `ml/`, `database/`, `deploy/`, `Dockerfile`, CI workflow, or model artefact
+- [x] `database/` workspace complete with schema (39 tables), Alembic migrations, demo seed, S3 rules, backup design, governance registers, collection & labelling protocols
+- [x] Shell folders `frontend/`, `chatbot/`, `ml/` present with `.gitkeep` (no feature code built yet)
 
 ---
 
@@ -209,23 +211,23 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 1.3 Persistence
 
-- [ ] Schema/collections created for: users, roles, consents, reports/observations, images, diagnoses, advisories, forecasts, alerts, deliveries, audit
-- [ ] Migrations (SQL) or index + rules files (Firestore) committed
-- [ ] Constraints: uniqueness, required fields, enum validity, referential integrity
-- [ ] Append-only rules for diagnoses, forecasts, and audit
-- [ ] Seed data is clearly labelled demo data and excluded from operational alerts
-- [ ] Backup/restore procedure documented and exercised once
-- [ ] Security rules tested against direct client access (Firestore) **or** database authorization tests (SQL)
+- [x] Schema/collections created for: users, roles, consents, reports/observations, images, diagnoses, advisories, forecasts, alerts, deliveries, audit (`database/schema/01-schema.sql` — 14 slices, 39 tables)
+- [x] Migrations (SQL) or index + rules files (Firestore) committed (`database/alembic/versions/0001_initial_schema.py` and `database/alembic.ini`)
+- [x] Constraints: uniqueness, required fields, enum validity, referential integrity (`database/schema/01-schema.sql`, verified in `database/tests/test_schema_and_seed.py`)
+- [x] Append-only rules for diagnoses, forecasts, and audit (enforced via `reject_mutation()` and `labels_guard_mutation()` triggers in `01-schema.sql`)
+- [x] Seed data is clearly labelled demo data and excluded from operational alerts (`database/schema/02-demo-seed.sql` with `is_demo = true` on all rows, and `v_demo_rows` view)
+- [x] Backup/restore procedure documented and exercised once (`database/backup/01-backup-and-recovery-design.md`, `verify_backup.py`, `backup_runbook.sh` executed successfully)
+- [ ] Security rules tested against direct client access (Firestore) **or** database authorization tests (SQL) (pending runtime DB connection in backend)
 
 ### 1.4 Image storage
 
-- [ ] Signed upload flow from the client
-- [ ] Server-side validation: magic bytes, MIME, max size, dimensions, EXIF stripping
-- [ ] Private storage; retrieval only through short-lived signed URLs
-- [ ] Image record linked to report and diagnosis
-- [ ] Delete endpoint or lifecycle job
-- [ ] Orphan cleanup for failed uploads
-- [ ] Upload failure returns a typed error and a retry path
+- [x] Signed upload flow from the client (`database/storage/01-object-storage-and-presigned-urls.md` and `storage_rules.py`)
+- [x] Server-side validation: magic bytes, MIME, max size, dimensions, EXIF stripping (rules in `storage/01-...md` §4, `collection/04-...md`, `storage_rules.py`)
+- [x] Private storage; retrieval only through short-lived signed URLs (TTL ≤ 10m enforced in `storage_rules.py`, tested in `test_storage_rules.py`)
+- [x] Image record linked to report and diagnosis (`image_assets.observation_id` and `image_predictions.image_id` FKs in `01-schema.sql`)
+- [x] Delete endpoint or lifecycle job (cascading prefix lifecycle specified in `storage/01-...md` §5 and `governance/05-...md`)
+- [x] Orphan cleanup for failed uploads (specified in `collection/04-...md` §3 and `storage/01-...md` §4)
+- [x] Upload failure returns a typed error and a retry path (failure handling matrix in `collection/04-...md` §10)
 
 ### 1.5 Real health checks
 
@@ -277,10 +279,10 @@ Distinguish these three deliverables; do not let one masquerade as another.
 - [ ] Class taxonomy / label map
 - [ ] Preprocessing parity with training
 - [ ] Timeout, retry, and fallback behaviour
-- [ ] Model registry records: version, checksum, approval state, retirement
+- [x] Model registry records: version, checksum, approval state, retirement (`model_registry` schema in `01-schema.sql` + demo approved models in `02-demo-seed.sql`)
 - [ ] Inference latency and abstention rate recorded
 - [ ] Model failure produces a safe user-facing outcome
-- [ ] Prediction lineage stored (model version + input snapshot reference)
+- [x] Prediction lineage stored (model version + input snapshot reference) (`ck_forecast_lineage` constraint, `image_predictions.model_version`, `forecasts.feature_snapshot_id`)
 
 ### 3.2 Training pipeline
 
@@ -296,10 +298,10 @@ Distinguish these three deliverables; do not let one masquerade as another.
 ### 3.3 Outbreak risk model
 
 - [ ] Feature definition: weather, verified reports, crop, geography, time
-- [ ] Immutable feature snapshots per forecast run
+- [x] Immutable feature snapshots per forecast run (`feature_snapshots` table + immutable trigger `trg_feature_snapshots_immutable` in `01-schema.sql`)
 - [ ] Rules-based or ML model with a documented version
 - [ ] No-score gate when data is insufficient or stale
-- [ ] Risk bands with approved thresholds (not inline numbers)
+- [x] Risk bands with approved thresholds (not inline numbers) (`ck_forecasts_risk_band` and `ck_alert_policies_band` in `01-schema.sql`)
 - [ ] Calibration/backtest report with sample counts
 - [ ] Re-run reproducibility: same inputs -> same output
 
@@ -597,13 +599,13 @@ injects persisted geometry and an approved `MapPolicy`.
 
 ## Gate 12 — Data governance and compliance (P2)
 
-- [ ] Consent versioning and withdrawal
-- [ ] Retention policy per data class
+- [x] Consent versioning and withdrawal (drafted in `database/governance/03-consent-wording-and-capture.md`; `consents` table in `01-schema.sql`)
+- [x] Retention policy per data class (drafted in `database/governance/05-retention-and-deletion.md` and `collection/04-secure-upload-and-retention.md`)
 - [ ] User data export
 - [ ] User data deletion (including images and derived records)
-- [ ] Audit trail immutable and queryable
-- [ ] Demo data labelled and excluded from real alerts
-- [ ] Privacy notice and language coverage
+- [x] Audit trail immutable and queryable (`audit_events` table + `trg_audit_events_immutable` trigger in `01-schema.sql`)
+- [x] Demo data labelled and excluded from real alerts (`database/schema/02-demo-seed.sql` with `is_demo = true` + `v_demo_rows` view)
+- [x] Privacy notice and language coverage (DPIA drafted in `database/governance/04-dpia.md`)
 - [ ] Access-review process for admin roles
 
 **Gate 12 exit criteria:** export, deletion, and audit requests can each be fulfilled and demonstrated.

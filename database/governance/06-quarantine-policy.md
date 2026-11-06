@@ -32,6 +32,7 @@ Applies to:
 - tabular observation and crop-context records;
 - weather and boundary data;
 - historical occurrence records;
+- archive records (plant-clinic, university and institutional collections);
 - advisory content;
 - model artefacts and dataset versions.
 
@@ -53,6 +54,7 @@ Applies to:
 | Weather | Impossible value, stale provider record, gap, grid mismatch |
 | Privacy | Image contains a face, document, precise location or other personal data without the required consent |
 | Permission | Dataset licence expired or use outside the permitted scope |
+| Archive | Missing source link, original label or reviewer; label unmappable to the project taxonomy; taxonomy version unrecorded |
 | Demo leakage | Demo/synthetic record mixed into an operational dataset without `is_demo` |
 
 ---
@@ -139,6 +141,10 @@ consent_missing
 permission_missing
 provenance_missing
 label_conflict
+label_unmappable
+original_label_missing
+taxonomy_version_missing
+permission_scope
 unsupported_class
 out_of_domain
 weather_anomaly
@@ -149,6 +155,20 @@ demo_leakage
 ```
 
 New codes require a documented reason; do not reuse a code for a different failure.
+
+### 6.1 Archive-specific codes
+
+| Code | Meaning | Default state |
+|---|---|---|
+| `label_unmappable` | The archive label has no defensible mapping to the project taxonomy | `quarantined`; never forced into a class |
+| `original_label_missing` | The record has no original archive label | `quarantined`; do not infer |
+| `taxonomy_version_missing` | The mapping was attempted without a pinned taxonomy version | `quarantined`; mapping blocked |
+| `permission_scope` | The record or use falls outside the signed permission scope | `escalated` to legal/privacy |
+
+Archive records with these codes are preserved with their original label, source link and
+provenance. They are excluded from training, evaluation and forecasting but are counted in
+the batch report (`../archive/02-label-reconciliation.md`,
+`../archive/03-archive-provenance.md`).
 
 ---
 
@@ -201,6 +221,7 @@ Targets are operational defaults; the programme may tighten them.
 - A failing batch is silently marked complete.
 - A `released` record loses its original failure history.
 - Real personal data is copied into the quarantine notes.
+- An unmappable archive record is forced into a class, merged or deleted.
 
 ---
 
@@ -240,6 +261,11 @@ Targets are operational defaults; the programme may tighten them.
 - [ ] Every resolution has an owner, reason, timestamp and audit event.
 - [ ] A `blocking` failure prevents batch release.
 - [ ] A privacy failure escalates to the privacy owner.
+- [ ] An unmappable archive record is quarantined, preserved and counted, never forced or
+      deleted.
+- [ ] An archive record with a missing original label, source link or taxonomy version is
+      quarantined with the matching archive code.
+- [ ] Archive quarantine counts are reported separately from field quarantine counts.
 - [ ] Deletion from quarantine requires approval and a legal-hold check.
 - [ ] The quality report reconciles total, passed, quarantined, rejected and deleted
       counts.
