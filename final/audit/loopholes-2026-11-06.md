@@ -38,6 +38,7 @@ decisions D7–D13.
 | 13 | `agronomist` added as a fifth RBAC role (D13); advisory approval now performable | `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `07-advisory-and-alerts.md` §2–§3 |
 | 14 | D7 accepted: sentinel-panel absence sampling, evidence-tier labels, as-of cutoffs, blinded primary read and double-read subset | `progress-tracker.md` §4; `06-forecast-and-risk-map.md` §2/§9/§11; `04-expert-review.md` §3/§6; `05-data-layer.md` §4.4 |
 | 15 | D8 accepted: safety-first abstention function, temperature-scaled calibration on a dedicated split, explicit OOD on held-out classes, no output override, and pre-registered image/forecast floors | `progress-tracker.md` §4; `ml-models.md` §5.3/§6; `phase-plan.md` §6.4–6.5, Gate 3; `01-design-system.md` §3.4/§3.9; `02-reporting-and-capture.md` §4/§9; `05-data-layer.md` §4.3/§5/§13; `TRD.md` §6.3–6.4/§10/§18; `06-forecast-and-risk-map.md` §9/§12 |
+| 16 | Reconciled the partner-added Phase-1 database artifacts with accepted decisions: image healthy/hard negatives are not forecast negatives (D7 sentinel visits only); added D8 prediction-decision and D7 sentinel fields; verification owner corrected to pathologist (D13); retention/controller references corrected to D10 | `database/data-dictionary/data-dictionary-v1.md`; `database/collection/02-sampling-matrix.md`; `database/governance/05-retention-and-deletion.md`; `database/collection/04-secure-upload-and-retention.md`; `database/governance/01-dataset-register.md` |
 
 ---
 

@@ -246,11 +246,11 @@ carry the full free-text consent body in logs.
 
 ## 6. Open questions
 
-1. Who is the data controller and what contact details appear in the notice?
+1. Who is the data controller and what contact details appear in the notice? **Blocked on D10.**
 2. Which jurisdiction and data-protection regime applies? `update.md` references India's
-   DPDP Act 2023, but D1/D4 are unresolved.
+   DPDP Act 2023, but D1/D4 are unresolved and the controller decision is D10.
 3. Which local language(s) must be provided, and who certifies the translation?
-4. What are the retention periods and the deletion SLA?
+4. What are the retention periods and the deletion SLA? **Blocked on D10.**
 5. Are images of people, faces or bystanders permitted? If so, what is the blurring and
    consent rule?
 6. Is exact location ever collected? If yes, under which separate consent and role

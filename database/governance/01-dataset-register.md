@@ -22,8 +22,8 @@
    permission record.
 4. Public datasets may be used for pretraining and benchmarking only. They are never the
    field validation set.
-5. Retention and update schedule are `TBD` until the owning institution and legal
-   position are settled (D4 and legal review).
+5. Retention and update schedule are `TBD` until the owning institution and legal position
+   are settled (D4 for the institution, D10 for the data controller and retention policy).
 6. Annotation, split role and version are recorded per dataset version, not only per
    dataset.
 7. A dataset containing real personal data, farm-identifying images or exact locations
@@ -111,8 +111,8 @@ entry or a linked permission record:
 
 - No permission records exist for any dataset.
 - No named data owner exists yet.
-- Retention periods are unset because the owning institution (D4) and legal position are
-  unresolved.
+- Retention periods are unset because the data controller (D10), owning institution (D4) and
+  legal position are unresolved.
 - Weather provider terms, boundary licence and archive access are unverified.
 - Public dataset licences have not been checked against the intended use.
 - The project taxonomy and crop/target list are unresolved (D1), so label compatibility

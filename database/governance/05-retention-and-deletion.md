@@ -1,6 +1,6 @@
 # Retention and deletion procedure
 
-**Status:** Draft — retention periods are **TBD** pending legal/programme decision (D4).
+**Status:** Draft — retention periods are **TBD** pending legal/programme decision (D10, with D4).
 **Owner:** Programme lead + legal + data engineer (TBD)
 **Last updated:** 2026-11-06
 **Authorities:** `final/feature-specs/05-data-layer.md` §11–12;

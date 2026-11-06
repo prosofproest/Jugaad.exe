@@ -98,7 +98,7 @@ optional consent for research/model improvement. The lawful basis for:
 - audit and security
 
 must be confirmed by counsel for the pilot jurisdiction. `update.md` references India's
-DPDP Act 2023, but D1/D4 are unresolved.
+DPDP Act 2023, but D1/D4 are unresolved and the data-controller/retention decision is D10.
 
 ---
 

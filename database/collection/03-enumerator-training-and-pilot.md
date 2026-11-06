@@ -36,7 +36,8 @@ protocol look successful.
 | Role | Responsibility |
 |---|---|
 | Field operations lead | Owns training delivery, pilot logistics, collector sign-off |
-| Agronomist / pathologist | Owns symptom, severity and condition content; reviews sampled cases |
+| Agronomist | Owns symptom, severity and condition content; **cannot** set verification status |
+| Pathologist | Reviews sampled cases and verification decisions; sole role that can set `confirmed` |
 | Data engineer | Owns app, upload, quality gate, metrics and the tracking sheet |
 | Trainer | Delivers modules; may be the field lead with agronomist support |
 | Supervisor | Spot-checks captures; signs off collector competency; ratio `TBD` |

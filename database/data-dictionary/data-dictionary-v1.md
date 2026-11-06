@@ -11,7 +11,9 @@
 > and area forecasting. Crop-specific target codes, severity scales, crop calendars,
 > horizon values and event thresholds are blocked on **D1** (crop/targets/zone) and
 > **D2** (nowcast vs outlook). They are marked `TBD — D1/D2`. They must not be filled with
-> plausible-looking values.
+> plausible-looking values. Forecast label eligibility and sentinel negatives follow **D7**;
+> abstention, calibration and OOD fields follow **D8**; retention and controller fields
+> follow **D10**.
 
 ---
 
@@ -55,7 +57,7 @@ Rules:
 
 ### 1.4 Owners
 
-Owners are roles, not individuals: Data engineer, Agronomist/pathologist, ML lead,
+Owners are roles, not individuals: Data engineer, Agronomist, Pathologist, ML lead,
 Field operations lead, Product lead, Legal/privacy.
 
 ---
@@ -86,7 +88,7 @@ These are not model features, but they are required joins and gates.
 | `phone_e164` | text | E.164 | User | Data engineer | Staff account may use email instead | observation | Yes |
 | `email` | text | Valid email | User | Data engineer | Farmer account may use phone instead | observation | Yes |
 | `locale` | text | BCP-47 | User | Product lead | Default locale TBD; do not assume | observation | No |
-| `role_code` | text | `farmer`, `extension_worker`, `pathologist`, `admin` | Config | Product lead | Not permitted | config | No |
+| `role_code` | text | `farmer`, `extension_worker`, `pathologist`, `agronomist`, `admin` | Config | Product lead | Not permitted | config | No |
 | `consent_type` | text | `service_privacy`, `image_assessment`, `approximate_location`, `research_model_improvement`, `extension_contact` | Consent registry | Legal/privacy | Not captured | observation | Yes |
 | `consent_version` | text | Published consent version | Consent registry | Legal/privacy | Not permitted | config | No |
 | `consent_granted` | boolean | `true` / `false` | User | Legal/privacy | Not captured; never assume granted | observation | Yes |
@@ -169,6 +171,28 @@ These are not model features, but they are required joins and gates.
 | `plant_present` | boolean | `true` / `false` | Quality gate | ML lead | Not measured | derivation | No |
 | `shipped_threshold` | text/numeric | Versioned threshold actually used | ML registry | ML lead | Not permitted for a served prediction | config | No |
 
+### 6.1 Image prediction and decision (D8)
+
+| Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
+|---|---|---|---|---|---|---|---|
+| `prediction_id` | uuid | — | System | Data engineer | Not permitted | derivation | No |
+| `image_id` | uuid | FK to the image | System | Data engineer | Not permitted | derivation | No |
+| `model_version` | text | Registry version | ML registry | ML lead | Not permitted | config | No |
+| `candidates` | jsonb | Array of `{label, score}`; max 3 shown | Model | ML lead | Not available | derivation | No |
+| `probabilities` | jsonb | Calibrated per-class probabilities; `null` unless calibration approved | Model | ML lead | Not calibrated/not approved | derivation | No |
+| `confidence_band` | text | `low`, `medium`, `high`, `not_calibrated` | Model | ML lead | `not_calibrated`; never a percentage | derivation | No |
+| `calibrated` | boolean | `true` / `false` | Model | ML lead | Treated as `false` | derivation | No |
+| `calibration_version` | text | Required when `calibrated = true` | ML registry | ML lead | Calibration not approved | config | No |
+| `abstained` | boolean | `true` / `false` | Decision function | ML lead | Not permitted | derivation | No |
+| `abstain_reason` | text | `below_class_threshold`, `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`, `quality_gate_failed` | Decision function | ML lead | Required when abstained | derivation | No |
+| `decision_thresholds` | jsonb | Per-class `τ_c`, margin, entropy, `ood_max`; required | Decision function | ML lead | Not permitted; prediction not reproducible | config | No |
+| `ood_score` | numeric | Scale defined by the OOD method and version | Model | ML lead | Unknown; treat as out-of-distribution | derivation | No |
+| `generated_at` | timestamptz | UTC | System | Data engineer | Not permitted | derivation | No |
+| `is_demo` | boolean | `true` / `false` | System | Data engineer | Not permitted | config | No |
+
+Predictions are append-only. No UI or API control overwrites a prediction; manual review is a
+separate audited record.
+
 ---
 
 ## 7. Labels and verification
@@ -177,14 +201,14 @@ These are not model features, but they are required joins and gates.
 |---|---|---|---|---|---|---|---|
 | `target_code` | text | Supported targets + `healthy` + `abiotic_look_alike` + `unknown` + `mixed_symptoms` + `insufficient_evidence` — `TBD — D1` | Label handbook | Agronomist | Unlabelled; never force a class | adjudicated_label | No |
 | `label_origin` | text | `suspected`, `expert_confirmed`, `lab_confirmed` | Review | Agronomist | Unknown provenance; not usable as a training label | adjudicated_label | No |
-| `verification_tier` | text | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` | Review | Agronomist | Unverified; never treat as confirmed | adjudicated_label | No |
-| `review_decision` | text | `confirmed`, `probable`, `rejected`, `duplicate`, `needs_visit`, `unresolved` | Review | Agronomist | No decision | adjudicated_label | No |
-| `reviewer_id` | uuid | — | Identity | Agronomist | Unknown reviewer; label not auditable | adjudicated_label | Yes |
-| `review_reason_code` | text | Controlled list — `TBD` | Review | Agronomist | Not recorded | adjudicated_label | No |
-| `corrected_from_label` | text | Prior label | Review | Agronomist | No correction | adjudicated_label | No |
+| `verification_tier` | text | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` | Review | Pathologist | Unverified; never treat as confirmed. Forecast eligibility is `confirmed` or `probable` with tier, inside the D7 as-of cutoffs | adjudicated_label | No |
+| `review_decision` | text | `confirmed`, `probable`, `rejected`, `duplicate`, `needs_visit`, `unresolved` | Review | Pathologist | No decision | adjudicated_label | No |
+| `reviewer_id` | uuid | — | Identity | Pathologist | Unknown reviewer; label not auditable | adjudicated_label | Yes |
+| `review_reason_code` | text | Controlled list — `TBD` | Review | Pathologist | Not recorded | adjudicated_label | No |
+| `corrected_from_label` | text | Prior label | Review | Pathologist | No correction | adjudicated_label | No |
 | `severity` | text/ordinal | Crop-specific scale — `TBD — D1` | Review/agronomist | Agronomist | Unknown; do not assume zero | adjudicated_label | No |
-| `label_confidence` | numeric/text | Scale `TBD` | Review | Agronomist | Unknown | adjudicated_label | No |
-| `evidence_type` | text | `image_note`, `field_observation`, `lab_result` | Review | Agronomist | No evidence | adjudicated_label | No |
+| `label_confidence` | numeric/text | Scale `TBD` | Review | Pathologist | Unknown | adjudicated_label | No |
+| `evidence_type` | text | `image_note`, `field_observation`, `lab_result` | Review | Pathologist | No evidence | adjudicated_label | No |
 | `event_date` | date | ISO date; when the event occurred | User/reviewer | Agronomist | Unknown; do not substitute report date | observation | No |
 | `report_date` | timestamptz | UTC; when reported | System | Data engineer | Not permitted | observation | No |
 | `provenance_source` | text | Source link/identifier | Field/archive | Data engineer | Unknown; record unusable for audit | observation | No |
@@ -237,19 +261,41 @@ for a scored area outlook.
 | `days_since_planting` | integer | Days, ≥ 0 | Derivation | Agronomist | Unknown | derivation | No |
 | `week_of_year` | integer | 1–53 | Derivation | ML lead | Not applicable | derivation | No |
 | `monsoon_period` | text/boolean | Crop/zone definition — `TBD — D1` | Crop calendar | Agronomist | Unknown | config | No |
-| `lagged_verified_cases` | integer | Count, ≥ 0 over a defined window | Verified reviews | ML lead | Unknown; never `0` | derivation | No |
-| `nearby_verified_reports` | integer | Count, ≥ 0 | Verified reviews | ML lead | Unknown | derivation | No |
+| `lagged_verified_cases` | integer | Count, ≥ 0 over a defined window; D7-eligible labels (`confirmed`, or `probable` with tier) only | Eligible reviews | ML lead | Unknown; never `0` | derivation | No |
+| `nearby_verified_reports` | integer | Count, ≥ 0; D7-eligible labels only | Eligible reviews | ML lead | Unknown | derivation | No |
 | `distance_decay_km` | numeric | Kilometres | Config | Agronomist | Not configured; feature not used | config | No |
 | `prior_season_occurrence` | boolean/numeric | Definition `TBD` | Historical records | Agronomist | Unknown | derivation | No |
 | `active_reporters` | integer | Count, ≥ 0 | Observations | Data engineer | Unknown | derivation | No |
 | `visits` | integer | Count, ≥ 0 | Field records | Field ops | Unknown | derivation | No |
 | `coverage_completeness` | numeric | 0–1 | Pipeline | Data engineer | Unknown; no-score | derivation | No |
 | `surveillance_intensity` | numeric/text | Definition `TBD`; documented | Pipeline | Data engineer | Unknown; no-score | derivation | No |
-| `event_definition` | text | `first_verified_case` / `incidence_threshold` / `escalation` — `TBD — D1/D5` | Config | Agronomist | Not permitted | config | No |
-| `negative_definition` | text | Verified absence within coverage; never "no report" | Config | Agronomist | Not permitted | config | No |
+| `event_definition` | text | `first_eligible_case` / `incidence_threshold` / `escalation`; exact outcome `TBD — D1/D5` | Config | Agronomist | Not permitted | config | No |
+| `negative_definition` | text | Verified absence from a pre-registered sentinel-panel visit (D7); never "no report" and never "no visit" | Config | Agronomist | Not permitted | config | No |
+| `sentinel_panel_version` | text | Version of the registered site list and visit schedule | Config | Field ops | Not permitted for a negative | config | No |
+| `label_window_start` / `label_window_end` | date | Inclusive window in which a scheduled visit can yield a negative | Config | Field ops | Not permitted | config | No |
 
 **Leakage rule:** every feature must be computable at `issue_time`. If it cannot be, it is
 not a feature.
+
+### 9.1 Sentinel panel and visits (D7)
+
+| Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
+|---|---|---|---|---|---|---|---|
+| `sentinel_site_id` | uuid | — | System | Field ops | Not permitted | config | No |
+| `site_geo_code` | text | Supported area code | Registered panel | Field ops | Not permitted | config | No |
+| `site_precision` | text | `approximate`, `exact`; precise geometry access is role-gated | Registered panel | Field ops | Treated as approximate | config | No |
+| `panel_version` | text | Monotonic version; no post-hoc site selection | Registered panel | Field ops | Not permitted | config | No |
+| `visit_id` | uuid | — | System | Field ops | Not permitted | observation | No |
+| `visit_date` | date | ISO date | Observer | Field ops | Not permitted | observation | No |
+| `scheduled` | boolean | `true` / `false`; must be `true` to yield a negative | Registered schedule | Field ops | Treated as `false` | config | No |
+| `observer_id` | uuid | — | Identity | Field ops | Unknown observer; visit not usable | observation | Yes |
+| `target_code` | text | Supported target — `TBD — D1` | Label handbook | Agronomist | Not usable | observation | No |
+| `observed` | text | `present`, `absent`, `indeterminate` | Observer | Pathologist | Not a negative | observation | No |
+| `evidence_ref` | text | Photo/field-note reference | Observer | Field ops | Visit not auditable | observation | Potentially |
+
+A visit is a forecast negative only when `scheduled = true`, `observed = 'absent'`, the target
+is supported, the visit is inside the label window, and the D9 coverage gate passed. A missing
+visit is never a negative.
 
 ---
 
@@ -323,8 +369,8 @@ not a feature.
 | Weather thresholds | Local validation | Agronomist |
 | Quality-gate score scales and thresholds | Model validation | ML lead |
 | Label confidence scale | Labelling handbook | Agronomist |
-| Retention periods | Legal/D4 | Legal + programme lead |
-| Consent jurisdiction, controller and contact | Legal/D4 | Legal |
+| Retention periods | Legal/D10 | Legal + programme lead |
+| Consent jurisdiction, controller and contact | Legal/D10 | Legal |
 | Notification channel allowlist | Pilot partner | Product lead |
 | Device class, lighting, background, framing categories | Capture protocol | Field ops |
 | Imputation policy details | Data foundation review | Data engineer + agronomist |

@@ -12,7 +12,7 @@
 > private bucket. Every processed version is a derivative that can be regenerated and can
 > never overwrite or replace the original.
 >
-> **Boundary:** retention periods are `TBD` pending legal/programme decision (D4). This
+> **Boundary:** retention periods are `TBD` pending legal/programme decision (D10, with D4). This
 > document specifies the mechanism, not the number of years.
 
 ---

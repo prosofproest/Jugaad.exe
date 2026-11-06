@@ -76,6 +76,11 @@ These are not optional extras. They are the material that teaches the system to 
 **Hard negatives are not "negatives" in the disease sense.** They are deliberate near-misses
 that must be retained and labelled. They are never deleted to improve apparent accuracy.
 
+**Forecast negatives are separate (D7).** A healthy-control or hard-negative image is training
+material for the photo assessment. It is not a forecast negative. Forecast negatives come only
+from scheduled sentinel-panel visits inside the label window; this sampling matrix does not
+supply them, and an unvisited field is never treated as absent.
+
 ---
 
 ## 4. Matrix tiers

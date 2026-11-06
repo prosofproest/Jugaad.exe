@@ -210,7 +210,8 @@ Targets are operational defaults; the programme may tighten them.
 |---|---|
 | Data engineer | Owns the queue, rules, metrics and tooling |
 | Data owner | Resolves dataset and permission issues |
-| Agronomist / pathologist | Resolves label and taxonomy conflicts |
+| Pathologist | Resolves verification status and label conflicts; sole role that can set `confirmed` |
+| Agronomist | Resolves taxonomy and advisory-content conflicts; **cannot** set verification status |
 | Legal / privacy | Resolves consent, PII and permission issues |
 | Field operations lead | Resolves capture and provenance issues |
 | QA | Audits resolutions and samples released records |
