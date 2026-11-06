@@ -2,8 +2,8 @@
 
 **Product:** PS-03 — AI-Based Early Pest and Disease Outbreak Prediction Network
 **Document type:** Product Requirements Document
-**Version:** 1.0
-**Status:** Draft for review — documentation only; no application code exists
+**Version:** 1.1
+**Status:** Draft for review — full-stack build: backend API + web + mobile (initial scaffold exists)
 **Owner:** Product lead
 **Last updated:** 2026-11-06
 
@@ -42,6 +42,21 @@ v1 is narrow on purpose: one crop, one agro-climatic zone, a small target list, 
 rules-based weather-risk model, assistive image triage, extension-worker verification, and
 SMS/WhatsApp delivery. Breadth is added only when data, expert labels, approved advisory
 content and evaluation evidence exist.
+
+**Delivery surfaces.** v1 is a full-stack product, not a document set. It ships three
+coordinated deliverables:
+
+| Surface | Role |
+|---|---|
+| **Backend API** (FastAPI) | Owns cases, media, inference, review, forecasts, advisories, alerts, audit |
+| **Web frontend** (Next.js) | Conversational capture for any signed-in user, expert review portal, district dashboard, admin |
+| **Mobile frontend** (Flutter, Android-first) | Conversational capture plus offline field capture, queue and history |
+
+The **chat** is the shared entry point on web and mobile: the user attaches or takes an
+image, adds optional context and sends it, and the system replies with a structured photo
+assessment. The chat is a wrapper around the assessment pipeline (spec `08`), not a new
+model and not a free-form diagnosis bot. The expert portal and district dashboard remain
+separate web surfaces; the mobile app remains the offline-first field surface.
 
 **The key product inversion:** lead with the reporting and verification network plus a
 rules-based risk model, and treat the image model as assistive triage. This produces a
@@ -166,7 +181,8 @@ Image AI:     lightweight CNN fine-tuned on field data, quality gate,
               abstention, top-3 candidates
 Forecast:     validated agronomic weather-risk model (rules first),
               ML overlay only when data supports it
-Product:      Flutter capture app for field staff + farmer-facing SMS/WhatsApp
+Product:      Flutter mobile app + Next.js web app, both with conversational
+              capture; SMS/WhatsApp alerts; expert portal and dashboard
 Verification: extension-worker-first; pathologist for escalations only
 Geography:    block/mandal level, never farm level
 Timeline:     18 months to limited operational alerts (planning assumption)
@@ -176,6 +192,9 @@ Team:         7–9 people
 ### 5.2 In scope
 
 - Account, language preference and consent.
+- A backend API consumed by both the web and mobile frontends.
+- Conversational capture (chat) on web and mobile: attach/take an image, add optional
+  context, send, and receive a structured assessment reply.
 - Crop-cycle and approximate-area setup; unknown values allowed.
 - Camera/gallery capture, framing guidance, quality feedback and retake.
 - Offline save, queued upload, idempotent sync and stale-cache handling.
@@ -194,12 +213,13 @@ Team:         7–9 people
 |---|---|
 | Spatiotemporal deep learning | Generative AI advisory |
 | Drone / satellite analytics | Autonomous chemical guidance |
-| On-device inference beyond the quality pre-check | Farm-level risk precision |
-| Multi-language beyond one | Universal all-crop diagnosis |
-| Multi-crop | Confirmed-outbreak claims |
-| IoT sensors | Public exact farm coordinates |
-| RBAC beyond the four roles | Automated model promotion |
-| Automated retraining | Yield-impact claims without a study design |
+| On-device inference beyond the quality pre-check | Free-form generative diagnosis chat |
+| Multi-language beyond one | Farm-level risk precision |
+| Multi-crop | Universal all-crop diagnosis |
+| IoT sensors | Confirmed-outbreak claims |
+| RBAC beyond the four roles | Public exact farm coordinates |
+| Automated retraining | Automated model promotion |
+| Group chat / voice notes | Yield-impact claims without a study design |
 
 ### 5.4 Expansion rule
 
@@ -217,6 +237,11 @@ Scope grows by evidence, not by request.
 ---
 
 ## 6. Product surfaces and journeys
+
+v1 delivers a **backend API** consumed by two frontends: a **web app** (conversational
+capture, expert portal, district dashboard, admin) and a **mobile app** (conversational
+capture plus offline field capture). The conversational surface is specified in
+`feature-specs/08-conversational-capture.md`.
 
 ### 6.1 Farmer / field-staff mobile app
 
@@ -316,6 +341,48 @@ review backlog.
 - Review audit events; run controlled exports with purpose, row limits and audit.
 - Monitor service health, backlog, coverage and delivery.
 
+### 6.6 Conversational capture — chat (web and mobile)
+
+**Purpose** — the fastest path from "something is wrong with this plant" to a safe,
+traceable next step. The chat is available to every signed-in user on both frontends and
+wraps the same observation and photo-assessment pipeline used by the structured flow.
+
+**Thread and composer**
+
+- Conversation list: crop/area context, last message, unread state, sync state.
+- Composer: image (camera/gallery on mobile; picker/drag-drop on web), optional crop,
+  growth stage, approximate area and a short symptom note.
+- Sending creates one observation and one message, linked by `client_message_id`.
+- Mobile works offline: the message and image are queued locally and sent on reconnect.
+
+**Assistant reply (always structured, never free-form diagnosis)**
+
+| Reply kind | What the user sees | Primary action |
+|---|---|---|
+| `assessment` | Top candidates, confidence band, model version, generation time, "assistive, not a diagnosis" | Add context, request review, open advisory |
+| `abstained` | Specific reason (blur, exposure, no plant, unsupported crop, out of domain) | Retake |
+| `unsupported_crop` | Explanation and supported-crop list | Change crop, escalate |
+| `queued` | "Will assess when connected" | View queue |
+| `failed` | Stable error code and whether retry helps | Retry |
+| `review_requested` | Review status and expected response | View case |
+
+**Hard rules**
+
+- The reply never contains a chemical name, dose, mixture, interval or legal-use
+  instruction; a server-side validator blocks unsafe content.
+- The reply never presents a candidate as a diagnosis or confirmed outbreak.
+- Photo assessment and area outlook are never merged; the chat may deep-link to the
+  separate outlook card.
+- No fabricated reply when the backend is unreachable.
+- Every reply carries `model_version`, `generated_at`, calibration status and `is_demo`
+  where applicable.
+- Requesting expert review from chat creates the same review request and audit event as
+  the structured capture flow.
+
+**Failure paths that must be designed** — offline send, interrupted upload, duplicate
+retry, blurry image, unsupported crop, model unavailable, expired cached conversation and
+conversation deletion.
+
 ---
 
 ## 7. Functional requirements
@@ -340,6 +407,7 @@ capability and the spec that owns it.
 | PRD-F-13 | Audit and traceability | Immutable events for reviews, roles, exports, consent, config, predictions | `04`, `05` |
 | PRD-F-14 | Data platform | Permissioned ingestion; lineage; snapshots; append-only predictions; registry | `05-data-layer.md` |
 | PRD-F-15 | Design system | Shared tokens/components; accessibility; colour-independent severity; wording | `01-design-system.md` |
+| PRD-F-16 | Conversational capture | Chat on web and mobile; attach/take image; structured assessment reply; abstention; queue; review request; no free-form diagnosis or chemical advice | `08-conversational-capture.md` |
 
 ### 7.1 Mandatory product rules (derived from R1–R10)
 
@@ -363,6 +431,15 @@ capability and the spec that owns it.
 - **PRD-R10** — Spec before code; scope, schema, API or model changes update the spec and
   tracker in the same change.
 
+**Additional chat rules (spec 08)** — the chat is a wrapper, not a new model:
+
+- The assistant reply is a structured assessment card; no free-form generative diagnosis,
+  treatment plan or prescription.
+- The server-side content validator rejects chemical vocabulary before an assistant message
+  is stored.
+- A chat reply may link to the area outlook but must never merge the two outputs.
+- Offline, failed and unsupported states show a next action; no fabricated reply.
+
 ---
 
 ## 8. Non-functional requirements
@@ -383,6 +460,8 @@ capability and the spec that owns it.
 | PRD-NF-12 | Reliability | Backups and restore tested; RTO/RPO documented before pilot; rollback tested |
 | PRD-NF-13 | Device support | Tested on a low-cost Android device and a constrained network |
 | PRD-NF-14 | Testability | Every requirement ID links to at least one test, including negative/failure cases |
+| PRD-NF-15 | Chat responsiveness | The chat composer stays responsive while an image uploads; replies show a queued state rather than blocking the UI |
+| PRD-NF-16 | Chat safety | Assistant replies are template-rendered and validator-checked; no free-form generative diagnosis or chemical content |
 
 ---
 
@@ -479,6 +558,20 @@ capability and the spec that owns it.
 - Calibration, abstention and thresholds are reviewed when the crop calendar, reporting
   patterns or data distribution change.
 
+### 10.4 Conversational layer
+
+- The chat does **not** introduce a new predictive model. It presents the existing photo
+  assessment through a message thread.
+- Reply text is rendered from versioned, expert-approved templates; the structured fields
+  (candidates, confidence, model version, timestamps) are the source of truth.
+- No free-form generative model answers a crop-health question in v1. If an approved LLM is
+  added later for phrasing, it may only rephrase approved template content, must pass the
+  same chemical-content validator and must not add facts.
+- The chat never invokes the forecast engine to answer a photo question, and never merges
+  an outlook into an assessment reply.
+- Every assistant message stores the assessment reference, template version, model version
+  and generation time so the reply can be reproduced and audited.
+
 ---
 
 ## 11. Safety, responsible AI and compliance
@@ -495,6 +588,11 @@ capability and the spec that owns it.
 - **Adversarial input:** provenance metadata, duplicate detection and spot checks.
 - **Transparency:** show coverage, staleness, abstention reasons and model limitations in the
   interface.
+- **Chat safety:** the assistant reply is an assistive photo assessment, not a diagnosis;
+  it abstains with a reason, offers no chemical advice, and escalates uncertain or severe
+  cases to expert review. The server-side validator blocks unsafe content before storage.
+- **No impersonation:** the chat never claims to be an agronomist, pathologist or
+  laboratory, and never states or implies that a case is confirmed.
 
 ---
 
@@ -510,6 +608,7 @@ committed in this PRD.
 | User | Task completion, comprehension of uncertainty wording, repeat use, alert usefulness, opt-out rate |
 | Agricultural | Lead time, field-inspection prioritisation, credible outcome indicators |
 | Equity | Performance and adoption by geography, device and user segment |
+| Chat | Messages sent, images attached, replies by state (assessed, abstained, unsupported, failed), median reply time, retake rate, review requests from chat, validator rejections |
 
 **Primary metric (D5):** median lead time from first farmer report to verified expert
 confirmation, versus the existing advisory baseline. It must be pre-registered before the
@@ -534,7 +633,7 @@ Detailed work per phase is in `docs-context/phase-plan.md`; live status is in
 |---|---|---|
 | 0 — Discovery | Decisions D1–D6, partners, crop calendar, pilot protocol | Decisions resolved and recorded |
 | 1 — Data foundation | Permissioned datasets, label handbook, schema, ingestion, frozen test set | Permissions + reproducible ingestion + approved handbook |
-| 2 — Platform MVP | Offline capture, case management, expert review, audit | Offline report synced once, reviewed, audited |
+| 2 — Platform MVP | Backend API, web and mobile clients, chat capture, offline capture, case management, expert review, audit | Offline report synced once, reviewed, audited; chat image → assessment reply works on web and mobile |
 | 3 — Image AI | Quality gate, calibrated triage, abstention, ONNX serving, result card | Field-test performance at shipped threshold |
 | 4 — Forecasting | Rules baseline, snapshots, no-score path, map, advisories, alerts | Reproducible forecast + verified no-score + approved thresholds |
 | 5 — Pilot | Silent phase, limited alerts, usability findings, issue log | Silent evidence reviewed, response staffed |
@@ -637,6 +736,10 @@ following are true and signed off.
 - [ ] Risk map distinguishes reports, predictions and coverage.
 - [ ] Advisories approved and versioned.
 - [ ] Offline queue and stale-data handling tested.
+- [ ] Chat image → structured assessment reply works on web and mobile.
+- [ ] Chat abstains with a reason on blur, unsupported crop and out-of-domain input.
+- [ ] Chat contains no chemical advice; the validator test passes.
+- [ ] Chat never merges photo assessment with area outlook.
 
 **Operations and governance**
 
@@ -677,6 +780,7 @@ review respectively.
 | **Stale** | Past its validity window; must be visually distinct from fresh data. |
 | **No-score** | Explicit `insufficient_data` outlook when coverage, freshness or approval fails. |
 | **Demo data** | Synthetic or illustrative data labelled `is_demo`; never presented as real output. |
+| **Conversational capture (chat)** | A message thread on web or mobile where a user sends an image and receives a structured photo-assessment reply. A wrapper, not a new model. |
 
 ---
 
@@ -696,7 +800,7 @@ review respectively.
 | `docs-context/roadmap-and-resources.md` | Roadmap rationale, budget logic, risks |
 | `docs-context/phase-plan.md` | Detailed work per phase |
 | `docs-context/progress-tracker.md` | Live status, decisions, ADRs, risk register |
-| `feature-specs/01`–`07` | Implementation contracts and acceptance criteria |
+| `feature-specs/01`–`08` | Implementation contracts and acceptance criteria |
 | `README.md` | Blueprint chapter-to-file map |
 
 ---
@@ -706,6 +810,7 @@ review respectively.
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-11-06 | Initial PRD distilled from the repository operating docs, feature specs and phase plan. No scope, gate or decision changed. |
+| 1.1 | 2026-11-06 | Made full-stack delivery explicit (backend + web + mobile) and added conversational capture (chat) on both frontends, with spec `08` and safety rules. No existing gate changed. |
 
 **Review cadence:** update this PRD whenever a decision (D1–D6), scope boundary, success
 metric or launch gate changes. Record the change in `docs-context/progress-tracker.md` in

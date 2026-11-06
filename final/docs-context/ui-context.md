@@ -1,7 +1,7 @@
 # UI context
 
-**Purpose:** the shared visual, verbal and interaction rules for the mobile app, expert
-portal and district dashboard.
+**Purpose:** the shared visual, verbal and interaction rules for the mobile app, web app,
+expert portal and district dashboard, including the conversational capture surface.
 **Rule of thumb:** a farmer should always be able to answer three questions — *what does
 this mean, how sure is it, and what do I do next?*
 **Last updated:** 2026-11-06
@@ -25,6 +25,9 @@ this mean, how sure is it, and what do I do next?*
    with one hand and bright outdoor light.
 8. **Data cost is a design constraint.** No autoplay, no oversized images, no unnecessary
    polling.
+9. **Chat is a wrapper, not an authority.** The conversation is the fastest way to send a
+   photo, but the reply is the same `AssessmentCard` used elsewhere. Chat never becomes a
+   free-form diagnosis or treatment conversation.
 
 ---
 
@@ -92,6 +95,24 @@ this mean, how sure is it, and what do I do next?*
 > **Outlook not available**
 > Weather data for this area is more than 48 hours old. We do not issue an outlook from
 > stale inputs. Last attempt: 6 Nov, 06:00.
+
+**Chat reply (assessed):**
+> **Assistive photo assessment — not a diagnosis**
+> Possible symptom match: late blight (medium confidence, not yet calibrated).
+> Also considered: early blight, nutrient deficiency.
+> The photo passed the quality check. A person has not reviewed this case.
+> **Next safe step:** inspect 10 plants and compare with the approved advisory. If symptoms
+> are spreading, request expert review.
+> [Add context] [Request expert review] [Read advisory]
+> *Generated 6 Nov 2026, 09:14. Model photo-0.3.1.*
+
+**Chat reply (abstained):**
+> **No assessment yet**
+> This photo is too blurry to compare with known symptoms.
+> [Retake photo] [Ask an extension worker]
+
+The chat must not add an area outlook to these replies. When an outlook is relevant it is a
+separate `OutlookCard`, opened from a link, with its own timestamp and coverage.
 
 ---
 
@@ -175,6 +196,9 @@ Shared web components live in `/components`; Flutter equivalents in
 | `ErrorState` | Recoverable failure | message, retry, support path |
 | `AssessmentCard` | Photo assessment | result, abstained, pending, unsupported_crop |
 | `OutlookCard` | Area outlook | scored, insufficient_data, stale |
+| `ChatComposer` | Chat image + optional context | idle, attaching, uploading, queued, offline, error |
+| `MessageBubble` | One chat message | user, assistant, queued, failed, deleted |
+| `AssessmentMessage` | Assistant reply in a thread | assessed, abstained, unsupported_crop, queued, failed, review_requested |
 | `ReviewDecisionForm` | Expert decision | edit, submitting, error, locked |
 | `QueueRow` | Review queue item | unassigned, assigned, escalated, overdue |
 | `MapLegend` | Layer meaning | per layer set |
@@ -189,6 +213,11 @@ Shared web components live in `/components`; Flutter equivalents in
 - `ReviewDecisionForm` disables submit until required evidence is present.
 - `QualityFeedback` never blocks the user from saving a report offline; it only blocks
   assessment.
+- `AssessmentMessage` renders from structured `kind` fields, never from parsed prose. It
+  reuses `AssessmentCard` content and never adds free-form medical or chemical advice.
+- `ChatComposer` keeps the image and context when a send fails, and a retry reuses the same
+  `client_message_id`.
+- A chat reply can link to an `OutlookCard` but can never embed it in the same bubble.
 
 ---
 
@@ -199,6 +228,8 @@ Shared web components live in `/components`; Flutter equivalents in
 | Screen | Spec | Key states |
 |---|---|---|
 | Onboarding / consent | 03-auth-and-roles | new, consent-required, offline |
+| Chat list | 08-conversational-capture | list, empty, offline, unread |
+| Chat thread | 08-conversational-capture | empty, composing, uploading, queued, replying, assessed, abstained, unsupported, failed |
 | Home | 02-reporting-and-capture | fresh outlook, stale outlook, no outlook, offline |
 | Crop & field context | 02-reporting-and-capture | defaults, unknown values allowed |
 | Capture | 02-reporting-and-capture | camera, gallery, permission denied, low storage |
@@ -209,6 +240,14 @@ Shared web components live in `/components`; Flutter equivalents in
 | Case detail | 02-reporting-and-capture | pending, reviewed, corrected |
 | Advisory | 07-advisory-and-alerts | available, expired, not-approved-for-area |
 | Alert preferences | 07-advisory-and-alerts | enabled, disabled, channel unavailable |
+
+### Web — conversational capture (any signed-in user)
+
+| Screen | Spec | Key states |
+|---|---|---|
+| `/chat` | 08-conversational-capture | list, empty, loading, error |
+| `/chat/[conversationId]` | 08-conversational-capture | empty, composing, uploading, queued, replying, assessed, abstained, unsupported, failed |
+| Image attachment | 08-conversational-capture | picker, drag-drop, preview, upload error |
 
 ### Web — expert portal
 
@@ -243,6 +282,10 @@ Shared web components live in `/components`; Flutter equivalents in
 | Stale | `StaleBanner` | "This outlook expired on …" | Refresh |
 | Offline | `OfflineBanner` | "You are offline. Reports will send when connected." | View queue |
 | Queued | `StatusChip: queued` | "Saved on this phone." | Retry now |
+| Assistant replying | Typing/placeholder in the thread, composer stays usable | "Assessing the photo…" | Cancel / leave |
+| Chat assessed | `AssessmentMessage` | "Assistive photo assessment — not a diagnosis." | Add context / review / advisory |
+| Chat queued | `MessageBubble: queued` | "Will assess when connected." | View queue |
+| Chat failed | `ErrorState` in the bubble | "Could not send. Your photo is saved." | Retry |
 | Syncing | Progress + cancel | "Sending…" | Cancel |
 | Sync failed | `ErrorState` | "Could not send. We will retry." | Retry |
 | Abstained | Neutral card, no risk colour | "No assessment for this photo." | Retake / escalate |

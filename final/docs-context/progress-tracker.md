@@ -4,7 +4,8 @@
 Update this file in the same change as any scope, schema, API or decision change.
 
 **Last updated:** 2026-11-06
-**Current phase:** Phase 0 — Discovery (documentation complete, decisions open)
+**Current phase:** Phase 0 — Discovery (documentation complete, decisions open; initial
+full-stack scaffold present but not feature work)
 
 ---
 
@@ -65,13 +66,20 @@ handbook approved by a pathologist.
 - [ ] Auth, roles, consent (`03-auth-and-roles.md`).
 - [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
 - [ ] Observation API with idempotency and presigned uploads.
+- [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
+- [ ] Conversational capture: `conversations` module + chat on web and mobile
+      (`08-conversational-capture.md`).
+- [ ] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
+      `review_requested`) and chemical-content validator.
 - [ ] Expert review queue and decision flow (`04-expert-review.md`).
-- [ ] Audit trail for reviews, roles and exports.
+- [ ] Audit trail for reviews, roles, exports and chat events.
 - [ ] Admin config for crops, targets, geographies.
 - [ ] End-to-end test: report → upload → review, including airplane mode.
+- [ ] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
 
 **Gate 2:** a report can be captured offline, synced once, reviewed, and audited, on a
-low-end device. No model required.
+low-end device; chat image → assessment works on web and mobile. No predictive model
+required; any demo reply is labelled.
 
 ### Phase 3 — Image AI `[ ]`
 
@@ -142,9 +150,10 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[ ]` | Scaffold after Gate 0 |
-| Mobile | `[ ]` | Prototype capture flow after Gate 0 |
-| Web portals | `[ ]` | Prototype queue + map shell |
+| Backend | `[~]` | FastAPI health-scaffold exists; identity + observations next |
+| Mobile | `[~]` | Flutter chat/capture scaffold committed; unverified (Flutter not installed here) |
+| Web | `[~]` | Next.js chat/app shell scaffold committed; build/typecheck recorded |
+| Chat | `[~]` | Spec 08 + client/API scaffolds; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
 | MLOps | `[ ]` | Registry table design in data layer |
@@ -300,6 +309,8 @@ assessment (FR-02-12).
 | ADR-004 | Rules-based forecast before ML | Accepted | 2026-11-06 |
 | ADR-005 | ONNX Runtime CPU inference for pilot | Proposed | 2026-11-06 |
 | ADR-006 | Flutter capture + SMS/WhatsApp delivery | Proposed | 2026-11-06 |
+| ADR-007 | Full-stack delivery: one API, web app and mobile app are all in scope | Accepted | 2026-11-06 |
+| ADR-008 | Chat is a `conversations` wrapper over photo assessment, not a new model or generative diagnosis | Accepted | 2026-11-06 |
 
 ---
 
@@ -323,6 +334,9 @@ assessment (FR-02-12).
 | R-14 | Adversarial input (borrowed/gamed images) | M | M | Provenance metadata; duplicate detection; spot checks | Field ops | Open |
 | R-15 | Expert burnout from unpaid review labour | M | H | Workload caps; compensation; triage | Programme | Open |
 | R-16 | Weather provider outage, gap or licence change | M | H | Freshness checks; `insufficient_data` path; provider terms recorded | Data engineer | Open |
+| R-17 | Chat reply read as a diagnosis | H | H | Structured templates; "assistive, not diagnosis" copy; abstention; review escalation | Product | Open |
+| R-18 | Chat emits chemical advice or free-form medical text | L | H | Server-side validator before storage; template tests; no generative diagnosis path in v1 | Eng lead | Open |
+| R-19 | Chat scope creep into a general LLM assistant | M | M | Explicit out-of-scope; wrapper-only architecture; no free-form model | Product | Open |
 
 L = likelihood, I = impact, both H/M/L.
 
@@ -337,6 +351,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added `phase-plan.md`: a detailed per-phase work breakdown (workstreams, deliverables, exit gates, owners, dependencies and explicit exclusions for Phases 0–6). Linked it from the README, `AGENTS.md`, `project-overview.md` and `roadmap-and-resources.md`. No gate, scope or decision changed. |
 | 2026-11-06 | Added `final/PRD.md` and `final/TRD.md`: consolidated product and technical requirements distilled from the operating docs, feature specs and phase plan. No gate, scope or decision changed. |
 | 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
+| 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
 
 ---
 
@@ -346,7 +361,8 @@ L = likelihood, I = impact, both H/M/L.
 2. Draft the data acquisition plan (partner MoUs, archive access, collection targets).
 3. Draft the labelling handbook for the chosen crop and target list.
 4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Scaffold `backend/` only after Gate 0, starting with identity + observations + audit.
+5. Verify the committed backend/web/mobile scaffolds and keep them minimal; expand only
+   after Gate 0, starting with identity + observations + audit + `conversations`.
 
 ---
 
@@ -417,7 +433,7 @@ The supplied blueprint (`../totalcontent.md`) is 55 chapters plus Appendices A�
 | Range | Document |
 |---|---|
 | Ch 1–10 | `project-overview.md` |
-| Ch 11–12 | `../feature-specs/02`–`07`, `code-standards.md` |
+| Ch 11–12 | `../feature-specs/02`–`08`, `code-standards.md` |
 | Ch 13–14, 43, 47, 48 | `architecture-context.md` |
 | Ch 15–17 | `ui-context.md` |
 | Ch 18–24 | `data-foundation.md` |

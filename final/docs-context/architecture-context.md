@@ -27,8 +27,8 @@ invariants the implementation must enforce.
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Mobile | **Flutter** (Android-first) | Camera, local DB, background sync; single codebase |
-| Web portals | **Next.js + TypeScript** (App Router) | Expert portal + district dashboard; API-only data access |
+| Mobile | **Flutter** (Android-first) | Conversational capture + camera, local DB, background sync; single codebase |
+| Web app | **Next.js + TypeScript** (App Router) | Conversational capture, expert portal, district dashboard and admin; API-only data access |
 | API | **Python 3.12 + FastAPI** | Pydantic v2, OpenAPI as the contract |
 | ORM / migrations | **SQLAlchemy 2.0 + Alembic** | Single migration owner; no second ORM |
 | Database | **PostgreSQL 16 + PostGIS** | Spatial only where queries need it |
@@ -45,8 +45,9 @@ invariants the implementation must enforce.
 microservices, Kafka, a separate feature store, on-device inference in v1, multi-tenant
 SaaS abstractions.
 
-The web portals consume the FastAPI OpenAPI schema; they never read the database
-directly. Generated TypeScript types come from that schema.
+The web app and mobile app consume the FastAPI OpenAPI schema; they never read the database
+directly. Generated TypeScript/Dart types come from that schema. The chat surface on both
+clients is a presentation layer over the `conversations` module, not a second backend.
 
 ---
 
@@ -54,11 +55,11 @@ directly. Generated TypeScript types come from that schema.
 
 ```
 ┌──────────────────────┐   ┌──────────────────────────────┐
-│ Flutter capture app  │   │ Next.js expert portal         │
-│ • crop context       │   │ + district dashboard          │
-│ • camera + quality   │   │ • review queue / case detail  │
+│ Flutter app          │   │ Next.js web app               │
+│ • chat + camera      │   │ • chat + image upload         │
+│ • crop context       │   │ • expert portal / cases       │
 │ • offline queue      │   │ • map layers / filters        │
-│ • result cards       │   │ • advisory admin              │
+│ • result cards       │   │ • advisory + admin            │
 └──────────┬───────────┘   └───────────────┬──────────────┘
            │ HTTPS/JSON (OpenAPI v1)       │
            └───────────────┬───────────────┘
@@ -67,8 +68,8 @@ directly. Generated TypeScript types come from that schema.
         │ FastAPI modular monolith                     │
         │                                              │
         │  identity ─ consent ─ observations ─ media   │
-        │  reviews ─ advisories ─ forecasts ─ alerts   │
-        │  admin ─ audit ─ notifications ─ jobs        │
+        │  conversations ─ reviews ─ advisories        │
+        │  forecasts ─ alerts ─ admin ─ audit ─ jobs   │
         │                                              │
         │  inference client ──► ONNX image service     │
         │  forecast engine  ──► rules / model artefacts│
@@ -79,6 +80,10 @@ directly. Generated TypeScript types come from that schema.
         (records, audit,     (images,       (weather, boundaries,
          snapshots, registry) artefacts)    SMS/WhatsApp, maps)
 ```
+
+Both clients use the same `/v1` API. The chat is a presentation layer over `observations`
+and `inference`, implemented by the `conversations` module; it does not call the forecast
+engine to answer a photo question.
 
 The image service may start as an in-process module behind an interface. It becomes a
 separate container when inference load or deployment cadence requires it; the API
@@ -96,6 +101,7 @@ through that interface, not through another module's tables.
 | `identity` | users, roles, sessions, devices, consent | know about images or forecasts |
 | `observations` | observations, crop cycles, growing areas, image assets | compute predictions |
 | `media` | upload validation, storage keys, presigned URLs, derivatives | expose public buckets |
+| `conversations` | chat threads, messages, attachments, reply templates, delivery state | compute predictions, write verification, return free-form advice |
 | `inference` | quality gate, photo assessment, model registry reads | write verification status |
 | `forecasts` | forecast runs, feature snapshots, coverage, risk bands | read unverified reports as confirmed |
 | `reviews` | review queue, verification states, evidence, corrections | auto-promote model output |
@@ -175,6 +181,22 @@ eligible forecast → dedupe key (area,target,band,window) → cooldown check
   → record delivery status + provider receipt
 ```
 
+### 5.6 Conversational capture (chat)
+
+```
+client (web or mobile) → POST /v1/conversations/{id}/messages
+  → create observation if needed (idempotent; client_message_id)
+  → presigned image upload → quality gate → inference
+  → compose reply from versioned template + structured assessment
+  → chemical-content validator (reject → failed message, never partial)
+  → persist assistant message (assessment_id, model_version, template_version)
+  → response: user message + assistant message
+  → optional review request (same review module + audit event)
+```
+
+The chat is a wrapper over observations and inference. It never merges the area outlook
+into the assessment reply; an outlook is a separate card fetched from `/v1/forecasts`.
+
 ---
 
 ## 6. Data model (conceptual)
@@ -188,6 +210,9 @@ users ─┬─ consents
 
 growing_areas ── crop_cycles ── observations ─┬─ image_assets ── image_predictions
                                               └─ reviews ── review_evidence
+
+conversations ── messages ─┬─ message_attachments ── image_assets
+                           └─ message_events
 
 geographies (boundary_version, level, code)
 forecasts ── feature_snapshots
@@ -219,6 +244,11 @@ Key relationships:
 | Approximate location default | precision column | geo service | field-level auth | coarse map |
 | Small counts suppressed | aggregate view | dashboard service | — | legend note |
 | Stale data visible | validity columns | freshness check | `is_stale` | stale banner |
+| Chat ≠ free-form diagnosis | `messages.kind` check | `conversations` service + validator | structured reply only | `AssessmentCard` |
+| Chat messages append-only | insert-only table grant | insert-only repo | no PATCH endpoint | history view |
+| Chat idempotency | unique `(conversation_id, client_message_id)` | message service | `Idempotency-Key` | retry reuses id |
+| Assistant reply traceable | `messages.assessment_id` NOT NULL for assistant | compose service | `model_version`, `template_version`, `generated_at` | metadata line |
+| Conversation private to owner | `owner_id` FK | ownership guard | 403 for others | not listed |
 
 If an invariant cannot be enforced at the lowest layer available, document why in the
 feature spec.
@@ -247,10 +277,12 @@ ever ships in a client build.
 - JSON only; ISO-8601 UTC timestamps; snake_case fields.
 - Errors use a single envelope (see `code-standards.md` §6).
 - Cursor pagination for queues and histories.
-- `Idempotency-Key` required on observation creation and upload completion.
+- `Idempotency-Key` required on observation creation, upload completion and chat messages.
 - Presigned URLs for binary transfer; no multipart through the API process at pilot scale.
 - Role checks are dependencies, not controller `if` statements.
 - No endpoint exposes raw model scores, feature vectors or storage keys to farmer clients.
+- Chat replies are structured message kinds, not free-form text; the server alone writes
+  `role = assistant`.
 
 Resource sketch:
 
@@ -262,6 +294,14 @@ POST   /v1/observations/{id}/images/upload-url
 POST   /v1/observations/{id}/images/{image_id}/complete
 POST   /v1/observations/{id}/review-request
 GET    /v1/observations/{id}/assessment
+
+GET    /v1/conversations?cursor=
+POST   /v1/conversations
+GET    /v1/conversations/{id}
+DELETE /v1/conversations/{id}
+GET    /v1/conversations/{id}/messages?cursor=
+POST   /v1/conversations/{id}/messages
+POST   /v1/conversations/{id}/messages/{message_id}/retry
 
 GET    /v1/forecasts?crop=&target=&geo=&horizon=
 GET    /v1/forecasts/{id}

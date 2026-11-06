@@ -37,7 +37,7 @@ Rules for this document:
 |---|---|---|---|---|
 | **0 — Discovery** | What exactly are we building, for whom, where, and how will we know it worked? | Decisions D1–D6, partners, crop calendar, pilot protocol | Gate 0: decisions resolved and recorded | 4–6 weeks |
 | **1 — Data foundation** | Can we collect, label, store and reproduce trustworthy data? | Permissioned datasets, label handbook, schema, ingestion, frozen test set | Gate 1: permissions + reproducible ingestion + approved label handbook | 3–4 months |
-| **2 — Platform MVP** | Can a report survive the field and reach a human verifier? | Offline capture, case management, expert review, audit | Gate 2: offline report synced once, reviewed, audited | 3–4 months |
+| **2 — Platform MVP** | Can a report survive the field and reach a human verifier? | Full-stack app (backend + web + mobile), chat capture, offline capture, case management, expert review, audit | Gate 2: offline report synced once, reviewed, audited; chat image → assessment works on web and mobile | 3–4 months |
 | **3 — Image AI** | Can the photo assessment be useful and honest? | Quality gate, calibrated triage model, abstention, ONNX serving, result card | Gate 3: field-test performance at the shipped abstention threshold | 3–4 months |
 | **4 — Forecasting** | Can we produce a reproducible area outlook without overclaiming? | Rules baseline, feature snapshots, no-score path, risk map, advisories, alerts | Gate 4: reproducible forecast + verified no-score + approved thresholds | 3–4 months |
 | **5 — Pilot** | Does it help real decisions in a real season? | Silent-phase evidence, limited alerts, usability findings, issue log | Gate 5: silent evidence reviewed, alert workflow staffed | One epidemic season (4–6 months) |
@@ -306,17 +306,20 @@ its gate.
 
 ---
 
-## 5. Phase 2 — Platform MVP (reporting and verification loop)
+## 5. Phase 2 — Platform MVP (reporting, chat and verification loop)
 
-**Objective:** deliver a working, offline-first loop: capture a report in the field, sync it
-once, review it as a human, and audit every step. No model is required for this phase to be
-useful.
+**Objective:** deliver a working full-stack, offline-first loop: capture a report in the field
+or through chat on web/mobile, sync it once, review it as a human, and audit every step. No
+predictive model is required for this phase; chat uses a demo/template assessment until
+Phase 3 supplies the real model.
 
 **Entry condition:** Gate 1 met (or explicit, recorded exception for schema-only overlap).
 
 ### 5.1 Engineering foundation
 
 - Scaffold `backend/`, `mobile/`, `web/`, `database/` and `deploy/` with the approved stack.
+- Stand up three coordinated deliverables: FastAPI backend, Next.js web app and Flutter
+  mobile app, all consuming the same `/v1` API.
 - Set up CI, linting, test runners, migrations, local compose, `dev`/`staging` environments,
   secret management and structured logging.
 - Publish the OpenAPI skeleton and error format; define API versioning.
@@ -371,20 +374,39 @@ useful.
 - "Needs better image" and "needs field visit" actions.
 - Governance: reviewer identity, timestamps, edits and advisory approvals logged.
 
-### 5.7 Admin configuration
+### 5.7 Conversational capture (chat)
+
+- Build a `conversations` module in the backend: threads, append-only messages, attachments,
+  events and idempotent send.
+- Ship the chat surface on **both** frontends:
+  - Flutter: `ChatList` and `ChatThread`, camera/gallery attach, offline queue.
+  - Next.js: `/chat` and `/chat/[conversationId]`, file picker/drag-drop, optimistic send.
+- Composer: image plus optional crop, growth stage, approximate area and short note.
+- Reply is a structured `AssessmentMessage` (`assessment`, `abstained`, `unsupported_crop`,
+  `queued`, `failed`, `review_requested`), never free-form prose.
+- Server-side chemical-content validator; no client-written assistant messages.
+- Request expert review from chat using the same review module and audit event as the
+  structured capture flow.
+- Link to the separate area-outlook card; never merge it into the reply.
+- Before Phase 3, chat replies use a clearly labelled demo assessment (`is_demo`).
+
+### 5.8 Admin configuration
 
 - Manage crops, targets, geographies and boundary versions.
 - Manage users, roles and partner assignments.
 - Configure threshold and alert-policy placeholders without inline numbers in code.
 - Export controls: role check, purpose, row limit, PII exclusion, audit.
 
-### 5.8 Audit and telemetry
+### 5.9 Audit and telemetry
 
 - Emit append-only audit events for auth, consent, review transitions, exports, admin views,
   config changes and role changes.
-- Define metric events without PII: sync success, queue depth, review latency, error rates.
+- Add chat audit events: conversation created/deleted, reply generated, validator rejection,
+  review requested from chat, staff access with reason.
+- Define metric events without PII: sync success, queue depth, review latency, chat replies by
+  state, error rates.
 
-### 5.9 Quality, security and release
+### 5.10 Quality, security and release
 
 - Unit tests for domain rules; integration tests for API/database; E2E for offline capture →
   sync → review → audit.
@@ -392,11 +414,13 @@ useful.
   session, cross-farmer access.
 - Accessibility and usability pass on a low-cost Android device and constrained network.
 - Threat model before phase exit; dependency and secret scanning; upload abuse tests.
+- Chat-specific tests: image → one observation, retry idempotency, abstention path,
+  validator rejection, conversation ownership (403), web and mobile parity.
 
 ### Deliverables
 
-- Flutter capture app (field-staff ready), FastAPI monolith, Next.js review portal and admin
-  console.
+- Flutter mobile app (field-staff ready, with chat), FastAPI monolith (with `conversations`
+  module), Next.js web app (chat, review portal and admin console).
 - Migrated schema slices and seed data labelled `is_demo`.
 - Test matrix with executed evidence.
 - Audit trail and telemetry events.
@@ -409,11 +433,14 @@ useful.
 - Duplicate retry produces no duplicate observation.
 - Only authorised roles can change verification status; every change is audited.
 - No PII or exact farm geometry leaks to unauthorised roles.
-- No model is required for the loop to work.
+- Chat works on web and mobile: an image message produces one observation and one structured
+  reply; retries are idempotent; a second user cannot read the conversation.
+- No predictive model is required for the loop to work; any demo reply is visibly labelled.
 
 ### Not in this phase
 
-- Image inference, forecast accuracy, alert dispatch, advisory approval.
+- Real image inference (chat uses a demo/template reply until Phase 3), forecast accuracy,
+  alert dispatch, advisory approval.
 - Automated verification or model-driven status changes.
 
 **Primary owner:** Application engineers, with QA and the security reviewer.
@@ -484,6 +511,8 @@ explain itself. It assists a human; it never diagnoses.
 ### 6.7 Result experience
 
 - Separate `AssessmentCard` from `OutlookCard`; never merge them.
+- Render the same assessment in the chat reply (`AssessmentMessage`) as in the structured
+  result screen; one source of truth, no chat-only variant.
 - Show up to three candidates, qualitative confidence, quality flags, model version and
   generated time.
 - Abstention shows the reason, retake path and escalation; no candidate list.

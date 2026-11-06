@@ -2,8 +2,8 @@
 
 **Product:** PS-03 — AI-Based Early Pest and Disease Outbreak Prediction Network
 **Document type:** Technical Requirements Document
-**Version:** 1.0
-**Status:** Draft for review — architecture baseline; no application code exists
+**Version:** 1.1
+**Status:** Draft for review — architecture baseline; initial backend/web/mobile scaffold exists
 **Owner:** Engineering lead
 **Last updated:** 2026-11-06
 
@@ -15,7 +15,8 @@
 | Working rules and hard stops | `docs-context/AGENTS.md` |
 | Architecture baseline and invariants | `docs-context/architecture-context.md` |
 | Language, API, security and ML conventions | `docs-context/code-standards.md` |
-| Implementation contracts | `feature-specs/01`–`07` |
+| Implementation contracts | `feature-specs/01`–`08` |
+| Conversational capture contract | `feature-specs/08-conversational-capture.md` |
 | Data rules | `docs-context/data-foundation.md` |
 | Model design | `docs-context/ml-models.md` |
 | Operations, pilot and monitoring | `docs-context/operations-and-pilot.md` |
@@ -34,8 +35,11 @@ ADR in `docs-context/progress-tracker.md` §5.
 
 - A modular-monolith API for identity, observations, media, inference, forecasts, reviews,
   advisories, alerts, admin and audit.
-- A Flutter Android capture app with offline queue and sync.
-- A Next.js expert portal and district dashboard, API-only.
+- A Flutter Android capture app with offline queue and sync, plus conversational capture.
+- A Next.js web frontend: conversational capture, expert portal, district dashboard and
+  admin, API-only.
+- A conversation service ("chat") shared by web and mobile that wraps the photo-assessment
+  pipeline: image message in, structured assessment reply out.
 - A PostgreSQL 16 + PostGIS schema with migrations.
 - Private S3-compatible object storage for images and model artefacts.
 - A PyTorch training workflow exporting ONNX; CPU inference at pilot scale.
@@ -56,6 +60,7 @@ ADR in `docs-context/progress-tracker.md` §5.
 | TRD-O-06 | Keep precise farm location out of unauthorised responses and public map layers. |
 | TRD-O-07 | Operate on low-cost infrastructure: one VM, managed Postgres, object storage, CPU inference. |
 | TRD-O-08 | Support testability, rollback and recovery before the pilot. |
+| TRD-O-09 | Serve a chat surface on web and mobile whose replies are structured, traceable, validator-checked and never a free-form diagnosis. |
 
 ### 1.3 Out of scope
 
@@ -63,7 +68,8 @@ ADR in `docs-context/progress-tracker.md` §5.
 - Multi-region replication, multi-tenant SaaS abstractions, a public third-party API.
 - On-device model inference in v1 (the quality pre-check is client-side; classification is
   server-side).
-- Farm-level risk inference, universal crop diagnosis, generative advisory.
+- Farm-level risk inference, universal crop diagnosis, generative advisory, free-form
+  generative diagnosis chat.
 - Real-time nowcasting from streaming data.
 - Multi-crop joint models and automated model promotion.
 
@@ -87,11 +93,11 @@ ADR in `docs-context/progress-tracker.md` §5.
 
 ```
 ┌──────────────────────┐   ┌──────────────────────────────┐
-│ Flutter capture app  │   │ Next.js expert portal         │
-│ • crop context       │   │ + district dashboard          │
-│ • camera + quality   │   │ • review queue / case detail  │
+│ Flutter app          │   │ Next.js web app               │
+│ • chat + camera      │   │ • chat + image upload         │
+│ • crop context       │   │ • expert portal / cases       │
 │ • offline queue      │   │ • map layers / filters        │
-│ • result cards       │   │ • advisory admin              │
+│ • result cards       │   │ • advisory + admin            │
 └──────────┬───────────┘   └───────────────┬──────────────┘
            │ HTTPS/JSON (OpenAPI v1)       │
            └───────────────┬───────────────┘
@@ -100,8 +106,8 @@ ADR in `docs-context/progress-tracker.md` §5.
         │ FastAPI modular monolith                     │
         │                                              │
         │  identity ─ consent ─ observations ─ media   │
-        │  reviews ─ advisories ─ forecasts ─ alerts   │
-        │  admin ─ audit ─ notifications ─ jobs        │
+        │  conversations ─ reviews ─ advisories        │
+        │  forecasts ─ alerts ─ admin ─ audit ─ jobs   │
         │                                              │
         │  inference client ──► ONNX image service     │
         │  forecast engine  ──► rules / model artefacts│
@@ -112,6 +118,10 @@ ADR in `docs-context/progress-tracker.md` §5.
         (records, audit,     (images,       (weather, boundaries,
          snapshots, registry) artefacts)    SMS/WhatsApp, maps)
 ```
+
+Both clients use the same `/v1` API. The chat is a presentation layer over `observations`
+and `inference`, implemented by the `conversations` module; it never calls the forecast
+engine to answer a photo question.
 
 The image service may start as an in-process module behind an interface. It becomes a
 separate container when inference load or deployment cadence requires it; the API contract
@@ -169,6 +179,7 @@ through that interface, never through another module's tables.
 | `identity` | users, roles, sessions, devices, consent | know about images or forecasts |
 | `observations` | observations, crop cycles, growing areas, image assets | compute predictions |
 | `media` | upload validation, storage keys, presigned URLs, derivatives | expose public buckets |
+| `conversations` | chat threads, messages, attachments, reply templates, delivery state | compute predictions, write verification, generate free-form advice |
 | `inference` | quality gate, photo assessment, model registry reads | write verification status |
 | `forecasts` | forecast runs, feature snapshots, coverage, risk bands | read unverified reports as confirmed |
 | `reviews` | review queue, verification states, evidence, corrections | auto-promote model output |
@@ -187,6 +198,8 @@ through that interface, never through another module's tables.
 - Modules may call `audit` and `notifications`.
 - `forecasts` may read **verified** observation projections through the `observations`
   interface only.
+- `conversations` may call `observations`, `media`, `inference`, `reviews` and `advisories`
+  through their interfaces; it never reads their tables directly.
 - Cross-module transactions are explicit and rare; prefer an outbox/job for side effects.
 
 ### 4.1 Target source layout
@@ -199,6 +212,7 @@ backend/app/
 │   ├── identity/
 │   ├── observations/
 │   ├── media/
+│   ├── conversations/   # chat threads + structured replies
 │   ├── inference/
 │   ├── forecasts/
 │   ├── reviews/
@@ -284,6 +298,9 @@ growing_areas ── crop_cycles ── observations ─┬─ image_assets ─�
                                                           └─ review_events
 observations ── observation_verification (projection)
 
+conversations ── messages ─┬─ message_attachments ── image_assets
+                           └─ message_events
+
 geographies (versioned boundaries)
 weather_snapshots
 forecasts ── feature_snapshots
@@ -301,6 +318,7 @@ export_jobs
 | Identity | `users`, `roles`, `user_roles`, `devices`, `consents`, `user_area_assignments`, `sessions` |
 | Geography / crop | `geographies`, `crop_calendars`, `crops`, `targets`, `growing_areas`, `crop_cycles` |
 | Observations / media | `observations`, `image_assets`, `image_quality_results`, `image_predictions`, `review_requests` |
+| Conversations | `conversations`, `messages`, `message_attachments`, `message_events` |
 | Review | `reviews`, `review_evidence`, `review_events`, `observation_verification`, `review_assignments` |
 | Forecast / weather | `weather_snapshots`, `feature_snapshots`, `forecasts`, `forecast_runs` |
 | Advisory / alerts | `advisories`, `advisory_versions`, `advisory_approvals`, `alert_policies`, `alerts`, `alert_deliveries`, `alert_feedback` |
@@ -312,6 +330,8 @@ export_jobs
 |---|---|
 | `observation.status` | `draft`, `pending_upload`, `uploaded`, `assessing`, `assessed`, `abstained`, `failed`, `pending_review`, `reviewed` |
 | `image_predictions.abstain_reason` | `blur`, `exposure`, `resolution`, `no_plant`, `unsupported_crop`, `out_of_domain`, `gate_version_missing` |
+| `messages.role` | `user`, `assistant` |
+| `messages.kind` | `image`, `text`, `assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`, `review_requested` |
 | Verification `evidence_tier` | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` |
 | `risk_band` | `low`, `moderate`, `high`, `urgent`, `insufficient_data` |
 | `coverage` | `good`, `partial`, `low`, `unknown` |
@@ -334,6 +354,10 @@ export_jobs
 | Approximate location default | `precision` column + serializer field-level auth |
 | Small counts suppressed | Aggregate view/function, not UI |
 | Stale data visible | Validity columns + `is_stale` in API and UI |
+| Chat ≠ free-form diagnosis | Reply is a structured message kind + server-side validator; no generative text path in v1 |
+| Chat messages append-only | Insert-only `messages`; corrections are new messages |
+| Chat idempotency | Unique `(conversation_id, client_message_id)`; `Idempotency-Key` required |
+| Chat reply traceable | Assistant message stores `assessment_id`, `model_version`, `template_version`, `generated_at` |
 
 **Required constraints (non-exhaustive)**
 
@@ -361,6 +385,10 @@ ALTER TABLE forecasts
 ALTER TABLE forecasts
   ADD CONSTRAINT ck_probability_bounds
   CHECK (probability IS NULL OR probability BETWEEN 0 AND 1);
+
+-- One user message per client id inside a conversation
+ALTER TABLE messages
+  ADD CONSTRAINT uq_message_client UNIQUE (conversation_id, client_message_id);
 ```
 
 **Service-level rules**
@@ -370,6 +398,10 @@ ALTER TABLE forecasts
   a `pathologist` actor.
 - Advisory serving requires at least one approval row and `valid_to` in the future.
 - A model cannot be served unless its registry status is `approved`.
+- An assistant message is stored only after the chemical-content validator passes; a
+  rejected reply is a failed message, never a partial one.
+- `conversations` calls `observations`/`inference` through their interfaces; it never
+  computes a prediction or writes verification.
 
 ### 6.6 Indexing baseline
 
@@ -382,6 +414,8 @@ ALTER TABLE forecasts
 | Audit by entity | `(entity_type, entity_id, created_at desc)` |
 | Weather freshness | `(geo_code, source_timestamp desc)` |
 | Image hash dedupe | `(content_hash)` |
+| Conversation list by owner | `(owner_id, last_message_at desc)` |
+| Messages by conversation | `(conversation_id, created_at)` |
 
 ### 6.7 Object storage layout
 
@@ -483,6 +517,16 @@ POST   /v1/observations/{id}/images/{image_id}/retake
 GET    /v1/observations/{id}/assessment
 POST   /v1/observations/{id}/review-request
 
+# Conversations (chat)
+GET    /v1/conversations?cursor=
+POST   /v1/conversations
+GET    /v1/conversations/{id}
+DELETE /v1/conversations/{id}
+GET    /v1/conversations/{id}/messages?cursor=
+POST   /v1/conversations/{id}/messages
+POST   /v1/conversations/{id}/messages/{message_id}/retry
+GET    /v1/conversations/{id}/events            # optional SSE; polling otherwise
+
 # Forecasts and map
 GET    /v1/forecasts?crop=&target=&geo=&horizon=
 GET    /v1/forecasts/{id}
@@ -549,6 +593,12 @@ GET    /v1/admin/exports/{id}
 }
 ```
 
+**Chat message** — see `feature-specs/08-conversational-capture.md` §6. A message is one
+of `assessment`, `abstained`, `unsupported_crop`, `queued`, `failed` or
+`review_requested`. Required assistant fields: `kind`, `assessment_id` or `reason_code`,
+`model_version`, `generated_at`, `next_steps`, `is_demo` where applicable. The assistant
+text is rendered from a versioned template; the structured fields are authoritative.
+
 **Area outlook** — see `feature-specs/06-forecast-and-risk-map.md` §7. Required fields:
 `issue_time`, `valid_from`, `valid_to`, `risk_band`, `probability` (null unless calibrated),
 `confidence`, `coverage`, `coverage_detail`, `drivers`, `model_version`,
@@ -575,6 +625,10 @@ Layers: `verified_reports`, `unverified_reports`, `modelled_risk`, `coverage`,
   returning data.
 - Exports require role check, purpose, row limit and audit; no PII columns.
 - `confirmed` verification is pathologist-only.
+- A conversation is readable and writable only by its owner; staff access requires a role,
+  area scope and reason, and writes an audit event before returning content.
+- An assistant message cannot be created by a client; only the server writes `role =
+  assistant`.
 
 ---
 
@@ -648,6 +702,25 @@ eligible forecast → dedupe key (area, target, band, window) → cooldown check
   → record delivery status + provider receipt
 ```
 
+### 8.6 Conversational capture (chat)
+
+```
+client (web or mobile) → POST /v1/conversations/{id}/messages (client_message_id, image ref)
+  → create observation if needed (idempotent)
+  → attach image via presigned upload; validate + quality gate
+  → inference (only if quality passes)
+  → compose reply from a versioned template + structured assessment fields
+  → chemical-content validator (reject → failed message, never partial)
+  → persist assistant message (assessment_id, model_version, template_version, generated_at)
+  → response: user message + assistant message
+  → optional: request review (creates review_requests + audit event)
+```
+
+Offline mobile: the message and image are stored locally with `client_message_id` and sent
+on reconnect. A retry returns the existing message; it never creates a second observation.
+The reply never merges area outlook: an outlook is a separate card fetched from
+`/v1/forecasts`.
+
 ---
 
 ## 9. Client requirements
@@ -668,6 +741,16 @@ eligible forecast → dedupe key (area, target, band, window) → cooldown check
 - Queue operations idempotent and resumable; persist retry count and last error.
 - Golden tests for result cards, quality feedback and stale banner.
 - Test on a low-end Android profile and in airplane mode.
+
+**Chat contract**
+
+- Chat is a first-class route, not a web-view wrapper: `ChatList` and `ChatThread` screens.
+- The composer attaches camera/gallery images through the same queue and compression path
+  as the structured capture flow.
+- Reply bubbles render structured `AssessmentCard` components; no raw JSON in the UI.
+- Offline messages show `queued`; a retry reuses `client_message_id`.
+- Conversation deletion calls the privacy endpoint and clears local rows.
+- Chat strings live in ARB files like all other copy.
 
 **Offline queue state machine**
 
@@ -699,6 +782,17 @@ draft → queued → syncing → synced
 - One component per file; named export; presentational components receive data, containers
   fetch.
 
+**Chat contract**
+
+- `/chat` and `/chat/[conversationId]` routes; Server Components fetch the thread, a client
+  component owns the composer and optimistic messages.
+- Image attach uses the presigned-URL flow; drag-and-drop is an addition, not a fork of the
+  capture contract.
+- The assistant reply renders from typed `kind` fields, never from parsed prose.
+- `is_demo` renders a visible badge; abstained/queued/failed states each show one primary
+  action.
+- The chat never embeds or merges the district map or area-outlook card; it links to them.
+
 ---
 
 ## 10. Media pipeline
@@ -713,6 +807,10 @@ draft → queued → syncing → synced
 6. If the gate passes, inference runs; otherwise the observation is `abstained` with a reason.
 7. Derivatives (preview) are generated separately and are regenerable.
 8. A retake attaches a new image to the same observation; history is preserved.
+
+**Chat attachments** use the same pipeline. A chat message references an upload; the
+server creates the observation first, then attaches the image. The chat never accepts a
+base64 image through the JSON API at pilot scale.
 
 **Constraints**
 
@@ -851,6 +949,7 @@ band. Late-arriving reports never rewrite a past forecast; they are used in the 
 | Audit | Append-only `audit_events` for reviews, role changes, exports, config changes and sensitive access |
 | Resilience | Backups, tested restore, incident-response ownership |
 | Threat model | Completed before Phase 2 exit; refreshed when a new integration lands |
+| Chat | Conversation ownership checks; server-only assistant role; chemical-content validator before storage; no client-supplied `model_version` or confidence |
 
 ### 13.2 Audit events (minimum)
 
@@ -861,6 +960,8 @@ band. Late-arriving reports never rewrite a past forecast; they are used in the 
 - Exports: requested, completed, downloaded, expired.
 - Predictions/forecasts: generated, model served, model approved/retired.
 - Alerts: generated, suppressed, sent, failed, feedback.
+- Chat: conversation created/deleted, message sent, reply generated, validator rejection,
+  review requested from chat, staff access with reason.
 
 Audit rows are insert-only and contain no PII payloads.
 
@@ -874,7 +975,9 @@ Refuse to implement anything that:
 - auto-verifies cases or bypasses expert review;
 - trains/evaluates on data without documented permission;
 - puts real personal or farm-identifying data into demo content, tests or fixtures;
-- weakens authentication, authorisation or audit logging for convenience.
+- weakens authentication, authorisation or audit logging for convenience;
+- serves a free-form generative diagnosis, treatment plan or chemical advice in chat;
+- lets a client write an `assistant` message or supply model/confidence fields.
 
 ---
 
@@ -891,6 +994,8 @@ Refuse to implement anything that:
 - Observations are append-only; expert verification changes are preserved as history.
 - Cached outlooks are marked stale after `valid_to`.
 - No flow requires a live server round-trip to save a report.
+- Chat queue: `client_message_id` is stable across retries; the same key returns the same
+  message and never creates a second observation.
 
 **Required tests**
 
@@ -899,6 +1004,7 @@ Refuse to implement anything that:
 - Interrupted upload → safe resume/restart.
 - Stale cached outlook → stale badge, not fresh risk.
 - Queue-size limit → warning, no silent drop.
+- Offline chat message → reconnect → one message, one assessment, no duplicate.
 
 ---
 
@@ -932,6 +1038,7 @@ One JSON event per line. Include `request_id` and propagate to jobs.
 | Alerts | Eligible, suppressed, sent, delivered, failed, opt-out |
 | Data | Weather freshness lag, missing snapshots, boundary version mismatches |
 | Review | Queue depth, median age, overdue count, decisions by type |
+| Chat | Messages sent, images attached, replies by state, median reply time, retake rate, validator rejections, review requests |
 
 Every metric and alert has an owner and a runbook entry before pilot launch.
 
@@ -995,6 +1102,7 @@ Do not pre-build any of this.
 | Forecast | Snapshot immutability; no-score on stale input; unverified excluded |
 | Map layer | Verified/unverified/risk separation; suppression threshold |
 | Advisory | Validator rejects chemical content; approval required before retrieval |
+| Chat | Image message → one observation; abstention path; validator rejection; reply traceability; conversation ownership (403) |
 | UI screen | Component/golden test for every state |
 | Model training | Reproducible run from recorded config; frozen split hash |
 | Security | Authorisation boundaries, upload abuse, PII leakage, secret handling |
@@ -1062,7 +1170,15 @@ The implementation is technically acceptable for pilot only when:
 - [ ] The map never merges reports and predictions server-side.
 - [ ] Offline capture, interrupted upload and duplicate retry are verified on a low-end
       device.
-- [ ] Audit events exist for auth, review, role, export, config and prediction events.
+- [ ] Chat image message produces one observation and one structured assessment reply on
+      web and mobile.
+- [ ] Chat retry is idempotent; no duplicate message or observation.
+- [ ] Chat abstains with a reason on blur, unsupported crop and out-of-domain input.
+- [ ] The chat validator rejects chemical content before storage (test).
+- [ ] A conversation is inaccessible to another user (403).
+- [ ] Assistant messages are server-only and carry assessment, model and template versions.
+- [ ] Chat never merges the area outlook into an assessment reply.
+- [ ] Audit events exist for auth, review, role, export, config, prediction and chat events.
 - [ ] Backup restore drill completed and documented.
 - [ ] Threat model completed before Phase 2 exit.
 - [ ] No secrets or PII in logs, fixtures, screenshots or builds.
@@ -1085,6 +1201,10 @@ The implementation is technically acceptable for pilot only when:
 | Migration lock or data loss | Expand → migrate → contract; tested on seeded DB; rollback note |
 | Cost growth | CPU inference, one VM, managed services, free weather sources until justified |
 | Model drift | Monitoring, calibration review, governed retraining, version rollback |
+| Chat reads as diagnosis | Structured reply templates, abstention, "assistive not diagnosis" copy, human review |
+| Chat emits chemical advice | Server-side validator before storage; template tests; no free-form generative path |
+| Chat bypasses verification | Chat review request uses the same review module, states and audit |
+| Chat scope creep into a general LLM assistant | Explicit out-of-scope; no generative diagnosis in v1 |
 
 ---
 
@@ -1099,6 +1219,7 @@ The implementation is technically acceptable for pilot only when:
 | Review and verification | `feature-specs/04-expert-review.md` |
 | Forecast, no-score, map | `feature-specs/06-forecast-and-risk-map.md` |
 | Advisory and alerts | `feature-specs/07-advisory-and-alerts.md` |
+| Conversational capture (chat) | `feature-specs/08-conversational-capture.md` |
 | UI tokens and states | `feature-specs/01-design-system.md`, `docs-context/ui-context.md` |
 | Data rules and splits | `docs-context/data-foundation.md` |
 | Model design and evaluation | `docs-context/ml-models.md` |
@@ -1121,6 +1242,8 @@ The implementation is technically acceptable for pilot only when:
 | **Stale** | Past its validity window; must be visually and semantically distinct from fresh data. |
 | **Presigned URL** | Short-lived signed URL for direct object-storage access. |
 | **ONNX** | Portable model format used for CPU inference at pilot scale. |
+| **Conversation** | A private chat thread owned by one user; messages are append-only. |
+| **Assistant reply** | A server-authored, template-rendered message carrying structured assessment fields. |
 
 ---
 
@@ -1129,6 +1252,7 @@ The implementation is technically acceptable for pilot only when:
 | Version | Date | Change |
 |---|---|---|
 | 1.0 | 2026-11-06 | Initial TRD distilled from the architecture baseline, code standards, feature specs and phase plan. No scope, gate or decision changed. |
+| 1.1 | 2026-11-06 | Made full-stack delivery explicit (backend + web + mobile) and added the `conversations` module, chat API, data tables, flows, client contracts, security controls, tests and acceptance criteria. No existing gate changed. |
 
 **Change control:** update this TRD whenever a stack choice, module boundary, schema
 invariant, API contract, security control or deployment topology changes. Record the change
