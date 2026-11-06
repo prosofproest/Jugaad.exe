@@ -3,40 +3,42 @@
 API-only Flutter client for the PS-03 modular monolith. It consumes the same
 versioned `/v1` API as the web app and never connects to the database.
 
-> **Verification status: analyze + test verified (2026-11-06).** `flutter pub get`,
-> `flutter analyze` and `flutter test` pass with Flutter 3.47.9 / Dart 3.13.7 on
-> Windows 11; the suite is **14 tests**. Platform runners are still absent and no
-> device, emulator or APK run has been performed, so camera capture, airplane-mode
-> queueing and background/resume flush are **unit-verified only** until
-> `flutter create .` is run and an APK is built.
+> **Verification status: analyze, test, debug APK and emulator smoke verified
+> (2026-11-06).** `flutter pub get`, `flutter analyze`, `flutter test` and
+> `flutter build apk --debug` pass with Flutter 3.47.9 / Dart 3.13.7 on
+> Windows 11; the suite is **14 tests** and the APK is produced at
+> `build/app/outputs/flutter-apk/app-debug.apk`. A headless Android emulator
+> smoke exercised gallery capture → `/v1/uploads` → photo-assessment chat,
+> airplane-mode queueing, and the 15 s reconnect flush against a fresh
+> SQLite/Alembic database. Real-device camera capture and iOS remain
+> unverified.
 
 ## First run (requires the Flutter SDK)
 
-The Dart package (`pubspec.yaml`, `lib/`, `test/`) is committed. Platform
-folders (`android/`, `ios/`) are intentionally **not** hand-written; generate
-them once with the Flutter CLI:
+The platform runners (`android/`, `ios/`) are generated from the Flutter 3.47
+templates and committed, so a fresh checkout only needs:
 
 ```bash
 cd mobile
-flutter create . --project-name ps03_mobile --platforms=android,ios
 flutter pub get
 flutter analyze
 flutter test
 flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8000
 ```
 
-`flutter create .` is additive: it keeps `lib/` and `test/` and only adds the
-missing platform runners. Commit the generated folders once the app runs, so
-CI can build it without regeneration.
+Build the debug APK with `flutter build apk --debug`. Regenerating the runners
+with `flutter create . --project-name ps03_mobile --platforms=android,ios` is
+additive and keeps `lib/`, `test/` and the committed permission entries.
 
-After generating the runners, add the platform permission strings the image
-picker needs before testing capture:
+Platform capture configuration (already applied):
 
-- **Android** — the `image_picker` plugin supplies its own camera/gallery
-  intents; no storage permission is required for the picker's cache copy.
-- **iOS** — add `NSCameraUsageDescription` and
-  `NSPhotoLibraryUsageDescription` to `ios/Runner/Info.plist` with plain-language
-  copy. Without them the app is rejected or the picker fails at runtime.
+- **Android** — `android/app/src/main/AndroidManifest.xml` declares the
+  `INTERNET` permission for the `/v1` API. The `image_picker` plugin supplies
+  its own camera/gallery intents, so no storage or `CAMERA` permission is
+  required for the picker's cache copy.
+- **iOS** — `ios/Runner/Info.plist` has `NSCameraUsageDescription` and
+  `NSPhotoLibraryUsageDescription` with plain-language copy. Without them the
+  app is rejected or the picker fails at runtime.
 
 ## Configuration
 
@@ -107,7 +109,7 @@ Added for this slice (all on the approved list):
 | `flutter pub get` | pass — dependencies resolved |
 | `flutter analyze` | pass — “No issues found!” |
 | `flutter test` | pass — **14 tests** |
-| `flutter build apk --debug` | not run — `android/` not generated |
+| `flutter build apk --debug` | pass — `build/app/outputs/flutter-apk/app-debug.apk` (149.2 MB debug, all ABIs) |
 
 Test coverage:
 
@@ -118,15 +120,37 @@ Test coverage:
 | `test/outbox_test.dart` | Round-trip persistence, dedupe by `client_message_id`, update/remove, and corrupt-JSON recovery. |
 | `test/widget_test.dart` | Home names both outputs without merging them; chat exposes capture and the honest demo copy. |
 
-Environment: Flutter 3.47.9 (stable), Dart 3.13.7, Windows 11 25H2. Android SDK
-36.1.0 and the Android Studio JBR are installed, so an APK build is the next
-verification step once the runners exist.
+Environment: Flutter 3.47.9 (stable), Dart 3.13.7, Windows 11 25H2, Android SDK
+36.1.0, Android Studio JBR (Java 21), Gradle/AGP from the Flutter 3.47 template.
+
+## Emulator smoke (2026-11-06)
+
+Run on the headless AVD `Medium_Phone_API_36.1` with the debug APK built for
+`http://10.0.2.2:8010`, a separate uvicorn process on port 8010 and a fresh
+Alembic-built SQLite database (`APP_DATABASE_URL` pointed at a scratch file), so
+the shared development database was untouched.
+
+| Step | Observed |
+| --- | --- |
+| Home screen | `PS-03 API 0.1.0`, `Environment: dev` fetched from `/health` |
+| Text-only turn | Demo-labelled abstained assessment (`scaffold-demo-0.1`); no photo invented |
+| Gallery capture | Picker returned `scaled_38.jpg`; `POST /v1/uploads` returned `quality_result=pass`; the JSON message referenced `upload_id`; demo assessment rendered (`demo-chat-0.1`) |
+| Airplane mode on, send | Bubble showed `queued`; outbox persisted `state=queued`, `retryable=true`; no assistant reply was fabricated |
+| Airplane mode off | The 15 s flush sent the turn, the outbox emptied, and the database held exactly one user message with that `client_message_id` plus one assistant reply |
+
+This smoke also exposed a backend persistence bug: the request dependency
+closed the session without committing while the chat/upload/video repositories
+only `flush()`, so a `201` response could lose its rows. It was fixed at the
+`get_session` unit-of-work boundary (commit on success, rollback on exception)
+with a cross-request regression test; the backend suite then reported
+**375 passed**.
 
 ## Not verified
 
-- No APK build, device run or emulator run.
-- Camera/gallery permissions on a real device.
-- Airplane-mode queue and reconnect on a real network.
-- Flush while backgrounded; only page-open and resume are wired.
+- Real-device camera capture (the emulator smoke used the gallery picker).
+- iOS build or run; only the generated runner and usage strings are committed.
+- A real mobile network; the emulator reached the host through `10.0.2.2`
+  and airplane mode was toggled with `adb`.
+- Flush while backgrounded; only page-open and app resume are wired.
 - A real provider call — the app is demo-labelled until the backend has a key
   and approved labels.
