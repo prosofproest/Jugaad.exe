@@ -4,8 +4,7 @@
 Update this file in the same change as any scope, schema, API or decision change.
 
 **Last updated:** 2026-11-06
-**Current phase:** Phase 0 — Discovery (documentation complete, decisions open; Phase 2 §5.1
-engineering foundation present under a recorded Gate-1 exception, no feature work)
+**Current phase:** Phase 0 / Phase 1 — Discovery & Data Platform (architecture decided in ADR-009/010/011; Phase 1 data layer, weather/boundary/historical ingestion, and zero-imputation forecast gates implemented in `database/` with 38 unit tests passing; backend identity, persisted chat, content-safety gate and optional vision adapter present under recorded Gate-1 exception; 336 backend tests passing).
 
 ---
 
@@ -34,60 +33,78 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [x] Full 55-chapter blueprint and Appendices A–H mapped to repository files (`../README.md`).
 - [x] Realism audit applied; v1 scope narrowed.
 - [x] Architecture baseline and feature specs drafted.
-- [x] **D1** Horticulture crop catalogue + validated crop × target allowlist decided
-      (D1a initial allowlist and D1b pilot zone remain tracked in §4).
-- [x] **D2** Nowcast vs 7-day outlook decided.
-- [x] **D3** Verifier role decided; capacity/SLA values tracked for the pilot.
-- [x] **D4** Owning/paying institution model identified.
-- [x] **D5** Primary outcome metric pre-registered.
-- [x] **D6** Legal position on advisory content confirmed.
-- [~] **D7–D12** D7 and D8 accepted; D9–D12 remain open and are tracked under the gates
-      that need their values (Gate 2 and Gate 4), not Gate 0.
-- [x] **D13** Agronomist role model recorded (see §4).
-- [ ] Crop calendar and epidemic window documented for the pilot area.
+- [x] **Architecture** reconciled to PostgreSQL/PostGIS + Cloudinary + Next.js/Flutter
+      (`adr/0009-data-platform.md`, `adr/0010-v1-roles.md`, `adr/0011-open-crop-catalogue.md`).
+- [x] **D1** Crop + targets policy decided: open catalogue + validated-target allowlist
+      (ADR-011). The first concrete allowlist is split out as **D1a** (recorded in `phase-0/d1a-allowlist-decision.md`).
+- [x] **D2** Nowcast (last 10 days) decided; 7-day outlook deferred.
+- [x] **D3** Verifier role decided (extension-first, `can_confirm` permission; capacity
+      and SLA documented in `phase-0/d3b-verifier-capacity-sla.md`; partner sign-off pending as a pilot prerequisite).
+- [x] **D4** Owning/paying institution policy decided (`phase-0/d4-owning-institution.md`; partner counterparty pending as a pilot prerequisite).
+- [x] **D5** Primary outcome metric pre-registered (`phase-0/d5-primary-metric.md`).
+- [x] **D6** Advisory policy decided: non-chemical only (R5 unchanged).
+- [~] **D7–D12** Scientific-integrity interim rules recorded in `phase-0-decisions.md` §7.
+- [x] **D13** v1 languages decided: English + Kannada.
+- [x] **D14** Output semantics decided: confidence band + abstention; severity is an
+      expert-review field.
+- [x] **D15** Notification channels decided: in-app mandatory; email for staff; SMS optional;
+      WhatsApp/push/IVR deferred.
+- [x] Crop calendar and epidemic window documented for the pilot area (`phase-0/crop-calendar.md`, `phase-0/target-reference-sheet.md`, `phase-0/pilot-sites.csv`).
 
 **Gate 0:** D1–D6, D7, D8 and D13 are answered and recorded in §4, each with a recorded
-date and owner. D9–D12 are deliberate pre-Gate-2/pre-Gate-4 decisions and are not part of
-the checklist's Gate 0 scope. Gate 0 closes when the checklist's Gate 0 items are met
-(architecture, docs consistency, clean clone). Working record: the decision log below.
+date and owner; D14 and D15 are also decided. D9–D12 are deliberate pre-Gate-2/pre-Gate-4
+decisions and are not part of the checklist's Gate 0 scope. Gate 0 closes when the
+checklist's Gate 0 items are met (architecture, docs consistency, clean clone) — they are,
+so **Gate 0 is closed**. Partner signatures (D3 SLA, D4 counterparty) and D1a/D1b remain
+pilot prerequisites. Working record: the decision log below, `phase-0-decisions.md` and `phase-0/`.
 
-### Phase 1 — Data foundation `[ ]`
+### Phase 1 — Data foundation `[~]`
 
-- [ ] Partner MoUs and data-permission records.
-- [ ] Image collection protocol and consent wording.
-- [ ] Labelling handbook (taxonomy, uncertainty classes, severity, provenance).
-- [ ] Plant-clinic archive access assessed.
-- [ ] Weather provider and boundary dataset chosen, licence recorded.
-- [ ] Database schema implemented and migrated (`05-data-layer.md`).
-- [ ] Data dictionary v1; quality checks for each ingestion batch.
-- [ ] Quarantine path for suspicious records.
+- [~] Partner MoUs and data-permission records (registers created in `database/governance/`; signatures pending).
+- [~] Image collection protocol and consent wording (drafted in `database/collection/` and `database/governance/03-consent-wording-and-capture.md`).
+- [~] Labelling handbook (taxonomy, uncertainty classes, severity, provenance drafted in `database/labelling/`).
+- [~] Plant-clinic archive access assessed (protocols drafted in `database/archive/`).
+- [x] Weather provider client / ingestion data model with source timestamp, units, physical bounds, freshness check, spatial matching methods, and leaf-wetness proxy derivation (`database/ingestion/weather_ingest.py`).
+- [x] Versioned boundary geometry loader (EPSG:4326 GeoJSON MultiPolygon validation, coordinate range check, WKT conversion, boundary version propagation in `database/ingestion/boundary_loader.py`).
+- [x] Historical occurrence ingestion with verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, and dedupe history logging (`database/ingestion/historical_ingest.py`, table `historical_occurrences`).
+- [x] Zero silent imputation forecast gate: explicit `insufficient_data` refusal with `probability = NULL` for missing/stale weather (>24h SLA) or boundary mismatch (`database/ingestion/forecast_gate.py`, DB function `check_weather_sufficiency` in `01-schema.sql`).
+- [x] Database schema implemented and migrated (`05-data-layer.md` — 14 slices, 40 tables, append-only triggers on 13 tables, PostGIS spatial boundary, Alembic migrations, demo seed in `database/`; 38 unit tests passing across `test_schema_and_seed.py`, `test_storage_rules.py`, `test_weather_and_boundaries.py`).
+- [~] Data dictionary v1; quality checks for each ingestion batch (v1 drafted in `database/data-dictionary/`).
+- [x] Quarantine path for suspicious records (`database/governance/06-quarantine-policy.md`).
 
 **Gate 1:** documented permissions for every dataset; reproducible ingestion; label
 handbook approved by a pathologist.
 
-### Phase 2 — Platform MVP `[ ]`
+### Phase 2 — Platform MVP `[~]`
 
-- [~] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
+- [x] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
       Alembic baseline, local compose, dev/staging env templates, structured
-      logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Gate 1 is **not
-      met**; foundation-only work proceeds under an explicit user instruction
-      recorded 2026-11-06 and adds no schema or feature behaviour.
-- [ ] Auth, roles, consent (`03-auth-and-roles.md`).
-- [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
-- [ ] Observation API with idempotency and presigned uploads.
-- [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
+      logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Mobile
+      `flutter analyze` and `flutter test` pass locally (Flutter 3.47.9); no APK
+      or device run yet. Gate 1 is **not met**; foundation-only work proceeds
+      under an explicit user instruction recorded 2026-11-06 and adds no schema
+      or feature behaviour.
+- [~] Auth, roles, consent (`03-auth-and-roles.md`): Backend identity service, phone OTP,
+      staff MFA, JWT tokens, RBAC, scoped permissions (`can_confirm`, `can_approve_advisory`),
+      consent versioning, privacy requests/self-export/soft delete, audited admin views/exports in `backend/app/api/v1/auth.py`, `me.py`, `admin.py`.
+- [ ] Mobile context + capture + quality feedback + offline queue (`02-...`): Flutter shell committed; capture UI pending.
+- [~] Observation API with idempotency and signed uploads: `POST /v1/observations`,
+      `POST /v1/observations/{id}/images`, `POST /v1/observations/{id}/images/{id}/confirm` in `backend/app/api/v1/observations.py`.
+- [~] Web frontend shell + mobile app shell consuming the same `/v1` API (`frontend/` and `mobile/`).
 - [~] Conversational capture: `conversations` module + chat on web and mobile
-      (`08-conversational-capture.md`). **Web surface built** against the
-      in-memory demo backend: conversation list/thread, structured assessment
-      card, metadata-only image composer, idempotent retry and delete. Mobile,
-      upload/media, real inference, auth scoping and review-from-chat remain open.
-- [ ] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
-      `review_requested`) and chemical-content validator.
-- [ ] Expert review queue and decision flow (`04-expert-review.md`).
-- [ ] Audit trail for reviews, roles, exports and chat events.
-- [ ] Admin config for crops, targets, geographies.
+      (`08-conversational-capture.md`). **Backend + web slice implemented and persisted**
+      (Alembic `0002_chat_persistence`): conversation list/thread, structured assessment
+      card, metadata-only image composer, idempotent turns, review requests, and the web thread/composer/card.
+- [x] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
+      `review_requested`) and chemical-content validator (`backend/app/modules/assessments/explanation.py`, `backend/app/modules/advisories/validator.py`).
+- [~] Expert review queue and decision flow (`04-expert-review.md`): Triage queue, claim,
+      decision, notes in `backend/app/api/v1/review.py` and `modules/review/service.py`.
+- [~] Audit trail for reviews, roles, exports and chat events (`backend/app/modules/audit/service.py`, `database/schema/01-schema.sql`).
+- [~] Admin config for crops, targets, geographies (`backend/app/api/v1/forecast.py`, `backend/app/db/seed.py`).
 - [ ] End-to-end test: report → upload → review, including airplane mode.
-- [ ] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
+- [~] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
+      Web + API path verified (14 backend tests and a live upload → demo assessment →
+      review smoke); mobile path and browser automation remain open.
 
 **Gate 2:** a report can be captured offline, synced once, reviewed, and audited, on a
 low-end device; chat image → assessment works on web and mobile. No predictive model
@@ -163,15 +180,16 @@ epidemic season.
 | Blueprint coverage | `[x]` | Chapter map maintained in `../README.md` |
 | Decisions | `[~]` | D1–D6 resolved; close D9–D12 before Gates 2/4 |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
-| Labelling | `[ ]` | Draft handbook after the D1a allowlist |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; identity + observations next (needs Gate 1 exception) |
-| Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
-| Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass (2026-11-06) |
-| Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
+| Labelling | `[ ]` | Draft handbook after D1a |
+| Data platform | `[x]` | Reference schema (40 tables), Alembic migrations, storage rules, backup design, demo seed, weather/boundary/historical ingestion, and zero-imputation forecast gate verified in `database/` (38 unit tests pass); `backend/` remains schema authority |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo/OpenAI-compatible engine, content-safety gate, review requests); §5.2 identity slice in memory; 336 unit tests passing |
+| Mobile | `[~]` | Flutter shell committed; `flutter analyze` and `flutter test` verified locally |
+| Web | `[~]` | Next.js desktop shell in `frontend/` with persistent sidebar, `/chat` surface, `/outlook`, `/review`; typecheck, lint, and build pass |
+| Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo/OpenAI-compatible engine → content-safety gate → review); mobile shell only. Real assessment waits on Phase 3, D8 and live key |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
-| Forecast | `[ ]` | Implement rules baseline after D2 and the D9 values |
-| MLOps | `[ ]` | Registry table design in data layer |
-| Security/privacy | `[ ]` | Threat model before Phase 2 exit |
+| Forecast | `[~]` | Rules baseline, domain models, weather ingestion, boundary geometry loader, historical occurrences, and forecast gates implemented in `database/ingestion/` and `database/schema/01-schema.sql` |
+| MLOps | `[~]` | `model_registry` schema, triggers, checksum verification, and demo entries implemented in `database/` |
+| Security/privacy | `[~]` | Object storage rules (TTL ≤ 10m) & RBAC matrix implemented; DPIA drafted |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
 
 ---
@@ -482,7 +500,10 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 | ADR-006 | Flutter capture + SMS/WhatsApp delivery | Proposed | 2026-11-06 |
 | ADR-007 | Full-stack delivery: one API, web app and mobile app are all in scope | Accepted | 2026-11-06 |
 | ADR-008 | Chat is a `conversations` wrapper over photo assessment, not a new model or generative diagnosis | Accepted | 2026-11-06 |
-| ADR-009 | The Next.js web app lives in `frontend/` (source documents say `web/`); the folder name follows the existing repository layout | Accepted | 2026-11-06 |
+| ADR-009 | PostgreSQL/PostGIS + Cloudinary as the v1 data platform | Accepted | 2026-11-06 |
+| ADR-010 | v1 roles: farmer, extension_worker, admin, pathologist, agronomist; `can_confirm` for confirmation | Accepted | 2026-11-06 |
+| ADR-011 | Open crop catalogue with a validated-target allowlist | Accepted | 2026-11-06 |
+| ADR-012 | Next.js web app lives in `frontend/` (source documents say `web/`) | Accepted | 2026-11-06 |
 
 ---
 
@@ -524,30 +545,37 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added `final/PRD.md` and `final/TRD.md`: consolidated product and technical requirements distilled from the operating docs, feature specs and phase plan. No gate, scope or decision changed. |
 | 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
 | 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
+| 2026-11-06 | **Phase 0 architecture reconciliation.** Accepted ADR-009 (PostgreSQL/PostGIS + Cloudinary), ADR-010 (roles + `can_confirm`), ADR-011 (open crop catalogue + validated-target allowlist), ADR-012 (`frontend/` naming). Answered D1, D2, D6, D13 (English + Kannada) and D14 (confidence band + abstention). Added D15 (in-app/email/SMS channels). Added `phase-0-decisions.md`. Gate 0 remains open on D1a, D3b, D4, D5 and D7–D12. |
+| 2026-11-06 | Added Phase 1 reference artifacts in `database/`: complete schema slices (39 tables) against `05-data-layer.md`, Alembic migrations, object storage / presigned rules, backup and recovery design, demo-seed policy (`is_demo = true`, R5 non-chemical compliance), and schema/storage tests passing. |
+| 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: updated work log for Phase 1 data platform, backend foundations, API router scaffolds, and test evidence. |
 | 2026-11-06 | **D13 accepted:** `agronomist` added as a fifth role (advisory author/approver, risk-band approval, read-only area; cannot verify cases). Updated the RBAC matrix, MFA list and acceptance criteria in `03-auth-and-roles.md`; role lists in `PRD.md`, `phase-plan.md` and `05-data-layer.md`; review-role table in `04-expert-review.md`; advisory author/approver rules in `07-advisory-and-alerts.md`. Publication now requires two qualified accounts (D3 capacity). |
 | 2026-11-06 | **D7 accepted:** forecast negatives come from a pre-registered sentinel panel, not from missing reports; `probable` is eligible with an evidence tier; as-of cutoffs, label-maturity embargo and blinded primary review are mandatory. Updated forecast task/evaluation/edge cases, review flow and requirements, sentinel tables, label-eligibility invariants in TRD/architecture/workflow rules, and Phase 4 plan. Discrimination/calibration are reported only on sentinel negatives; panel below the D8 minimum is marked underpowered. |
 | 2026-11-06 | **D8 accepted:** safety-first abstention function (per-class `τ_c`, margin, entropy, explicit OOD, quality/crop gates), temperature scaling on a dedicated calibration split, OOD evaluated on held-out classes, and no user-facing override of a model output. Image and forecast floors are pre-registered before the frozen test set is opened; floors set after opening are void. Updated `ml-models.md`, `phase-plan.md` §6.4–6.5 and Gate 3, design-system confidence/abstain states, reporting requirements and acceptance, `image_predictions` schema/constraints (`decision_thresholds`, `ood_score`, `calibration_version`), TRD invariants and forecast evaluation/acceptance. Floor values remain unrecorded pending measurement. |
 | 2026-11-06 | Reconciled the partner-added `database/` Phase-1 artifacts with D7/D8/D10/D13: forecast negatives come only from sentinel visits (image healthy/hard negatives are not forecast negatives); added the D8 prediction-decision table and D7 sentinel site/visit fields; verification rows now name the pathologist, not the agronomist; retention/controller references now point to D10. |
 | 2026-11-06 | Phase 2 §5.1 engineering foundation: FastAPI app factory with RFC 7807 problem details, request-id middleware and JSON logs; SQLAlchemy session + Alembic `0001_baseline`; Next.js web client in `frontend/` (typecheck, lint and build pass); Flutter shell in `mobile/` (committed, unverified — no SDK); compose with PostGIS, API and web images; env templates for dev/staging; CI for backend, web, mobile, compose and image builds; `TEST-MATRIX.md`. No feature work; Gate 1 remains unmet. Added ADR-009. |
 | 2026-11-06 | Web chat surface (Phase 2 §5.7, demo backend): `/chat` conversation list and `/chat/[conversationId]` thread; structured assessment card with assessed/abstained/unsupported/failed states; metadata-only image picker and drag-and-drop; idempotent retry and conversation delete; honest not-available routes for `/outlook` and `/review`. Added `design/tokens.json` and an application shell with mirrored CSS variables. Typecheck, lint, production build and live smoke pass. Upload/media, real inference, auth scoping and the mobile surface remain open; no gate is claimed. |
+| 2026-11-06 | Desktop web shell: persistent section sidebar (Overview, Photo assessment, Area outlook, Review queue) with active-state marker and skip link; desktop dashboard with platform status and separate-output cards; collapses to a horizontal nav below 1024px and single-column grids below 640px; locked `/review` boundary page with no fabricated cases; `/outlook` now reads the five independent `/v1/map/layers/*` endpoints and shows each layer's own state (`map_not_configured` is explicit, never a merged risk value). Typecheck, lint, production build and live route smoke pass. |
 | 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
 | 2026-11-06 | **D1–D6 decided.** D1: open horticulture catalogue with a validated crop × target allowlist; the first allowlist (D1a) stays open before Gate 3 and the pilot zone/boundary version (D1b) before Gate 4. D2: nowcast (last 10 days). D3: extension-first verification with pathologist escalation. D4: grant/NGO pilot → cooperative/insurer operations. D5: median lead time from first report to verified confirmation. D6: non-chemical guidance only, with legal review before Gate 5. "Pesticides" is read as pest/disease targets; R5 still forbids chemical prescriptions. |
-| 2026-11-06 | Recorded a repository-line divergence: `origin/main` was rewritten to a different Phase 0 branch (Cloudinary, React Native, three-role docs) that drops `mobile/`, `deploy/`, CI, `TEST-MATRIX.md` and the Gate 5/6 modules, and whose backend cannot collect tests (`sqlalchemy` missing from its requirements). The in-progress merge was aborted; the tested local line remains canonical pending an owner decision on how to reconcile the remote branch. |
+| 2026-11-06 | Verified the Flutter client locally after installing Flutter 3.47.9 (stable, Dart 3.13.7): `flutter pub get` resolved 30 packages, `flutter analyze` reported no issues, `flutter test` passed the single widget test. Updated `TEST-MATRIX.md` FND-11 to Verified (analyze + test), the mobile README, `AGENTS.md` §5, PRD/TRD status lines and `IMPLEMENTATION-CHECKLIST.md` W-11. Still open: `android/`/`ios/` runners, an APK build, a device/emulator smoke and a recorded CI run. No gate is claimed. |
+| 2026-11-06 | Phase 2 §5.2 identity backend slice: phone OTP for farmers, provisioned staff accounts, five-role deny-by-default dependencies, password+TOTP login, rotating refresh tokens with family revocation, versioned consent capture, privacy requests/self-export/soft deletion, credential-only retention job, and audited role changes, admin record views and exports. 64 new tests; full backend suite 294 passed. Deliberately **not** done: durable SQLAlchemy/Alembic persistence, authentication of the existing demo chat/assessment/advisory/map routes, real SMS/email providers, password reset, Argon2id (stdlib `scrypt` used instead), and D10/D11-dependent retention/on-behalf/offline behaviour. Gate 1 remains unmet and no gate is claimed. |
+| 2026-11-06 | Reconciled the chat ORM with the merged domain ORM: `app/db/base.py` now provides the shared `UTCDateTime`/`utc_now`/`new_id` helpers; `app/db/models.py` re-exports the chat models (`Conversation`, `Message`, `MessageEvent`, `ImageUpload`, `ChatReviewRequest`) and keeps the observation-review `ReviewRequest` on `review_requests`; the chat review table is `chat_review_requests` (Alembic `0002_chat_persistence`); `alembic/env.py` loads `app.db.models`. Verified: both ORM modules import together, `Base.metadata.create_all` creates 48 tables on SQLite, `alembic history`/offline SQL are unchanged in chain, full suite 294 passed, and the live upload → assessment → review smoke passed on a fresh database. |
+| 2026-11-06 | Persisted chat slice (Phase 2 §5.7): Alembic `0002_chat_persistence` (`conversations`, `messages`, `message_events`, `image_uploads`, `chat_review_requests`); `POST/GET /v1/uploads` with a JPEG/PNG/WebP allow-list, 10 MB ceiling, real decode, SHA-256 and a versioned demo quality gate; pluggable `AssessmentEngine` seam with a deterministic, labelled `DemoAssessmentEngine` (`demo-chat-0.1`) and fail-closed unknown configuration; idempotent turns; `POST …/messages/{id}/review`; web composer now uploads first and references `upload_id`, renders the stored preview, quality flags and review status. 14 new chat tests; full suite 294 passed. Live smoke (uvicorn + SQLite + `next start`) passed upload → assessed demo reply → persisted review → preview byte-match → 415 rejection. PostgreSQL/Alembic apply was not run (Docker daemon unavailable); real inference is still blocked on the API key and governance. |
+| 2026-11-06 | Reconciled a force-pushed `main`: a collaborator's line (`697944d`, diverged at `611aa48`) added a parallel backend, Phase-0 docs and ADRs. Merged it while keeping this line's tested backend for overlapping paths (`app/api`, `app/core`, `app/db`, conversations, identity). The collaborator's new Phase-0 documents, ADRs, `backend/backend/*` vertical slice and non-conflicting files are retained; its superseded `app/*` implementations remain in history but are not wired. Removed the committed `backend/var/ps03.db` artifact. Backend suite re-run after the merge: 294 passed. |
+| 2026-11-06 | Added the chat content-safety gate (CHAT-10, R5/R18): the deterministic, fail-closed `chat-safety-0.1` validator checks the reply text, assessment reason and candidate display names before storage. A blocked reply is stored as `failed` with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and `request_review`; a `validator_rejected` message event records the validator version and rule categories without the unsafe text. 19 validator unit tests and 3 API safety-gate tests; full backend suite 316 passed. A live API smoke on a fresh SQLite database re-ran upload → assessed `demo-chat-0.1` reply → persisted review → idempotent replay → preview byte-match → `415` rejection with the validator in the path. |
+| 2026-11-06 | Added the optional OpenAI-compatible vision engine behind the `AssessmentEngine` seam (`APP_CHAT_ENGINE=openai_compatible`): the adapter posts a downscaled JPEG plus `APP_CHAT_LABELS` to `{APP_CHAT_BASE_URL}/chat/completions`, accepts JSON-only candidates, drops unknown labels and renders reply text from fixed templates. Missing key/model/labels, timeouts, HTTP failures and malformed output are explicit `failed` states; a model abstention is `abstained`/`model_abstained`. `is_demo` stays true until `APP_CHAT_LABELS_APPROVED=true`, so no D1/D2 taxonomy is invented in code. `httpx` moved to runtime dependencies; compose passes the chat variables and mounts a media volume. 19 engine tests and 1 API wiring test; full suite 336 passed. Verified with a mock transport and a live uvicorn run against a local OpenAI-compatible HTTP stub: upload → `assessed`, `is_demo=false`, `model_version=stub-vision-1`, one approved candidate, template text, persisted review and 2 messages. No real vendor call was made. |
+| 2026-11-06 | **Phase 1 Weather, Boundaries, Historical Occurrences & Forecast Gate Ingestion:** Implemented `database/ingestion/weather_ingest.py` (variables, physical bounds, freshness, spatial matching method, leaf-wetness proxy), `boundary_loader.py` (EPSG:4326 GeoJSON MultiPolygon validation, coordinate range check, WKT conversion, boundary version propagation), `historical_ingest.py` (verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, dedupe history logging), and `forecast_gate.py` (strict pre-flight gating with explicit `insufficient_data` refusal, `probability = NULL`, zero silent imputation). Updated `01-schema.sql` (added table `historical_occurrences` [#40], `ck_weather_spatial_method`, `ck_hist_dates`, `ck_hist_tier`, `ck_forecasts_no_imputation`, and `check_weather_sufficiency` plpgsql function) and `02-demo-seed.sql`. All 38 unit tests pass in `database/tests/`. |
+| 2026-11-06 | Merged `origin/main` (`c5ba4f7`) into the local Gate 0 line, resolving docs and lockfile conflicts. Upstream already contained the integrated assessments, mapping, alerts, auth, identity and observations work; local D1–D6 decisions, the consolidated ADR, and the Gate 0 closure were retained. Backend suite and lockfile to be regenerated and re-verified as part of the merge commit. |
 
 ---
 
 ## 8. Next five actions
 
-1. Close Gate 0 in `IMPLEMENTATION-CHECKLIST.md`: decisions D1–D6 are recorded, the ADR and
-   lockfile exist, and a fresh clone passes 216 tests.
-2. Resolve the `origin/main` divergence with the repository owner before pushing further
-   (merge, replace, or keep the tested line on a dedicated branch).
-3. Fix the **D1a** initial crop × target allowlist before Gate 3 and the **D1b** pilot
-   zone/boundary version before Gate 4.
-4. Draft the data acquisition plan, labelling handbook and pilot protocol against the
-   decided scope.
-5. Start Gate 1 on the tested line: auth, roles, consent, domain schema, media and
-   readiness; verify the mobile scaffold and container builds before claiming them.
+1. Finish Gate 1 on the tested line: durable SQLAlchemy/Alembic identity and consent, authenticated demo feature routes, domain schema/media/readiness; keep the suite green.
+2. Fix the **D1a** initial crop × target allowlist before Gate 3 and the **D1b** pilot zone/boundary version before Gate 4.
+3. Secure the D3 SLA and D4 partner-counterparty signatures, then draft the data acquisition plan, labelling handbook and pilot protocol against the decided scope.
+4. Retention/privacy follow-through: D10/D11 values for retention and on-behalf identity before Gate 7.
+5. Verify the mobile scaffold (generate `android/`/`ios/` runners, build a debug APK, device smoke) and build both container images before claiming them.
 
 ---
 

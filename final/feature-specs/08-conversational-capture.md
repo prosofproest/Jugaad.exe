@@ -44,7 +44,7 @@ verification model or the risk semantics.
 |---|---|---|
 | Farmer | "Something is wrong with this plant — what might it be, and what can I do safely?" | Mobile chat, web chat |
 | Field staff / extension worker | Capture evidence quickly, add context, route to expert review | Mobile chat |
-| Expert (pathologist) | See the conversation and image that produced a case, without a second tool | Web chat + expert portal |
+| Expert (agronomist / senior extension worker) | See the conversation and image that produced a case, without a second tool | Web chat + expert portal |
 | Admin | Audit conversations and message events; never browse content without a reason | Admin console |
 
 All users are authenticated. A conversation is private to its owner; staff access is
@@ -56,7 +56,8 @@ role- and area-scoped and audited.
 
 ### 3.1 In scope
 
-- A chat thread list and a message thread on **mobile (Flutter)** and **web (Next.js)**.
+- A chat thread list and a message thread on **mobile (React Native + TypeScript)** and
+  **web (Next.js)**.
 - Sending an image from camera or gallery through the chat composer.
 - Optional short text context (`crop`, `growth stage`, `area`, symptom note); unknown is
   allowed.
@@ -91,7 +92,7 @@ open chat
   → assistant reply (structured, one of):
        ├─ assessed      → candidate card + confidence + next safe step
        ├─ abstained     → reason + retake action (image kept)
-       ├─ unsupported   → supported-crop list + escalation
+       ├─ unsupported   → catalogue support status + escalation (never a forced class)
        ├─ queued        → "will assess when connected"
        ├─ failed        → retry action, no invented result
        └─ review        → request created, status visible
@@ -144,12 +145,13 @@ previous image is retained; history is append-only from the user's perspective.
   "assessment": {
     "state": "assessed",
     "candidates": [
-      {"label": "late_blight", "score": 0.71},
-      {"label": "abiotic_lookalike", "score": 0.12},
-      {"label": "unknown", "score": 0.08}
+      {"label": "late_blight", "band": "medium"},
+      {"label": "abiotic_lookalike", "band": "low"},
+      {"label": "unknown", "band": "low"}
     ],
     "confidence_band": "medium",
     "calibrated": false,
+    "probability": null,
     "quality_flags": [],
     "model_version": "image-classifier-demo-0.1",
     "generated_at": "2026-11-06T06:00:00Z",
@@ -168,8 +170,7 @@ previous image is retained; history is append-only from the user's perspective.
   "role": "assistant",
   "kind": "abstained",
   "observation_id": "obs_demo_002",
-  "reason_code": "quality_gate_failed",
-  "quality_flag": "blur",
+  "reason_code": "blur",
   "reason_text": "The image is too blurry to assess.",
   "next_steps": ["retake"],
   "model_version": "image-quality-gate-demo-0.1",
@@ -185,7 +186,7 @@ previous image is retained; history is append-only from the user's perspective.
 | `queued` | `client_message_id`, `queued_at` | wait, view queue |
 | `failed` | `client_message_id`, `error_code`, `retryable` | retry, delete |
 | `review_requested` | `review_request_id`, `status`, `submitted_at` | view status |
-| `unsupported_crop` | `supported_crops`, `reason_code` | change crop, escalate |
+| `unsupported_crop` | `catalogue_link`, `reason_code` | change crop, escalate |
 
 `is_demo` is mandatory for any synthetic or illustrative reply. It must render a demo
 badge in every client.
@@ -202,11 +203,14 @@ DELETE /v1/conversations/{id}
 GET    /v1/conversations/{id}/messages?cursor=
 POST   /v1/conversations/{id}/messages
 POST   /v1/conversations/{id}/messages/{message_id}/retry
+POST   /v1/conversations/{id}/messages/{message_id}/review
+POST   /v1/uploads                              # multipart image upload (Phase 2 demo)
+GET    /v1/uploads/{upload_id}                  # owner-scoped preview bytes
 GET    /v1/conversations/{id}/events            # optional SSE; polling otherwise
 ```
 
-`POST /v1/conversations/{id}/messages` accepts either JSON (text-only) or a multipart
-descriptor that references a presigned image upload:
+`POST /v1/conversations/{id}/messages` accepts JSON. An image is uploaded first with a
+multipart `POST /v1/uploads`; the message then references the returned `upload_id`:
 
 ```json
 {
@@ -224,11 +228,31 @@ descriptor that references a presigned image upload:
 Rules:
 
 - `Idempotency-Key` is required, matching `client_message_id` semantics.
-- The server creates the observation before attaching the image (same rule as spec 02).
-- The server returns a `message` plus an `assessment` reference; the client renders the
-  card from structured fields.
+- The server validates and stores the image before the message is accepted. In the
+  Phase 2 demo slice the `image_uploads` row is the observation record for the turn;
+  creating a full `observations` row and linking `image_assets` is deferred until the
+  capture pipeline in spec 02 lands.
+- The server returns the stored user and assistant messages, each with its structured
+  `assessment`/`image` descriptor; the client renders the card from those fields.
 - No endpoint returns raw scores to farmer clients beyond the documented candidates.
-- An assistant message is append-only.
+- An assistant message is append-only. `POST …/review` creates at most one
+  `chat_review_requests` row per assistant message and returns the same row on replay.
+- Every assistant reply is validated before it is stored. If the reply text, the
+  assessment reason or a candidate display name contains a chemical product, dose,
+  mixture, application interval or spray instruction, the turn is stored as `failed`
+  with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and
+  `next_steps` set to `["request_review"]`. A `validator_rejected` `message_events` row
+  records the validator version and rule categories; the unsafe text is never stored.
+- The assessment engine is a pluggable seam. `APP_CHAT_ENGINE=demo` serves the
+  deterministic labelled engine; `APP_CHAT_ENGINE=openai_compatible` calls a vision
+  model through an OpenAI-compatible chat-completions endpoint. The model may only
+  choose from the configured `APP_CHAT_LABELS`; the server renders the reply from fixed
+  templates, so the provider never supplies user-facing advice. Missing key/model/labels
+  and malformed output become `failed` states (`model_not_configured`,
+  `invalid_model_response`, `model_unavailable`, `model_timeout`); a model abstention
+  becomes `abstained`/`model_abstained`. `is_demo` stays true until the label set is the
+  approved D1/D2 taxonomy and `APP_CHAT_LABELS_APPROVED=true`; no taxonomy is invented in
+  code.
 
 ---
 
@@ -236,13 +260,20 @@ Rules:
 
 | Table | Purpose | Key constraints |
 |---|---|---|
-| `conversations` | Thread owned by one user | `owner_id` FK; `deleted_at` for user deletion |
-| `messages` | Append-only user and assistant messages | `conversation_id`, `role`, `kind`, `client_message_id` unique per conversation |
-| `message_attachments` | Links a message to `image_assets` | one image per user message in v1 |
-| `message_events` | delivery/assessment state transitions | append-only |
+| `conversations` | Thread owned by one user | `owner_id` (demo owner until auth); `deleted_at` for user deletion |
+| `messages` | Append-only user and assistant messages | `conversation_id`; `client_message_id` unique per conversation; `turn_id` pairs the user/assistant rows |
+| `message_events` | delivery/assessment/review state transitions | append-only |
+| `image_uploads` | Validated image metadata and quality metrics | `owner_id`; SHA-256; bytes live outside the database |
+| `chat_review_requests` | Expert-review request for one assistant message | unique `message_id`; separate from the observation-review `review_requests` table |
 
-Replies store `assessment_id`, `model_version`, `generated_at` and `is_demo`. The
-`assistant` message is never edited; corrections are new messages.
+Replies store an immutable `assessment` JSON snapshot (`model_version`, `generated_at`,
+`calibrated`, `is_demo`) and, for an image turn, an `image` JSON descriptor referencing
+the `image_uploads` row. The `assistant` message is never edited; corrections are new
+messages.
+
+Phase 2 implements this demo path. Linking a message to `image_assets` through
+`message_attachments` is deferred until the observation pipeline in spec 02 is wired in;
+the upload row and the message descriptor are the traceable record in the meantime.
 
 ---
 
@@ -259,8 +290,10 @@ the following are hard requirements:
    monitoring, sanitation, crop management and escalation.
 4. Severe, uncertain or unsupported cases surface "request expert review" as the primary
    action.
-5. The server-side content validator rejects chemical vocabulary before a message is
-   stored; a template test asserts this.
+5. The server-side content validator (`chat-safety-0.1`) rejects chemical vocabulary
+   before a message is stored. It is fail-closed: a blocked reply becomes a `failed`
+   assessment with no candidates, and the rejection is audited without copying the
+   unsafe text. Unit and API tests assert this.
 6. No free-form generative text is served in v1. Template rendering is deterministic and
    versioned.
 7. The chat cannot be used to bypass verification: requesting review creates the same
@@ -288,7 +321,7 @@ the following are hard requirements:
 |---|---|
 | CHAT-NF-01 | Mobile chat remains usable on a low-end Android device and a constrained network. |
 | CHAT-NF-02 | Web chat is keyboard operable, labelled, and meets the contrast/focus rules in `01-design-system.md`. |
-| CHAT-NF-03 | Image upload uses the existing presigned-URL pipeline; no multipart through the API process. |
+| CHAT-NF-03 | Image upload uses the existing signed-upload pipeline; no multipart through the API process. |
 | CHAT-NF-04 | Message and attachment access is authorised per conversation; IDs are unguessable (UUID). |
 | CHAT-NF-05 | Logs include conversation/message identifiers and states, never image bytes, coordinates or user text. |
 | CHAT-NF-06 | Reply templates are externalised for translation; no hard-coded user-facing copy. |
@@ -301,10 +334,7 @@ the following are hard requirements:
 - [ ] A user can send an image from mobile and web and receives a structured reply card.
 - [ ] Retrying the same send produces one observation and one message.
 - [ ] Airplane-mode send is queued and delivered once after reconnect.
-- [ ] A blurry image yields `abstained` with `quality_gate_failed`, the `blur` flag and a
-      retake action; the image stays in history.
-- [ ] An abstention renders a machine reason code in plain language and no candidate list.
-- [ ] No chat control overrides a model output; retake and review do not rewrite the prediction.
+- [ ] A blurry image yields `abstained` with a retake action; the image stays in history.
 - [ ] An unsupported crop yields the supported list; no class is forced.
 - [ ] The reply shows model version, generation time and calibration status.
 - [ ] The reply never contains chemical advice; the validator test fails the build if it does.

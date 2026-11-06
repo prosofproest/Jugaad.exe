@@ -30,15 +30,22 @@ the browser uses the public origin.
 | --- | --- | --- |
 | `/` | Reports API reachability and explains the two separate outputs. | live smoke, build |
 | `/chat` | Conversation list: create, open and delete; empty and API-unreachable states. | live smoke, build |
-| `/chat/[conversationId]` | Thread with structured assessment replies, idempotent retry, demo badge and delete. | live smoke, build |
-| `/outlook` | Honest “not available in this phase” state for the separate area-outlook output. | build, manual check |
-| `/review` | Honest “locked” state for the expert review portal; no fabricated cases. | build, manual check |
+| `/chat/[conversationId]` | Thread with image upload, structured assessment replies, review requests, idempotent retry, demo badge and delete. | live smoke (upload → assessment → review), build |
+| `/outlook` | Independent map-layer states (verified, unverified, modelled risk, coverage, boundaries) fetched from `/v1/map/layers/*`; explicit “not configured” state, never a merged risk value. | live smoke, build |
+| `/review` | Honest “locked” state for the expert review portal; no fabricated cases. | live smoke, build |
+
+The desktop shell is a persistent left sidebar (Overview, Photo assessment, Area
+outlook, Review queue) with an active-section marker, a skip link and a top bar.
+Below 1024px the sidebar collapses into a horizontal scrollable nav. Layout
+reflows to a single column and the dashboard grids stack at 640px.
 
 The web chat is the Phase 2 §5.7 surface, not a new model. It renders the
 server's structured `AssessmentCard` fields; it never parses prose into a
-diagnosis and never invents a result. An image attachment sends **filename
-metadata only** — the upload/media pipeline and any real image model are not
-connected in this phase.
+diagnosis and never invents a result. The composer uploads the photo to
+`POST /v1/uploads` first and the message references the returned `upload_id`.
+The server validates and stores the image, runs a demo quality gate and returns
+a labelled demo assessment. No real image model is connected; the demo engine
+(`demo-chat-0.1`) and all synthetic labels are visibly marked.
 
 ## Design system
 
@@ -53,20 +60,21 @@ Implemented:
 
 - conversation list, thread, create and delete;
 - honest placeholder routes for area outlook and expert review (no fabricated data);
-- text and image-metadata composer (file picker and drag-and-drop, preview,
-  10 MB guard);
+- image composer with file picker, drag-and-drop, local preview and 10 MB guard;
+- real upload to `/v1/uploads`, server-side validation and stored preview rendering;
 - structured assessment card with assessed / abstained / unsupported / failed
-  states, confidence band, calibration status, model version and generation
-  time;
+  states, quality flags, confidence band, calibration status, model version and
+  generation time;
+- request expert review from an assessment and see its persisted status;
 - demo labelling, offline notice, failed-send retry with the same
   `client_message_id`, and empty/error states.
 
 Not implemented in this phase:
 
-- image upload, presigned URLs and media storage;
+- presigned-URL/object-storage uploads (local multipart storage only) and signed preview URLs;
 - real image inference (replies are labelled demo);
 - chat context fields (crop, stage, area) — the crop list is blocked on D1;
-- expert review from chat, advisories, area outlook;
+- the reviewer queue, advisories and area outlook;
 - authentication and per-user ownership (the backend uses a single demo owner);
 - localisation catalogs (copy is currently English-only in components).
 
@@ -77,8 +85,10 @@ Not implemented in this phase:
 | `npm run typecheck` | pass (2026-11-06) |
 | `npm run lint` | pass (2026-11-06) |
 | `npm run build` | pass; routes `/`, `/_not-found`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review` |
-| Live smoke | `/chat` listed a created conversation; thread rendered title, demo badge and the abstained assessment; delete returned the empty state |
+| Live smoke | `/`, `/chat`, `/outlook`, `/review` returned 200; `/chat/conv_missing` returned 404; the sidebar nav and platform status rendered. Upload → message → review returned a persisted `demo-chat-0.1` assessment and review status; the preview bytes matched the upload; the thread rendered the stored image, quality flags and review status; delete returned the empty state. `/outlook` rendered all five layer cards as “Not configured” with the new map router and “0 of 5 layers serving data”; no value was merged into a risk number |
 
-The production build and live smoke used the local FastAPI dev server with the
-in-memory demo conversation store. No real image upload or model inference was
-exercised.
+The production build and live smoke used the local FastAPI dev server with a
+file-backed SQLite database (the production schema is Alembic
+`0002_chat_persistence`; PostgreSQL apply is not yet verified). The upload,
+demo quality gate, demo assessment and review paths were exercised; no real
+model inference was.

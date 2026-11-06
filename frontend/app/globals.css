@@ -524,6 +524,58 @@ p:last-child {
   padding-left: var(--space-6);
 }
 
+.layer-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.layer-card {
+  display: grid;
+  gap: var(--space-2);
+  align-content: start;
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+}
+
+.layer-card h3 {
+  margin: 0;
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.layer-card p {
+  margin: 0;
+}
+
+.layer-meta {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.layer-meta div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+  justify-content: space-between;
+}
+
+.layer-meta dt {
+  font-weight: 600;
+}
+
+.layer-meta dd {
+  margin: 0;
+}
+
 .card {
   background: var(--surface-raised);
   border-radius: var(--radius-card);
@@ -801,6 +853,19 @@ label {
   border-left: 4px solid var(--feedback-error);
 }
 
+.message-photo {
+  margin: 0;
+  display: grid;
+  gap: var(--space-2);
+}
+
+.message-photo img {
+  max-width: min(100%, 22rem);
+  height: auto;
+  border-radius: var(--radius-control);
+  border: 1px solid var(--border-subtle);
+}
+
 /* ---------- Assessment card ---------- */
 
 .assessment {
@@ -1003,6 +1068,10 @@ label {
   .section-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
+
+  .layer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {
@@ -1011,8 +1080,8 @@ label {
     padding: var(--space-3) var(--space-4);
   }
 
-  main {
-    margin-top: var(--space-6);
+  .app-content {
+    padding-top: var(--space-4);
   }
 
   .page-header h1 {
@@ -1021,6 +1090,10 @@ label {
   }
 
   .section-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .layer-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 

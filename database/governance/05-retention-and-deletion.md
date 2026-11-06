@@ -32,6 +32,9 @@
 | Consent events | Type, version, grant/withdraw, text hash | TBD; longer than the account | Account deletion or programme end | Retain as audit evidence unless legal order requires deletion |
 | Growing area | Approximate area, optional geometry | TBD | Account deletion or programme end | Soft delete; remove precise geometry first |
 | Observations and images | Reports, originals, previews | TBD | Case retention expiry or deletion request | Soft delete → hard delete; remove derivatives and previews; propagate to object storage |
+| Archive originals (`ARC-###`) | Read-only archive images and metadata | Per permission record; TBD | Permission expiry, withdrawal or programme end | Return or destroy exactly as the permission requires; never delete before it allows; record evidence |
+| Archive mapping and provenance | Manifests, checksums, original labels, mapping table, reviewer refs | Longer than the archive batch; TBD | Programme audit expiry | Retain as audit evidence; minimise reviewer identity where required |
+| Archive quarantine | Unmappable, conflicting or provenance-missing records | TBD | Resolution plus retention expiry | Preserve the original; never delete merely because the label is unmappable |
 | Image quality results | Gate version, flags, thresholds | TBD | Same as image | Retain for model audit if de-identified; otherwise delete with image |
 | Image predictions | Candidates, model version, abstention | Longer than the case | Model/programme audit expiry | Append-only; retain in de-identified form; never soft-delete |
 | Reviews and evidence | Decisions, notes, lab/field evidence | Longer than the case | Programme audit expiry | Append-only; retain; de-identify where required |
@@ -66,6 +69,7 @@ retention schedule and update this table.
 | Retention period expires | Scheduled job | Job log and row count |
 | Legal/regulatory order | Legal owner | Signed instruction; legal hold check |
 | Dataset permission expires or is withdrawn | Data owner | Contract record; scope of deletion |
+| Archive permission expires, is withdrawn, or the institution requests return | Data owner + legal | Signed permission record; return/destruction instruction; legal-hold check |
 | Erroneous or quarantined record | Data owner | Quarantine resolution record |
 | Demo reset | Engineering | Environment check; `is_demo` confirmation |
 | Programme closure | Programme lead | Approved closure plan |
@@ -146,6 +150,9 @@ Rules:
 8. The deletion SLA and communication template.
 9. Whether users can request deletion of individual images while keeping the case.
 10. Cross-border backup locations and transfer mechanism.
+11. Archive retention period, return/destruction obligations and the evidence required.
+12. Whether reviewer identity in archive provenance is retained, minimised or deleted
+    after the audit window.
 
 ---
 
@@ -154,3 +161,4 @@ Rules:
 | Date | Change | Owner |
 |---|---|---|
 | 2026-11-06 | Initial procedure drafted; periods TBD | Draft — legal/data engineer (TBD) |
+| 2026-11-06 | Added archive originals, mapping/provenance and archive-quarantine rows plus archive deletion trigger; periods still TBD | Draft — legal/data engineer (TBD) |

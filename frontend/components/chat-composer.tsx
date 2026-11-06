@@ -94,7 +94,7 @@ export function ChatComposer({
           ref={inputRef}
           id="chat-image"
           type="file"
-          accept="image/*"
+          accept="image/jpeg,image/png,image/webp"
           onChange={(event) => chooseFile(event.target.files?.[0] ?? null)}
         />
         <p className="small">
@@ -108,8 +108,8 @@ export function ChatComposer({
           </label>
         </p>
         <p className="small muted">
-          Image upload is not connected in this phase. The attachment sends filename
-          metadata only: no image is stored, uploaded or assessed.
+          JPEG, PNG or WebP, up to 10 MB. The photo is stored on this demo server
+          and checked by the demo quality gate. It is not sent to a real model.
         </p>
       </div>
 
@@ -131,7 +131,7 @@ export function ChatComposer({
                 <strong>{file.name}</strong>
               </p>
               <p className="small muted" style={{ marginBottom: 0 }}>
-                {Math.max(1, Math.round(file.size / 1024))} KB · metadata only
+                {Math.max(1, Math.round(file.size / 1024))} KB · ready to upload
               </p>
             </div>
           </div>

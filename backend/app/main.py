@@ -1,8 +1,6 @@
-"""FastAPI application entry point.
+"""PS-03 Decision Support Backend Application Entrypoint.
 
-Modular monolith: one deployable app, explicit internal module boundaries.
-See ``final/docs-context/architecture-context.md`` for the invariants and
-``final/TRD.md`` §4 for module ownership.
+See ``final/docs-context/architecture-context.md`` §1–§4 for architectural boundaries.
 """
 
 from __future__ import annotations
@@ -19,14 +17,34 @@ from app.core.config import get_settings
 from app.core.errors import register_error_handlers
 from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
+from app.modules.identity.dependencies import get_identity_service
 
 OPENAPI_TAGS = [
     {"name": "health", "description": "Process liveness only."},
     {
+        "name": "auth",
+        "description": (
+            "Phone OTP for farmers, email/password + TOTP for staff, rotating "
+            "refresh tokens and logout."
+        ),
+    },
+    {
+        "name": "me",
+        "description": "Authenticated profile, versioned consent, export and privacy requests.",
+    },
+    {
+        "name": "admin",
+        "description": (
+            "Admin-only user provisioning, audited record views, role/status changes, "
+            "retention jobs and aggregate-only exports."
+        ),
+    },
+    {
         "name": "conversations",
         "description": (
-            "Conversational capture scaffold. Demo replies are labelled "
-            "`is_demo`; no model is served in this phase."
+            "Conversational capture: upload an image, send a message and receive "
+            "a structured assessment card. Demo replies are labelled `is_demo`; "
+            "no real model is served in this phase."
         ),
     },
 ]
@@ -36,6 +54,15 @@ OPENAPI_TAGS = [
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
+    # Construct identity now so production misconfiguration and the one-time
+    # admin bootstrap fail at startup rather than on the first request.
+    get_identity_service()
+    # Local development and tests use SQLite, where the schema can be created
+    # without a migration step. Deployed environments are Alembic's job.
+    if settings.database_url.startswith("sqlite") and settings.seed_reference_data:
+        from app.db.session import init_db
+
+        init_db(seed=True)
     yield
 
 
@@ -63,7 +90,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
     )
 

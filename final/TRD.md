@@ -3,7 +3,7 @@
 **Product:** PS-03 — AI-Based Early Pest and Disease Outbreak Prediction Network
 **Document type:** Technical Requirements Document
 **Version:** 1.1
-**Status:** Draft for review — architecture baseline; Phase 2 §5.1 scaffold exists (web verified, mobile unverified)
+**Status:** Draft for review — architecture baseline; Phase 2 §5.1 scaffold exists (web verified; mobile analyze/test verified, no device build)
 **Owner:** Engineering lead
 **Last updated:** 2026-11-06
 

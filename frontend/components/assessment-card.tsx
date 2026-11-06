@@ -1,21 +1,17 @@
-import type { Assessment } from "@/lib/api";
+import type { Assessment, ReviewRequest } from "@/lib/api";
 
 const ABSTAIN_COPY: Record<string, string> = {
   below_class_threshold:
     "The evidence did not reach the threshold for any supported condition.",
-  low_margin:
-    "The leading candidates were too close to separate reliably.",
-  high_entropy:
-    "The visual evidence was too mixed to support one assessment.",
+  low_margin: "The leading candidates were too close to separate reliably.",
+  high_entropy: "The visual evidence was too mixed to support one assessment.",
   out_of_distribution:
     "This image does not look like the photos the system was validated on.",
-  unsupported_crop:
-    "This crop is not on the supported list for this release.",
-  quality_gate_failed:
-    "The photo did not pass the image-quality check.",
+  unsupported_crop: "This crop is not on the supported list for this release.",
+  quality_gate_failed: "The photo did not pass the image-quality check.",
   no_image: "No photo was attached, so there is nothing to assess.",
   demo_mode:
-    "This is the scaffold demo: the image path is not connected to a model yet.",
+    "The demo engine is active: this is a labelled scaffold, not a trained model.",
 };
 
 const STATE_TITLE: Record<Assessment["state"], string> = {
@@ -54,19 +50,27 @@ function reasonText(assessment: Assessment): string | null {
 export function AssessmentCard({
   assessment,
   nextSteps,
+  reviewRequest,
   onRetake,
   onAddContext,
+  onRequestReview,
+  reviewing = false,
 }: {
   assessment: Assessment;
   nextSteps: string[];
+  reviewRequest?: ReviewRequest | null;
   onRetake?: () => void;
   onAddContext?: () => void;
+  onRequestReview?: () => void;
+  reviewing?: boolean;
 }) {
   const isAssessed = assessment.state === "assessed";
   const candidates = assessment.candidates.slice(0, 3);
   const explanation = reasonText(assessment);
   const showRetake = nextSteps.includes("retake") || !isAssessed;
   const showAddContext = nextSteps.includes("add_context");
+  const showReview = nextSteps.includes("request_review") && onRequestReview;
+  const qualityFlags = assessment.quality_flags.filter(Boolean);
 
   return (
     <section className="assessment" aria-label="Photo assessment">
@@ -85,6 +89,13 @@ export function AssessmentCard({
         result.
       </p>
 
+      {assessment.is_demo ? (
+        <p className="small muted">
+          Demo engine output: candidate labels and scores are synthetic
+          placeholders. No trained model produced this reply.
+        </p>
+      ) : null}
+
       {isAssessed ? (
         <>
           {candidates.length > 0 ? (
@@ -93,7 +104,7 @@ export function AssessmentCard({
               <ul className="assessment-candidates small">
                 {candidates.map((candidate) => (
                   <li key={candidate.label}>
-                    {candidate.label.replaceAll("_", " ")}
+                    {(candidate.display_name ?? candidate.label).replaceAll("_", " ")}
                   </li>
                 ))}
               </ul>
@@ -112,6 +123,12 @@ export function AssessmentCard({
         <p className="small">{explanation}</p>
       ) : null}
 
+      {qualityFlags.length > 0 ? (
+        <p className="small muted">
+          Image-quality flags: {qualityFlags.join(", ").replaceAll("_", " ")}
+        </p>
+      ) : null}
+
       {(showRetake || showAddContext) && (
         <div className="chip-row">
           {showRetake && onRetake ? (
@@ -127,11 +144,32 @@ export function AssessmentCard({
         </div>
       )}
 
-      {nextSteps.includes("request_review") ||
-      nextSteps.includes("read_advisory") ? (
+      {reviewRequest ? (
+        <p className="small">
+          <span className="chip chip-muted">Review {reviewRequest.status}</span>{" "}
+          Expert review requested{" "}
+          <time dateTime={reviewRequest.submitted_at}>
+            {new Date(reviewRequest.submitted_at).toLocaleString()}
+          </time>
+          . The original assessment is unchanged.
+        </p>
+      ) : showReview ? (
+        <div className="chip-row">
+          <button
+            type="button"
+            className="button-secondary"
+            disabled={reviewing}
+            onClick={onRequestReview}
+          >
+            {reviewing ? "Requesting review…" : "Request expert review"}
+          </button>
+        </div>
+      ) : null}
+
+      {nextSteps.includes("read_advisory") ? (
         <p className="small muted">
-          Expert review and approved advisories arrive in a later phase. This reply
-          does not include them.
+          Approved advisories arrive in a later phase. This reply does not include
+          them.
         </p>
       ) : null}
 

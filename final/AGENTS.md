@@ -18,10 +18,14 @@ Short version:
   decisions or status change.
 
 Repository status as of 2026-11-06: documentation plus Phase 2 engineering scaffolds
-(FastAPI, Next.js web client, Flutter shell, compose and CI) and the **web chat
-surface** wired to the in-memory demo backend. No real model is connected; the web
-app builds and its chat flow passed a live smoke test, while the mobile shell is
-unverified. Gate 1 is not met.
+(FastAPI, Next.js web client, Flutter shell, compose and CI), the **persisted demo
+chat slice** (image upload + quality gate + deterministic demo engine + optional
+mock- and local-stub-tested OpenAI-compatible vision adapter + review requests, Alembic
+`0002_chat_persistence`), and the **§5.2 identity backend slice** (phone OTP, staff
+MFA, five roles, consent, privacy, audit — in memory). No real model is connected by
+default and identity state is not durable; the web app builds and its chat flow
+passed a live upload → assessment → review smoke test, while the mobile shell passes
+`flutter analyze` and `flutter test` (no device or APK run yet). Gate 1 is not met.
 
 The full 55-chapter blueprint and Appendices A–H are mapped to repository files in
 [README.md](README.md). Coverage is documentation, not scope approval: v1 scope is set by

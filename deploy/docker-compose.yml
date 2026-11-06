@@ -41,6 +41,20 @@ services:
       APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ps03}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ps03}
       # Comma-separated or JSON list; pydantic-settings accepts JSON.
       APP_CORS_ORIGINS: '["${WEB_ORIGIN:-http://localhost:3000}"]'
+      # Local default only; a production deployment must inject a unique
+      # >=32-character secret from the platform secret store.
+      APP_AUTH_SECRET: ${APP_AUTH_SECRET:-dev-only-insecure-secret-change-me}
+      # Chat engine (spec 08). Defaults to the labelled demo engine; the
+      # provider key stays unset unless the deployment supplies it.
+      APP_CHAT_ENGINE: ${APP_CHAT_ENGINE:-demo}
+      APP_CHAT_API_KEY: ${APP_CHAT_API_KEY:-}
+      APP_CHAT_BASE_URL: ${APP_CHAT_BASE_URL:-https://api.openai.com/v1}
+      APP_CHAT_MODEL: ${APP_CHAT_MODEL:-}
+      APP_CHAT_LABELS: ${APP_CHAT_LABELS:-[]}
+      APP_CHAT_LABELS_APPROVED: ${APP_CHAT_LABELS_APPROVED:-false}
+      APP_MEDIA_ROOT: /var/media
+    volumes:
+      - ps03-media:/var/media
     command:
       - sh
       - -c
@@ -90,3 +104,4 @@ services:
 
 volumes:
   ps03-db:
+  ps03-media:

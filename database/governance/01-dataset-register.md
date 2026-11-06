@@ -28,6 +28,10 @@
    dataset.
 7. A dataset containing real personal data, farm-identifying images or exact locations
    must never appear in tests, fixtures or demo content.
+8. **Archive data is registered separately from field data.** Archive sources use
+   `ARC-###` sub-register rows under `DS-002`; field sources stay under `DS-001`/`DS-005`.
+   Archive records never share a dataset version, split manifest or frozen field test set
+   with field data. See `../archive/01-archive-acquisition.md` §7.
 
 ---
 
@@ -65,6 +69,28 @@
 
 **No row is `cleared`.** This is intentional: no permission records exist yet.
 
+### 3.1 Archive sub-register (`DS-002`)
+
+`DS-002` is the archive family. Each archive source gets its own `ARC-###` row so that
+permissions, retention, provenance and counts are tracked per institution. No institution
+has been named, approached or granted permission; both rows are `candidate`.
+
+| ID | Source type | Institution | Status | Permission record | Permitted use | Owner | Retention | Quality check |
+|---|---|---|---|---|---|---|---|---|
+| `ARC-001` | Plant-clinic archive (Plantwise-style) | `TBD` | `candidate` | None — not executed | None yet | TBD | TBD | Provenance, label reconciliation, PII |
+| `ARC-002` | University pathology department archive | `TBD` | `candidate` | None — not executed | None yet | TBD | TBD | Provenance, label reconciliation, PII |
+
+Rules for these rows:
+
+- An `ARC-###` row moves beyond `candidate` only with a signed permission record covering
+  the twelve items in `../archive/01-archive-acquisition.md` §4.
+- Archive counts are never folded into a field total. The register reports archive and
+  field counts separately.
+- Archive records are never part of a field dataset version, split manifest or frozen field
+  test set.
+- Archive label mapping, provenance and quarantined-record counts are recorded per batch
+  (`../archive/02-label-reconciliation.md`, `../archive/03-archive-provenance.md`).
+
 ---
 
 ## 4. Required detail per dataset version
@@ -86,6 +112,7 @@ entry or a linked permission record:
 | Sensitivity | Personal data, farm-identifying images, precise location, commercial sensitivity |
 | Geography and time coverage | Where and when the data applies |
 | Provenance | Source link, collection method, original labels, reviewer identity where permitted |
+| Archive batch (archive only) | `ARC-###`, batch version, manifest ID, taxonomy version, mapping status counts, unmappable count |
 | Checksum | Content hash for the received version |
 | Split manifest | Grouping rule and split version if used for modelling |
 | Quarantine status | Count of quarantined records and open resolutions |
@@ -117,6 +144,10 @@ entry or a linked permission record:
 - Public dataset licences have not been checked against the intended use.
 - The project taxonomy and crop/target list are unresolved (D1), so label compatibility
   cannot be assessed.
+- No archive institution has been named, approached or granted permission; `ARC-001` and
+  `ARC-002` remain `candidate`.
+- Archive ingest has no schema home: `final/feature-specs/05-data-layer.md` has no archive
+  tables, so the provenance and mapping controls cannot yet be enforced by a migration.
 - No split manifest or frozen test set exists.
 
 ---
@@ -126,3 +157,4 @@ entry or a linked permission record:
 | Date | Change | Owner |
 |---|---|---|
 | 2026-11-06 | Register created with candidate rows; no dataset cleared | Draft — Data engineer (TBD) |
+| 2026-11-06 | Added archive separation rule, `DS-002` archive sub-register (`ARC-001`, `ARC-002`), archive batch detail and archive gaps; no archive acquired | Draft — Data engineer (TBD) |
