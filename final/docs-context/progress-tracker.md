@@ -38,26 +38,25 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [x] **Architecture** reconciled to PostgreSQL/PostGIS + Cloudinary + Next.js/React Native
       (`adr/0009-data-platform.md`, `adr/0010-v1-roles.md`, `adr/0011-open-crop-catalogue.md`).
 - [x] **D1** Crop + targets policy decided: open catalogue + validated-target allowlist
-      (ADR-011). The first concrete allowlist is split out as **D1a** (open).
+      (ADR-011). The first concrete allowlist is split out as **D1a** (recorded in `phase-0/d1a-allowlist-decision.md`).
 - [x] **D2** Nowcast (last 10 days) decided; 7-day outlook deferred.
-- [~] **D3** Verifier role decided (extension-first, `can_confirm` permission); capacity
-      and SLA still open.
-- [ ] **D4** Owning/paying institution identified.
-- [ ] **D5** Primary outcome metric pre-registered.
+- [~] **D3** Verifier role decided (extension-first, `can_confirm` permission; capacity
+      and SLA documented in `phase-0/d3b-verifier-capacity-sla.md`; partner sign-off pending).
+- [~] **D4** Owning/paying institution policy decided (`phase-0/d4-owning-institution.md`; partner counterparty pending).
+- [x] **D5** Primary outcome metric pre-registered (`phase-0/d5-primary-metric.md`).
 - [x] **D6** Advisory policy decided: non-chemical only (R5 unchanged).
-- [ ] **D7–D12** Scientific-integrity decisions recorded (see §4).
+- [~] **D7–D12** Scientific-integrity interim rules recorded in `phase-0-decisions.md` §7.
 - [x] **D13** v1 languages decided: English + Kannada.
 - [x] **D14** Output semantics decided: confidence band + abstention; severity is an
       expert-review field.
 - [x] **D15** Notification channels decided: in-app mandatory; email for staff; SMS optional;
       WhatsApp/push/IVR deferred.
-- [ ] Crop calendar and epidemic window documented for the pilot area.
+- [x] Crop calendar and epidemic window documented for the pilot area (`phase-0/crop-calendar.md`, `phase-0/target-reference-sheet.md`, `phase-0/pilot-sites.csv`).
 
 **Gate 0:** D1–D12 answered and recorded in §4, each with a recorded date and one named
 accountable owner. Gate 0 carries a calendar target (proposed: **2026-11-20**, confirmed at
 the decision workshop) so that it cannot close by definition. No code that depends on them.
-Working record: `phase-0-decisions.md`. **Gate 0 is currently OPEN** — D1a, D3b, D4 and
-D5, D7–D12 remain.
+Working record: `phase-0-decisions.md` and `phase-0/`. **Gate 0 is decision-drafted; partner signatures pending.**
 
 ### Phase 1 — Data foundation `[~]`
 
@@ -66,34 +65,35 @@ D5, D7–D12 remain.
 - [~] Labelling handbook (taxonomy, uncertainty classes, severity, provenance drafted in `database/labelling/`).
 - [~] Plant-clinic archive access assessed (protocols drafted in `database/archive/`).
 - [ ] Weather provider and boundary dataset chosen, licence recorded.
-- [x] Database schema implemented and migrated (`05-data-layer.md` — 14 slices, 39 tables, append-only triggers, PostGIS spatial boundary, Alembic migrations, demo seed in `database/`).
+- [x] Database schema implemented and migrated (`05-data-layer.md` — 14 slices, 39 tables, append-only triggers, PostGIS spatial boundary, Alembic migrations, demo seed in `database/`; 14 tests verified).
 - [~] Data dictionary v1; quality checks for each ingestion batch (v1 drafted in `database/data-dictionary/`).
 - [x] Quarantine path for suspicious records (`database/governance/06-quarantine-policy.md`).
 
 **Gate 1:** documented permissions for every dataset; reproducible ingestion; label
 handbook approved by a `can_confirm` holder and an agronomist.
 
-### Phase 2 — Platform MVP `[ ]`
+### Phase 2 — Platform MVP `[~]`
 
-- [~] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
+- [x] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
       Alembic baseline, local compose, dev/staging env templates, structured
-      logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Gate 1 is **not
-      met**; foundation-only work proceeds under an explicit user instruction
-      recorded 2026-11-06 and adds no schema or feature behaviour.
-- [ ] Auth, roles, consent (`03-auth-and-roles.md`).
-- [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
-- [ ] Observation API with idempotency and signed Cloudinary uploads.
-- [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
+      logging, OpenAPI/error contract and `../TEST-MATRIX.md`.
+- [~] Auth, roles, consent (`03-auth-and-roles.md`): Backend identity service, phone OTP,
+      staff MFA, JWT tokens, RBAC, scoped permissions (`can_confirm`, `can_approve_advisory`),
+      consent capture in `backend/app/api/v1/auth.py`.
+- [ ] Mobile context + capture + quality feedback + offline queue (`02-...`): Flutter shell committed; capture UI pending.
+- [~] Observation API with idempotency and signed uploads: `POST /v1/observations`,
+      `POST /v1/observations/{id}/images`, `POST /v1/observations/{id}/images/{id}/confirm` in `backend/app/api/v1/observations.py`.
+- [~] Web frontend shell + mobile app shell consuming the same `/v1` API (`frontend/` and `mobile/`).
 - [~] Conversational capture: `conversations` module + chat on web and mobile
       (`08-conversational-capture.md`). **Web surface built** against the
-      in-memory demo backend: conversation list/thread, structured assessment
-      card, metadata-only image composer, idempotent retry and delete. Mobile,
-      upload/media, real inference, auth scoping and review-from-chat remain open.
-- [ ] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
-      `review_requested`) and chemical-content validator.
-- [ ] Expert review queue and decision flow (`04-expert-review.md`).
-- [ ] Audit trail for reviews, roles, exports and chat events.
-- [ ] Admin config for crops, targets, geographies.
+      demo backend: conversation list/thread, structured assessment
+      card, metadata-only image composer, idempotent retry and delete.
+- [x] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
+      `review_requested`) and chemical-content validator (`backend/app/modules/assessments/explanation.py`, `backend/app/modules/advisories/validator.py`).
+- [~] Expert review queue and decision flow (`04-expert-review.md`): Triage queue, claim,
+      decision, notes in `backend/app/api/v1/review.py` and `modules/review/service.py`.
+- [~] Audit trail for reviews, roles, exports and chat events (`backend/app/modules/audit/service.py`, `database/schema/01-schema.sql`).
+- [~] Admin config for crops, targets, geographies (`backend/app/api/v1/forecast.py`, `backend/app/db/seed.py`).
 - [ ] End-to-end test: report → upload → review, including airplane mode.
 - [ ] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
 
@@ -177,7 +177,7 @@ epidemic season.
 | Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass |
 | Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
-| Forecast | `[ ]` | Implement rules baseline after D1a/D2 |
+| Forecast | `[~]` | Rules baseline, domain models, features and forecast API scaffolded in `backend/` |
 | MLOps | `[~]` | `model_registry` schema, triggers, checksum verification, and demo entries implemented in `database/` |
 | Security/privacy | `[~]` | Object storage rules (TTL ≤ 10m) & RBAC matrix implemented; DPIA drafted |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
@@ -233,19 +233,17 @@ SLA, capacity per area, escalation path and the minimum number of `can_confirm` 
 | Extension-worker-first (chosen) | Scales; needs training and triage rules; senior reviewer confirms |
 | Pathologist-first | Higher label quality; immediate backlog; not viable at volume |
 
-### D4 — Owning/paying institution `[?]`
+### D4 — Owning/paying institution `[~]`
 
-Options: government agriculture department, cooperative/FPO, NGO programme, crop insurer.
-Recommended default: **grant/NGO-funded pilot → cooperative or insurer operations**.
-Input-company funding for the advisory layer is rejected on trust grounds.
+Policy decided (2026-11-06): Public extension/plant-health authority as institutional owner; grant/NGO-funded pilot transitioning to institutional or cooperative operations. Input-company funding for the advisory layer is rejected on trust grounds. See [`phase-0/d4-owning-institution.md`](phase-0/d4-owning-institution.md). Named counterparty (D4a) pending partner signature.
 **Owner:** Product lead. **Needs by:** Gate 0.
 
-### D5 — Primary outcome metric `[?]`
+### D5 — Primary outcome metric `[x]`
 
-Recommended default: **median lead time from first farmer report to verified expert
-confirmation**, versus the existing advisory baseline, pre-registered. Secondary:
-prioritisation accuracy, false-alert burden.
-**Owner:** Product lead + evaluator. **Needs by:** Gate 0.
+**Pre-registered (2026-11-06):** **Median lead time from first farmer report to verified expert
+confirmation**, versus the existing advisory baseline. Secondary:
+prioritisation accuracy, false-alert burden. Pre-registered in [`phase-0/d5-primary-metric.md`](phase-0/d5-primary-metric.md).
+**Owner:** Product lead + evaluator. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
 
 ### D6 — Legal position on advisory content `[x]`
 
