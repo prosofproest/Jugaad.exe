@@ -24,7 +24,7 @@
 | Gate | Date | Verified by | Command / artefact | Result |
 |---|---|---|---|---|
 | 0 | 2026-11-06 | Repository review (checklist reconciliation) | `git log --oneline`; `progress-tracker.md` §4–§5; search for `final/backend` | **Open** — ADRs recorded in the tracker but no `docs/adr/` file; D1–D6 and D9–D12 open; docs largely reconciled |
-| 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 187 backend tests pass; web typecheck, lint and build pass; no auth, readiness, domain tables or media |
+| 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 216 backend tests pass; web typecheck, lint and build pass; no auth, readiness, domain tables or media |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
 | — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 and Gate 1 remain unmet |
@@ -66,7 +66,7 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-10 | Design tokens source committed and mirrored into CSS | `design/tokens.json`, `frontend/app/globals.css`; `frontend/README.md` §Design system | Phase 2 §5.1 design foundation |
 | W-11 | Flutter shell committed with API client and widget test; **not run locally** | `mobile/pubspec.yaml`, `mobile/lib/*`, `mobile/test/widget_test.dart`; CI mobile job | Gate 10 (Defined, not verified) |
 | W-12 | Deploy and CI scaffolding: API/web Dockerfiles, base + dev compose override, dev/staging env templates, CI jobs for backend/web/mobile/compose/image builds | `backend/Dockerfile`, `frontend/Dockerfile`, `deploy/*`, `.github/workflows/ci.yml` | Gate 11 (defined, not run) |
-| W-13 | Test evidence refreshed: 187 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 187 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
+| W-13 | Test evidence refreshed: 216 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 216 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
 | W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
 
 ---
@@ -130,7 +130,7 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
   - **Evidence (2026-11-06):** only `frontend/package-lock.json` exists; the backend has no lockfile. **Not done.**
 - [ ] Confirm the documented quickstart works from a clean clone on the supported Python version
   - **Done when:** `pip install -r requirements.txt && pytest` succeeds with zero manual steps.
-  - **Evidence (2026-11-06):** the local venv runs 187 tests, but a clean-clone install has not been repeated and the backend has no lockfile. **Not verified.**
+  - **Evidence (2026-11-06):** the local venv runs 216 tests, but a clean-clone install has not been repeated and the backend has no lockfile. **Not verified.**
 
 **Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
 
@@ -513,7 +513,7 @@ injects persisted geometry and an approved `MapPolicy`.
 ## Gate 10 — Testing and CI/CD (P2)
 
 - [ ] Unit tests for services and rules
-  - **Evidence (2026-11-06):** 187 tests cover health, the error envelope, request IDs, logging, OpenAPI, conversations, the image-triage decision/quality-gate/OOD/calibration/evaluation/explanation/registry path, and advisory/alert dispatch. No real-database integration or module-boundary service test exists. **Not done.**
+  - **Evidence (2026-11-06):** 216 tests cover health, the error envelope, request IDs, logging, OpenAPI, conversations, the image-triage decision/quality-gate/OOD/calibration/evaluation/explanation/registry path, advisory/alert dispatch, and the Gate 6 map layers. No real-database integration or module-boundary service test exists. **Not done.**
 - [ ] Integration tests per module (real DB/emulator, not mocks)
 - [ ] Contract tests against the OpenAPI schema
 - [ ] Security tests: cross-user, cross-role, unauthenticated, object-level
@@ -574,7 +574,7 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 | # | Check | Expected evidence | Status |
 |---|---|---|---|
 | 1 | Clean install | fresh clone -> install -> tests pass | PARTIAL — scaffold builds, but no backend lockfile and no clean-clone run recorded |
-| 2 | Tests | full suite green, count recorded | PARTIAL - 187 backend tests pass (health, conversations, triage/decision, advisories/alerts); no domain-service integration, real-DB or E2E tests |
+| 2 | Tests | full suite green, count recorded | PARTIAL - 216 backend tests pass (health, conversations, triage/decision, advisories/alerts, map layers); no domain-service integration, real-DB or E2E tests |
 | 3 | OpenAPI security | `securitySchemes` present | MISSING — chat and health routes are unauthenticated |
 | 4 | Unauthenticated admin route | `401` | MISSING — no admin route exists |
 | 5 | Farmer cross-tenant read | `403`/`404` with no data leak | MISSING — no auth or ownership model |
@@ -583,7 +583,7 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 | 8 | Image retrievable via signed URL | `200`, URL expires | MISSING — metadata-only composer; no media storage |
 | 9 | Weather affects risk | two fixtures -> different scores | MISSING — no weather ingestion or forecast |
 | 10 | Risk -> alert | one deduped alert, correct recipients | MISSING — no alerts module |
-| 11 | Map uses API data | layer changes when records change | MISSING — no map; `/outlook` is an honest empty state |
+| 11 | Map uses API data | layer changes when records change | MISSING - backend layer API exists (Gate 6 slice) but no map client; `/outlook` is an honest empty state |
 | 12 | Admin sees real data | count matches database | MISSING — no admin surface or API |
 | 13 | Audit event written | login / role change / record view present | MISSING — no audit module |
 | 14 | Kannada complete | no English leaks on Kannada UI | MISSING — one local language + English is specified but no locale catalogs exist |
