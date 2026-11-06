@@ -63,11 +63,11 @@ def get_session_factory() -> sessionmaker[Session]:
 def get_session() -> Iterator[Session]:
     """FastAPI dependency: one transaction-scoped session per request.
 
-    The request is the unit of work. Committing here means a route that only
-    calls ``session.flush()`` (the chat, upload and video repositories do) still
-    persists its writes; an exception rolls the whole request back. Routes that
-    already call ``commit()`` explicitly keep working — the final commit is then
-    a no-op.
+    The request is the unit of work. Commits on success and rolls back
+    on exception so that flush-only service code (conversations, uploads,
+    videos) persists across requests. Routes that already call ``db.commit()``
+    explicitly are unaffected: the second commit is a no-op. This mirrors
+    the test fixture in ``tests/test_chat_api.py``.
     """
     session = get_session_factory()()
     try:

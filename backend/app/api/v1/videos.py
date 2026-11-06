@@ -79,9 +79,7 @@ def get_video(video_id: str, session: Session = Depends(get_session)) -> VideoDe
 
 
 @router.get("/{video_id}/preview")
-def get_preview(
-    video_id: str, session: Session = Depends(get_session)
-) -> Response:
+def get_preview(video_id: str, session: Session = Depends(get_session)) -> Response:
     settings = get_settings()
     try:
         data = service.preview_bytes(session, settings, video_id)

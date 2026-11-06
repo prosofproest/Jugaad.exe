@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy.orm import Session
-
 from app.core.request_context import get_request_id
 from app.db.models import AuditEvent, User
+from sqlalchemy.orm import Session
 
 
 def record_audit(

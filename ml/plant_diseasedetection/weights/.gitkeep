@@ -1,0 +1,7 @@
+# Placeholder directory for bundled YOLOv11x weights (.pt).
+#
+# Pre-trained weights (best.pt, ~457 MB) are downloaded automatically from
+# Hugging Face (Ananthakrishnanmzen/PlantDiseaseDetection) on first load. To
+# bundle weights locally instead, copy best.pt into this directory.
+#
+# Weights are NOT committed to this repository (large binary). See README.md.

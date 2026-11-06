@@ -112,9 +112,7 @@ def _store_video(
     return relative
 
 
-def _store_frame(
-    settings: Settings, owner_id: str, video_id: str, index: int, data: bytes
-) -> str:
+def _store_frame(settings: Settings, owner_id: str, video_id: str, index: int, data: bytes) -> str:
     relative = f"{owner_id}/videos/{video_id}/frames/{index}.jpg"
     destination = Path(settings.media_root) / relative
     destination.parent.mkdir(parents=True, exist_ok=True)
@@ -389,9 +387,7 @@ def read_video(
     frame_assessments: list[dict] = []
     engine_failures: list[str] = []
     for item in selected:
-        storage_path = _store_frame(
-            settings, OWNER_ID, row.id, item.frame.index, item.frame.jpeg
-        )
+        storage_path = _store_frame(settings, OWNER_ID, row.id, item.frame.index, item.frame.jpeg)
         context = UploadContext(
             upload_id=row.id,
             sha256=hashlib.sha256(item.frame.jpeg).hexdigest(),

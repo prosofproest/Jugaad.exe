@@ -7,7 +7,7 @@ checks live here so routers cannot accidentally filter after fetch.
 from __future__ import annotations
 
 from collections.abc import Iterable
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import Depends, Header, Request
 from sqlalchemy import select
@@ -21,7 +21,7 @@ from app.db.session import get_db
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _bearer(request: Request) -> str | None:
@@ -34,9 +34,7 @@ def _bearer(request: Request) -> str | None:
 
 def active_roles(db: Session, user_id: str) -> list[str]:
     rows = db.scalars(
-        select(UserRole).where(
-            UserRole.user_id == user_id, UserRole.revoked_at.is_(None)
-        )
+        select(UserRole).where(UserRole.user_id == user_id, UserRole.revoked_at.is_(None))
     ).all()
     return [row.role_code for row in rows]
 
@@ -60,16 +58,13 @@ def assigned_area_codes(db: Session, user_id: str) -> set[str]:
         select(UserAreaAssignment).where(
             UserAreaAssignment.user_id == user_id,
             UserAreaAssignment.active_from <= now,
-            (UserAreaAssignment.active_to.is_(None))
-            | (UserAreaAssignment.active_to > now),
+            (UserAreaAssignment.active_to.is_(None)) | (UserAreaAssignment.active_to > now),
         )
     ).all()
     return {row.geo_code for row in rows}
 
 
-def get_current_user(
-    request: Request, db: Session = Depends(get_db)
-) -> User:
+def get_current_user(request: Request, db: Session = Depends(get_db)) -> User:
     token = _bearer(request)
     if not token:
         raise ApiError(401, "unauthorized", "Authentication required")
@@ -114,9 +109,7 @@ def current_permissions(request: Request) -> set[str]:
 
 
 def require_roles(*allowed: str):
-    def _dependency(
-        user: User = Depends(get_current_user), db: Session = Depends(get_db)
-    ) -> User:
+    def _dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
         if not set(active_roles(db, user.id)).intersection(allowed):
             raise ApiError(403, "forbidden", "Your role cannot perform this action")
         return user
@@ -125,9 +118,7 @@ def require_roles(*allowed: str):
 
 
 def require_permission(permission: str):
-    def _dependency(
-        user: User = Depends(get_current_user), db: Session = Depends(get_db)
-    ) -> User:
+    def _dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
         if not user_has_permission(db, user.id, permission):
             raise ApiError(
                 403,
@@ -143,9 +134,7 @@ def require_permission(permission: str):
 def require_any_role_or_permission(roles: Iterable[str], permission: str | None = None):
     role_set = set(roles)
 
-    def _dependency(
-        user: User = Depends(get_current_user), db: Session = Depends(get_db)
-    ) -> User:
+    def _dependency(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> User:
         if set(active_roles(db, user.id)).intersection(role_set):
             return user
         if permission and user_has_permission(db, user.id, permission):
@@ -156,7 +145,7 @@ def require_any_role_or_permission(roles: Iterable[str], permission: str | None 
 
 
 def require_idempotency_key(
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key")
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
 ) -> str:
     if not idempotency_key or len(idempotency_key) > 200:
         raise ApiError(

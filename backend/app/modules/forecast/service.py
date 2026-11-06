@@ -6,10 +6,7 @@ separately and the API never builds a merged "risk" layer.
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import func, select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 from app.core.config import get_settings
 from app.core.errors import ApiError
@@ -31,14 +28,15 @@ from app.db.models import (
     WeatherSnapshot,
 )
 from app.modules.audit.service import record_audit
-from app.modules.identity import service as identity_service
+from sqlalchemy import func, select
+from sqlalchemy.orm import Session
 
 BAND_RANK = {"insufficient_data": 0, "low": 1, "moderate": 2, "high": 3, "urgent": 4}
 COVERAGE_RANK = {"unknown": 0, "low": 1, "partial": 2, "good": 3}
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _as_float(value) -> float | None:
@@ -124,13 +122,15 @@ def get_forecast(db: Session, forecast_id: str) -> dict:
     ).all()
     valid_advisories = []
     for advisory in advisories:
-        version = db.get(AdvisoryVersion, advisory.current_version_id) if advisory.current_version_id else None
+        version = (
+            db.get(AdvisoryVersion, advisory.current_version_id)
+            if advisory.current_version_id
+            else None
+        )
         if (
             version is not None
             and version.valid_from <= _now() <= version.valid_to
-            and db.scalar(
-                select(AdvisoryApproval).where(AdvisoryApproval.version_id == version.id)
-            )
+            and db.scalar(select(AdvisoryApproval).where(AdvisoryApproval.version_id == version.id))
             is not None
             and (not advisory.geo_scope or forecast.geo_code in advisory.geo_scope)
         ):
@@ -164,24 +164,30 @@ def _latest_weather(db: Session, geo_code: str) -> WeatherSnapshot | None:
 def coverage_for_area(db: Session, geo_code: str, *, now: datetime | None = None) -> dict:
     now = now or _now()
     cutoff = now - timedelta(days=14)
-    verified = db.scalar(
-        select(func.count(Observation.id))
-        .join(
-            ObservationVerification,
-            ObservationVerification.observation_id == Observation.id,
+    verified = (
+        db.scalar(
+            select(func.count(Observation.id))
+            .join(
+                ObservationVerification,
+                ObservationVerification.observation_id == Observation.id,
+            )
+            .where(
+                Observation.area_code == geo_code,
+                ObservationVerification.status.in_(["confirmed", "probable"]),
+            )
         )
-        .where(
-            Observation.area_code == geo_code,
-            ObservationVerification.status.in_(["confirmed", "probable"]),
+        or 0
+    )
+    active_reporters = (
+        db.scalar(
+            select(func.count(func.distinct(Observation.user_id))).where(
+                Observation.area_code == geo_code,
+                Observation.created_at >= cutoff,
+                Observation.deleted_at.is_(None),
+            )
         )
-    ) or 0
-    active_reporters = db.scalar(
-        select(func.count(func.distinct(Observation.user_id))).where(
-            Observation.area_code == geo_code,
-            Observation.created_at >= cutoff,
-            Observation.deleted_at.is_(None),
-        )
-    ) or 0
+        or 0
+    )
     weather = _latest_weather(db, geo_code)
     completeness = float(weather.completeness) if weather else 0.0
     verified = int(verified)
@@ -339,9 +345,10 @@ def generate_forecast(
         if float(variables.get("relative_humidity_mean", 0) or 0) >= 80:
             score += 0.2
             drivers.append("high_humidity")
-        if 15 <= float(variables.get("temp_min_c", 0) or 0) and float(
-            variables.get("temp_max_c", 0) or 0
-        ) <= 28:
+        if (
+            15 <= float(variables.get("temp_min_c", 0) or 0)
+            and float(variables.get("temp_max_c", 0) or 0) <= 28
+        ):
             score += 0.15
             drivers.append("temperature_window")
         if float(variables.get("leaf_wetness_hours", 0) or 0) >= 30:
@@ -432,9 +439,7 @@ def map_layer(
         if crop:
             query = query.where(Observation.crop_code == crop)
         if layer == "verified_reports":
-            query = query.where(
-                ObservationVerification.status.in_(["confirmed", "probable"])
-            )
+            query = query.where(ObservationVerification.status.in_(["confirmed", "probable"]))
         else:
             query = query.where(
                 ObservationVerification.status.in_(["unverified", "pending_review"])
@@ -467,9 +472,9 @@ def map_layer(
             "legend": "Symbol/count of human-reviewed reports. Empty is not absence.",
         }
     if layer in {"modelled_risk", "coverage"}:
-        forecasts = list_forecasts(
-            db, crop=crop, target=target, geo=None, horizon_days=None
-        )["items"]
+        forecasts = list_forecasts(db, crop=crop, target=target, geo=None, horizon_days=None)[
+            "items"
+        ]
         features = []
         for item in forecasts:
             if layer == "modelled_risk":

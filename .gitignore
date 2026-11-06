@@ -40,3 +40,4 @@ next-env.d.ts
 
 # Local media/upload storage (development only; never commit user images)
 backend/var/
+var/

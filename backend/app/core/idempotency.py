@@ -9,9 +9,7 @@ from app.core.errors import ApiError
 from app.db.models import IdempotencyRecord
 
 
-def find_existing(
-    db: Session, *, user_id: str, scope: str, key: str
-) -> IdempotencyRecord | None:
+def find_existing(db: Session, *, user_id: str, scope: str, key: str) -> IdempotencyRecord | None:
     return db.scalar(
         select(IdempotencyRecord).where(
             IdempotencyRecord.user_id == user_id,
@@ -41,9 +39,7 @@ def remember(
     return record
 
 
-def ensure_key_matches(
-    db: Session, *, user_id: str, scope: str, key: str, entity_id: str
-) -> None:
+def ensure_key_matches(db: Session, *, user_id: str, scope: str, key: str, entity_id: str) -> None:
     """Raise if a key was already used for a different entity."""
 
     record = find_existing(db, user_id=user_id, scope=scope, key=key)

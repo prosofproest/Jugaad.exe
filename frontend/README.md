@@ -33,9 +33,10 @@ the browser uses the public origin.
 | `/chat/[conversationId]` | Thread with image upload, structured assessment replies, review requests, idempotent retry, demo badge and delete. | live smoke (upload → assessment → review), build |
 | `/outlook` | Independent map-layer states (verified, unverified, modelled risk, coverage, boundaries) fetched from `/v1/map/layers/*`; explicit “not configured” state, never a merged risk value. | live smoke, build |
 | `/review` | Honest “locked” state for the expert review portal; no fabricated cases. | live smoke, build |
+| `/admin` | Admin dashboard for the identity slice: staff sign-in + MFA, profile, account list/counts, provision staff, audited record view, role/status changes, retention and aggregate exports. Tokens stay in the tab's `sessionStorage`; unauthenticated, non-admin and expired states are explicit. | live smoke, build |
 
 The desktop shell is a persistent left sidebar (Overview, Photo assessment, Area
-outlook, Review queue) with an active-section marker, a skip link and a top bar.
+outlook, Review queue, Admin) with an active-section marker, a skip link and a top bar.
 Below 1024px the sidebar collapses into a horizontal scrollable nav. Layout
 reflows to a single column and the dashboard grids stack at 640px.
 
@@ -67,7 +68,12 @@ Implemented:
   generation time;
 - request expert review from an assessment and see its persisted status;
 - demo labelling, offline notice, failed-send retry with the same
-  `client_message_id`, and empty/error states.
+  `client_message_id`, and empty/error states;
+- admin sign-in (staff login + TOTP MFA) with one-time refresh and logout;
+- admin account list and role/status counts derived from the server list;
+- staff provisioning (one-time MFA secret), audited record view with a
+  required reason, role and status changes (staff-only, last-admin guards),
+  credential retention and aggregate-only exports with required purposes.
 
 Not implemented in this phase:
 
@@ -75,17 +81,19 @@ Not implemented in this phase:
 - real image inference (replies are labelled demo);
 - chat context fields (crop, stage, area) — the crop list is blocked on D1;
 - the reviewer queue, advisories and area outlook;
-- authentication and per-user ownership (the backend uses a single demo owner);
+- per-user ownership for chat (the chat backend still uses a single demo owner);
+- httpOnly-cookie sessions (admin tokens live in `sessionStorage`; see
+  `lib/auth.ts`);
 - localisation catalogs (copy is currently English-only in components).
 
 ## Verified locally
 
 | Check | Result |
 | --- | --- |
-| `npm run typecheck` | pass (2026-11-06) |
-| `npm run lint` | pass (2026-11-06) |
-| `npm run build` | pass; routes `/`, `/_not-found`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review` |
-| Live smoke | `/`, `/chat`, `/outlook`, `/review` returned 200; `/chat/conv_missing` returned 404; the sidebar nav and platform status rendered. Upload → message → review returned a persisted `demo-chat-0.1` assessment and review status; the preview bytes matched the upload; the thread rendered the stored image, quality flags and review status; delete returned the empty state. `/outlook` rendered all five layer cards as “Not configured” with the new map router and “0 of 5 layers serving data”; no value was merged into a risk number |
+| `npm run typecheck` | pass |
+| `npm run lint` | pass |
+| `npm run build` | pass; routes `/`, `/_not-found`, `/admin`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review` |
+| Live smoke | `/`, `/chat`, `/outlook`, `/review`, `/admin` returned 200; `/chat/conv_missing` returned 404; the sidebar nav (including Admin) and platform status rendered. Upload → message → review returned a persisted `demo-chat-0.1` assessment and review status; the preview bytes matched the upload; the thread rendered the stored image, quality flags and review status; delete returned the empty state. `/outlook` rendered all five layer cards as “Not configured” with the new map router and “0 of 5 layers serving data”; no value was merged into a risk number. `/admin` rendered the staff sign-in form while unauthenticated; the supporting API flows (login → MFA → profile/list, provision, audited view with reason, role/status guards, retention, aggregates, refresh rotation, 401/403 negative paths) were verified directly against the live backend |
 
 The production build and live smoke used the local FastAPI dev server with a
 file-backed SQLite database (the production schema is Alembic

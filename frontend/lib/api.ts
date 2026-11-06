@@ -310,3 +310,217 @@ export interface MapLayer {
 export function getMapLayer(layer: MapLayerName): Promise<MapLayer> {
   return request<MapLayer>(`/v1/map/layers/${layer}`);
 }
+
+/* ------------------------------------------------------------------ */
+/* Identity + admin (identity slice, in-memory)                        */
+/*                                                                     */
+/* The backend protects these routes with a bearer token. The browser   */
+/* stores the current access/refresh pair in sessionStorage via         */
+/* ``@/lib/auth`` and passes the access token explicitly. There is no    */
+/* httpOnly cookie or CSRF handling in this scaffold — see Admin page   */
+/* for the production warning.                                          */
+/* ------------------------------------------------------------------ */
+
+export type Role = "farmer" | "extension_worker" | "pathologist" | "agronomist" | "admin";
+
+export interface TokenPair {
+  access_token: string;
+  refresh_token: string;
+  token_type: "bearer";
+  expires_in: number;
+  refresh_expires_in: number;
+  user_id: string;
+  role: Role;
+}
+
+export interface LoginResponse {
+  mfa_required: boolean;
+  challenge_token: string | null;
+  challenge_expires_in: number | null;
+  tokens: TokenPair | null;
+}
+
+export interface UserSummary {
+  user_id: string;
+  kind: "farmer" | "staff";
+  roles: Role[];
+  status: "active" | "disabled" | "deleted";
+  email: string | null;
+  phone_masked: string | null;
+  mfa_enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface UserProfile extends UserSummary {
+  phone: string | null;
+  last_login_at: string | null;
+}
+
+export interface AdminUserDetail extends UserSummary {
+  last_login_at: string | null;
+  consent_complete: boolean | null;
+  active_consents: string[];
+}
+
+export interface StaffProvisioned {
+  user: UserSummary;
+  mfa_secret: string | null;
+  otpauth_uri: string | null;
+  note: string;
+}
+
+export interface RetentionResult {
+  expired_otp_challenges: number;
+  expired_refresh_tokens: number;
+  expired_mfa_challenges: number;
+  note: string;
+}
+
+export interface AdminExportSummary {
+  schema_version: "1.0";
+  exported_at: string;
+  purpose: string;
+  row_limit: number;
+  total_users: number;
+  counts_by_role: Record<string, number>;
+  counts_by_status: Record<string, number>;
+  note: string;
+}
+
+function authHeaders(token: string) {
+  return { Authorization: `Bearer ${token}` };
+}
+
+/** Staff login. Admins and MFA roles return `mfa_required` first. */
+export function loginStaff(email: string, password: string): Promise<LoginResponse> {
+  return request<LoginResponse>("/v1/auth/login", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+}
+
+/** Complete the MFA step with a 6-digit TOTP code. */
+export function verifyMfa(challenge: string, totp: string): Promise<TokenPair> {
+  return request<TokenPair>("/v1/auth/mfa/verify", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ challenge, totp }),
+  });
+}
+
+/**
+ * Rotate the refresh token. The backend revokes the whole family on reuse,
+ * so the caller must store the returned pair immediately.
+ */
+export function refreshTokens(refreshToken: string): Promise<TokenPair> {
+  return request<TokenPair>("/v1/auth/refresh", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refresh_token: refreshToken }),
+  });
+}
+
+/** End the current session. The caller must clear stored tokens. */
+export function logoutSession(token: string): Promise<void> {
+  return request<void>("/v1/auth/logout", {
+    method: "POST",
+    headers: authHeaders(token),
+  });
+}
+
+/** The caller's own profile; proves whose token this is. */
+export function getProfile(token: string): Promise<UserProfile> {
+  return request<UserProfile>("/v1/me", { headers: authHeaders(token) });
+}
+
+/** All users. Admin role only; 401 without a token, 403 for non-admins. */
+export function listAdminUsers(token: string): Promise<UserSummary[]> {
+  return request<UserSummary[]>("/v1/admin/users", { headers: authHeaders(token) });
+}
+
+/** Provision a staff account. The MFA secret is shown once. */
+export function provisionStaff(
+  token: string,
+  input: {
+    email: string;
+    password: string;
+    roles: Role[];
+    require_mfa: boolean;
+    reason: string;
+  },
+): Promise<StaffProvisioned> {
+  return request<StaffProvisioned>("/v1/admin/users", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify(input),
+  });
+}
+
+/**
+ * One user detail. The `reason` (≥8 chars) is required and the backend
+ * writes `admin.record_viewed` before returning the record.
+ */
+export function getAdminUser(
+  token: string,
+  userId: string,
+  reason: string,
+): Promise<AdminUserDetail> {
+  const query = new URLSearchParams({ reason });
+  return request<AdminUserDetail>(`/v1/admin/users/${userId}?${query}`, {
+    headers: authHeaders(token),
+  });
+}
+
+/** Replace staff roles. Staff-only, audited; cannot change own roles. */
+export function updateAdminRoles(
+  token: string,
+  userId: string,
+  roles: Role[],
+  reason: string,
+): Promise<UserSummary> {
+  return request<UserSummary>(`/v1/admin/users/${userId}/roles`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ roles, reason }),
+  });
+}
+
+/** Enable/disable a staff account. Cannot change own status. */
+export function updateAdminStatus(
+  token: string,
+  userId: string,
+  status: "active" | "disabled",
+  reason: string,
+): Promise<UserSummary> {
+  return request<UserSummary>(`/v1/admin/users/${userId}/status`, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ status, reason }),
+  });
+}
+
+/** Purge expired OTP/refresh/MFA challenges. Reason ≥8 chars. */
+export function runRetention(token: string, reason: string): Promise<RetentionResult> {
+  return request<RetentionResult>("/v1/admin/maintenance/retention", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+/**
+ * Aggregate identity counts (no names/emails/phones). `purpose` ≥8 chars.
+ */
+export function exportAggregates(
+  token: string,
+  purpose: string,
+  rowLimit = 1000,
+): Promise<AdminExportSummary> {
+  return request<AdminExportSummary>("/v1/admin/exports", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...authHeaders(token) },
+    body: JSON.stringify({ purpose, row_limit: rowLimit }),
+  });
+}

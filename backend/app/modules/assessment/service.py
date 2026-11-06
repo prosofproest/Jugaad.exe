@@ -8,8 +8,7 @@ quality gate or an unsupported crop/target never yields a forced class.
 
 from __future__ import annotations
 
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import UTC
 
 from app.core.config import get_settings
 from app.db.models import (
@@ -21,12 +20,14 @@ from app.db.models import (
     Target,
 )
 from app.modules.audit.service import record_audit
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 
 def _now():
-    from datetime import datetime, timezone
+    from datetime import datetime
 
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def run_quality_gate(db: Session, image: ImageAsset) -> ImageQualityResult:
@@ -208,7 +209,11 @@ def assessment_payload(db: Session, observation: Observation) -> dict:
     if prediction is None:
         return {
             "observation_id": observation.id,
-            "state": observation.status if observation.status in {"pending_upload", "failed"} else "unavailable",
+            "state": (
+                observation.status
+                if observation.status in {"pending_upload", "failed"}
+                else "unavailable"
+            ),
             "abstention_reason": None,
             "quality": None,
             "candidates": [],
@@ -222,9 +227,7 @@ def assessment_payload(db: Session, observation: Observation) -> dict:
         "observation_id": observation.id,
         "state": "abstained" if prediction.abstained else "assessed",
         "abstention_reason": prediction.abstain_reason,
-        "quality": (
-            {"result": quality.result, "flags": list(quality.flags)} if quality else None
-        ),
+        "quality": ({"result": quality.result, "flags": list(quality.flags)} if quality else None),
         "candidates": list(prediction.candidates),
         "confidence": {
             "band": prediction.confidence_band,
