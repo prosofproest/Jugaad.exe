@@ -555,7 +555,8 @@ explain itself. It assists a human; it never diagnoses.
 **Objective:** produce a transparent, reproducible area outlook with an explicit no-score
 state, show it separately from observed reports, and connect approved guidance and alerts.
 
-**Entry condition:** Gate 3 met; D1, D2 and the event definition are recorded.
+**Entry condition:** Gate 3 met; D1, D2 and D7 (event, negative class, label eligibility)
+recorded, with the sentinel panel and visit schedule committed under D3.
 
 ### 7.1 Task definition and event semantics
 
@@ -563,7 +564,14 @@ state, show it separately from observed reports, and connect approved guidance a
   threshold, escalation or another operational outcome.
 - Fix crop × target × geography × issue time × horizon; define the smallest defensible
   spatial unit.
-- Define negative labels as verified absence within coverage, never "no report".
+- Define negative labels as verified absence from pre-registered sentinel-panel visits inside
+  the label window, never "no report" and never "no visit" (D7).
+- Define label eligibility: `confirmed` or `probable` with evidence tier, `verified_at <=
+  cutoff` and event date `<= cutoff`; every other verification state is excluded (D7).
+- Register the sentinel panel, visit cadence, observers and coverage condition before the
+  season; no post-hoc site selection.
+- Record the primary review blind, then reveal candidates and forecast context; run the
+  double-read subset for agreement (D7).
 - Define issue cadence, validity and expiry; keep different event types as separate tasks.
 - Document the surveillance-bias treatment and how coverage is represented.
 
@@ -582,7 +590,7 @@ state, show it separately from observed reports, and connect approved guidance a
 - Weather windows: rolling rainfall, temperature ranges, humidity and consecutive wet days.
 - Crop: type, stage, planting window, variety and irrigation context.
 - Seasonal: week of year, monsoon period, days since planting, local crop calendar.
-- Historical pressure: lagged verified cases, nearby verified reports, prior-season
+- Historical pressure: lagged eligible labels, nearby verified reports, prior-season
   occurrence.
 - Coverage: active reporters, visits, completeness and data freshness.
 - Enforce the leakage rule: every feature must be computable at `issue_time`.
@@ -604,7 +612,9 @@ state, show it separately from observed reports, and connect approved guidance a
 ### 7.5 Calibration, thresholds and validation
 
 - Assess reliability diagrams, Brier score and log loss on a temporal holdout; spatial
-  holdout where data allows.
+  holdout where data allows. Report discrimination and calibration only on sentinel-panel
+  negatives; if the panel is below the D8 minimum, mark the metric underpowered and do not
+  gate on it (D7).
 - Set band thresholds from validated probabilities or a documented expert-approved score.
 - Balance false alarms against missed events using the cost of each error.
 - Review thresholds when the crop calendar, reporting patterns or calibration change.
@@ -649,6 +659,8 @@ state, show it separately from observed reports, and connect approved guidance a
 ### Deliverables
 
 - Written task/event definition and spatial-unit decision.
+- Sentinel-panel protocol: site list, visit schedule, observer assignment, coverage condition
+  and label-window definition.
 - Expert-approved, versioned rules baseline.
 - Feature pipeline with immutable snapshots and lineage.
 - Forecast generation job with no-score behaviour and idempotency.
@@ -661,6 +673,10 @@ state, show it separately from observed reports, and connect approved guidance a
 
 - A forecast is reproducible from a stored snapshot.
 - The no-score path is verified and visible.
+- Sentinel-panel membership and visit schedule are frozen; label eligibility (`verified_at`
+  and event date `<= cutoff`, `confirmed`/`probable` only) is enforced in the query and tested.
+- Discrimination and calibration are reported only on sentinel-panel negatives, with sample
+  counts and an underpowered flag where applicable.
 - The map never merges reports and predictions; coverage is always visible.
 - Band thresholds and actions are approved by an agronomist with a review date.
 - Advisory content is approved, versioned and non-chemical.

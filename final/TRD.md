@@ -320,7 +320,7 @@ export_jobs
 | Observations / media | `observations`, `image_assets`, `image_quality_results`, `image_predictions`, `review_requests` |
 | Conversations | `conversations`, `messages`, `message_attachments`, `message_events` |
 | Review | `reviews`, `review_evidence`, `review_events`, `observation_verification`, `review_assignments` |
-| Forecast / weather | `weather_snapshots`, `feature_snapshots`, `forecasts`, `forecast_runs` |
+| Forecast / weather | `weather_snapshots`, `feature_snapshots`, `forecasts`, `forecast_runs`, `sentinel_sites`, `sentinel_visits` |
 | Advisory / alerts | `advisories`, `advisory_versions`, `advisory_approvals`, `alert_policies`, `alerts`, `alert_deliveries`, `alert_feedback` |
 | Registry / audit | `model_registry`, `audit_events`, `export_jobs` |
 
@@ -333,6 +333,7 @@ export_jobs
 | `messages.role` | `user`, `assistant` |
 | `messages.kind` | `image`, `text`, `assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`, `review_requested` |
 | Verification `evidence_tier` | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` |
+| `sentinel_visits.observed` | `present`, `absent`, `indeterminate` |
 | `risk_band` | `low`, `moderate`, `high`, `urgent`, `insufficient_data` |
 | `coverage` | `good`, `partial`, `low`, `unknown` |
 | `model_registry.status` | `draft`, `validated`, `approved`, `retired` |
@@ -347,7 +348,7 @@ export_jobs
 | Predictions append-only | Insert-only repository + DB trigger/permissions |
 | Reviews append-only | Insert-only `reviews` and `review_events` |
 | Only reviewers verify | Role dependency + FK/check; `confirmed` requires pathologist |
-| Unverified ≠ confirmed feature | Forecast query filters `verified_at IS NOT NULL` |
+| Unverified ≠ confirmed feature | Forecast labels filter on evidence tier (`confirmed`, `probable`) and `verified_at <= cutoff`; `unverified` and non-verified states excluded |
 | Forecast lineage | `feature_snapshot_id` and `model_version` NOT NULL |
 | No probability without calibration | `probability` null unless calibration approved |
 | No chemical advisory | Content validator + approval required before serving |

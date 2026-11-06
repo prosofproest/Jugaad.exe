@@ -534,11 +534,13 @@ capability and the spec that owns it.
 - **Prediction unit:** target × crop × geography × issue time × horizon.
 - **Event definition:** written before feature engineering; different event types are
   separate tasks.
-- **Negatives:** verified absence within coverage, never "no report".
+- **Negatives:** verified absence from pre-registered sentinel-panel visits (D7), never a
+  missing report or a missing visit.
 - **Model ladder:** documented expert rules → logistic regression → gradient boosting →
   spatiotemporal models only with dense longitudinal data.
-- **Features:** weather windows, crop/crop stage, seasonality, lagged verified reports,
-  nearby verified reports, prior-season occurrence and coverage.
+- **Features:** weather windows, crop/crop stage, seasonality, lagged eligible labels
+  (`confirmed`, or `probable` with evidence tier, as-of cutoff), nearby verified reports,
+  prior-season occurrence and coverage.
 - **Leakage rule:** every feature must be computable at issue time; persist an immutable
   feature snapshot.
 - **No-score gate:** weather freshness, minimum coverage, calendar/stage availability,
@@ -606,7 +608,7 @@ committed in this PRD.
 
 | Level | Metrics |
 |---|---|
-| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier score, calibration; latency |
+| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier score, calibration on sentinel-panel negatives only (underpowered below the D8 minimum); latency |
 | Operational | Report-to-review time, backlog, verified case rate, notification delivery, sync success |
 | User | Task completion, comprehension of uncertainty wording, repeat use, alert usefulness, opt-out rate |
 | Agricultural | Lead time, field-inspection prioritisation, credible outcome indicators |

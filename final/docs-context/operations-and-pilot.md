@@ -156,7 +156,7 @@ Success is measured at multiple levels. Model accuracy is only one part.
 
 | Level | Metrics |
 |---|---|
-| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier score, calibration; inference latency |
+| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier score, calibration on sentinel-panel negatives only; inference latency |
 | Operational | Report-to-review time, review backlog, verified case rate, notification delivery, sync success |
 | User | Task completion, comprehension of uncertainty wording, repeat use, alert usefulness, opt-out rate |
 | Agricultural | Lead time, field-inspection prioritisation, outcome indicators where credible data exists |

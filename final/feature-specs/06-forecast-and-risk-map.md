@@ -28,8 +28,9 @@ overlay only after at least two seasons of verified outcomes.
 | Geography | block/mandal level | Blocked on D1 |
 | Horizon | nowcast (default) or 7 days | Blocked on D2 |
 | Issue cadence | daily (proposed) | Proposed |
-| Event definition | first verified case / incidence threshold / escalation | **Blocked on D1/D5** |
-| Negative definition | verified absence within coverage, not "no report" | Required |
+| Event definition | first evidence-eligible case (D7); exact outcome per D1/D5 | Decided — D7 |
+| Negative definition | verified absence from pre-registered sentinel-panel visits; never "no report" or "no visit" | Decided — D7 |
+| Label eligibility | `confirmed` or `probable` with evidence tier; `verified_at <= cutoff` and event date `<= cutoff`; all other states excluded | Decided — D7 |
 | Spatial unit | smallest unit inputs support | Blocked on D1 |
 | Primary consumer | extension worker + farmer SMS | Proposed |
 
@@ -45,7 +46,7 @@ as separate tasks. "No report" is never a negative label.
 | Weather | rainfall, temp min/max, RH, consecutive wet days, leaf-wetness proxy | Must exist at issue time; store `source_timestamp` |
 | Crop context | crop, stage, planting window, variety, irrigation | From crop cycle / calendar |
 | Seasonal | week of year, monsoon period, days since planting | Deterministic |
-| Historical pressure | lagged verified reports, nearby verified reports, prior-season occurrence | Verified only |
+| Historical pressure | lagged eligible labels, nearby verified reports, prior-season occurrence | Eligible labels only (D7) |
 | Coverage | active reporters, visits, data completeness | Required for no-score gate |
 | Boundaries | versioned admin geometry | Version recorded with forecast |
 
@@ -111,7 +112,7 @@ scheduled job (daily, per crop × target × area)
   ├─ check model approval + config validity
   ├─ load weather snapshots (freshness check)
   ├─ load crop stage + calendar
-  ├─ load lagged verified reports (verified only)
+  ├─ load lagged eligible labels (confirmed + probable with tier, as-of cutoff)
   ├─ compute coverage
   ├─ if gate fails → persist insufficient_data row (reason, coverage)
   ├─ else compute features → persist feature_snapshot (immutable)
@@ -209,6 +210,13 @@ Rules:
 Report sample counts and per-area results. Never report a single aggregate without the
 class/area breakdown.
 
+**Negative-class rule (D7):** discrimination and calibration are computed only where verified
+negatives exist — on the pre-registered sentinel panel. Training on presence-only data is a
+positive-unlabelled design and does not license PR-AUC, precision/recall, Brier or ECE.
+Report panel sample size per area/target; if it is below the D8 minimum, report the metric as
+underpowered and do not gate on it. Never treat an unvisited area or a missing report as a
+negative.
+
 ---
 
 ## 10. Alert hand-off
@@ -228,6 +236,8 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 | Boundary version mismatch | `insufficient_data` with `boundary_mismatch`; ops alert |
 | Crop calendar missing | `insufficient_data` with `calendar_missing` |
 | Zero verified reports but good coverage | Valid low/moderate score; coverage shown; never "disease-free" |
+| No sentinel visit in the window | Not a negative; excluded from evaluation and coverage shown |
+| Sentinel panel below D8 minimum | Metrics marked underpowered; no discrimination or calibration claim |
 | High reports, low coverage | Band capped or `insufficient_data`; coverage shown |
 | Model not approved | No forecast generated; job fails loudly |
 | Duplicate run | Idempotent; no duplicate current forecast |
@@ -245,6 +255,13 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 - [ ] Re-running a forecast from its snapshot reproduces the same band.
 - [ ] No-score gate returns `insufficient_data` for each of the five failure conditions.
 - [ ] Unverified reports are excluded from features (test with an inserted unverified row).
+- [ ] A label is eligible only when `verified_at <= cutoff` and the event date is `<= cutoff` (test).
+- [ ] `probable` enters features only with its evidence tier recorded; `needs_visit`,
+      `duplicate`, `unresolved` and `rejected` never enter (test each).
+- [ ] A negative exists only for a scheduled sentinel visit inside the window; a missing visit
+      is not a negative (test).
+- [ ] Discrimination and calibration are reported only on sentinel-panel negatives, with
+      sample counts and an underpowered flag when below the D8 minimum.
 - [ ] `probability` is null unless calibration is approved.
 - [ ] Forecast response includes issue/validity, coverage, drivers, model version.
 - [ ] Map layers are independently toggleable and never merged server-side.

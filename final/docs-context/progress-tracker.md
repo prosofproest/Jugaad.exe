@@ -41,11 +41,13 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [ ] **D5** Primary outcome metric pre-registered.
 - [ ] **D6** Legal position on advisory content confirmed.
 - [ ] **D7–D12** Scientific-integrity decisions recorded (see §4).
+- [x] **D13** Agronomist role model recorded (see §4).
 - [ ] Crop calendar and epidemic window documented for the pilot area.
 
-**Gate 0:** D1–D12 answered and recorded in §4, each with a recorded date and one named
-accountable owner. Gate 0 carries a calendar target (proposed: **2026-11-20**, confirmed at
-the decision workshop) so that it cannot close by definition. No code that depends on them.
+**Gate 0:** D1–D13 answered and recorded in §4, each with a recorded date and one named
+accountable owner (D7 and D13 are already accepted). Gate 0 carries a calendar target
+(proposed: **2026-11-20**, confirmed at the decision workshop) so that it cannot close by
+definition. No code that depends on them.
 
 ### Phase 1 — Data foundation `[ ]`
 
@@ -108,10 +110,11 @@ clear the pre-registered floor fails the gate.
 - [ ] Temporal holdout evaluation; calibration report.
 - [ ] Alert trigger, dedupe, cooldown, delivery status.
 
-**Gate 4:** the D7 event definition and label maturity rule are fixed and frozen before the
-test season; the D9 coverage, freshness and suppression values are recorded and approved;
-the forecast is reproducible from a stored snapshot; the no-score path is verified against
-those values; the map never merges reports and predictions.
+**Gate 4:** the D7 event definition, label eligibility rule, sentinel-panel membership and
+visit schedule are fixed and frozen before the test season; the D9 coverage, freshness and
+suppression values are recorded and approved; the forecast is reproducible from a stored
+snapshot; the no-score path is verified against those values; the map never merges reports and
+predictions.
 
 ### Phase 5 — Pilot `[ ]`
 
@@ -225,23 +228,51 @@ Options: non-chemical only (recommended), approved chemical content with legal s
 Recommended default: **non-chemical + escalation**, legal review before pilot.
 **Owner:** Programme lead + legal. **Needs by:** Gate 0 (legal sign-off before Gate 5).
 
-### D7 — Forecast event, negative class and label eligibility `[?]`
+### D7 — Forecast event, negative class and label eligibility `[x]`
 
-The forecast track currently has no observable negative class, and `probable` may or may not
-count as verified — two readings are both valid today.
+**Accepted 2026-11-06.** Sentinel-panel absence sampling; `probable` is eligible with an
+evidence tier.
 
-| Option | Consequence |
-|---|---|
-| Presence / first-verified-case event | No denominator needed; cannot report PR-AUC or Brier honestly; must be framed as positive-unlabelled |
-| Scheduled absence sampling (scouting rounds record verified negatives) | Enables real discrimination metrics; needs field capacity per D3 |
+**Negative class.** A fixed sentinel panel of monitored field points is defined per supported
+area before the season and visited on a pre-registered schedule by extension workers or
+partners. At each visit the visitor records observed presence or absence of the supported
+target using the same diagnostic criteria as case verification. A visit yields a **verified
+negative** only if all of these hold: the visit falls inside the label window; the point is on
+the supported crop in the supported area; the visit was scheduled in advance, not triggered
+by a report; and the D9 coverage gate passed for that area and window. `no visit`, `no
+report`, `unresolved` and `needs_visit` are never negatives.
 
-Must also decide: whether `probable` is eligible for forecast features (recommended: yes,
-with an evidence tier, and `unverified` never eligible); the as-of label rule
-(`verified_at <= cutoff`, event date <= cutoff); and the label-maturity embargo before a
-season is frozen as test data.
-**Owner:** ML lead + agronomist + pathologist. **Needs by:** Gate 0; frozen before Gate 4.
-**Blocks:** `06-forecast-and-risk-map.md` §6, `04-expert-review.md` §16 Q2, `05-data-layer.md`
-`observation_verification`.
+**Event.** First evidence-eligible case of the target in the spatial unit within the event
+window. The event date is the earliest observed/onset date recorded. The exact outcome (first
+case, incidence threshold or escalation) still follows D1/D5, but the eligibility rule is
+fixed: a case enters features only if `verified_at <= cutoff` and its event date is
+`<= cutoff`. `confirmed` and `probable` are eligible; `probable` carries its evidence tier as
+a lower-confidence flag. `unverified`, `needs_visit`, `duplicate`, `unresolved` and `rejected`
+are never eligible.
+
+**Training versus evaluation.** Features may be trained on presence-only data, but that is a
+positive-unlabelled design: PR-AUC, precision/recall, Brier and ECE are reported **only** on
+the sentinel panel, which supplies real negatives. If the panel is below the D8 minimum
+sample for a stratum, the metric is reported as underpowered and is not used for a gate. No
+metric is ever computed by treating an unvisited area as negative.
+
+**Blinding.** The primary review records the label before seeing model candidates or the
+forecast at report time; both are revealed only after the decision is stored. A double-read
+subset is labelled independently and inter-rater agreement is reported; its size and threshold
+are set under D8.
+
+**Label maturity.** A season is not frozen as test data until its label window has closed and
+the review backlog for that window is cleared. Right-censored recent cases are excluded from
+the frozen set, never labelled negative.
+
+**Consequence — capacity:** the panel and its visit schedule are a D3 commitment. Without
+them the forecast track has no negative class and must fall back to presence-only, in which
+case discrimination and calibration are not reported at all.
+
+**Owner:** ML lead + agronomist + pathologist + field ops. **Recorded:** 2026-11-06;
+frozen before Gate 4.
+**Blocks:** `06-forecast-and-risk-map.md` §2/§9/§11, `04-expert-review.md` §3/§6,
+`05-data-layer.md` §4.4, `phase-plan.md` §7.1.
 
 ### D8 — Abstention rule and numeric acceptance floors `[?]`
 
@@ -381,6 +412,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
 | 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
 | 2026-11-06 | **D13 accepted:** `agronomist` added as a fifth role (advisory author/approver, risk-band approval, read-only area; cannot verify cases). Updated the RBAC matrix, MFA list and acceptance criteria in `03-auth-and-roles.md`; role lists in `PRD.md`, `phase-plan.md` and `05-data-layer.md`; review-role table in `04-expert-review.md`; advisory author/approver rules in `07-advisory-and-alerts.md`. Publication now requires two qualified accounts (D3 capacity). |
+| 2026-11-06 | **D7 accepted:** forecast negatives come from a pre-registered sentinel panel, not from missing reports; `probable` is eligible with an evidence tier; as-of cutoffs, label-maturity embargo and blinded primary review are mandatory. Updated forecast task/evaluation/edge cases, review flow and requirements, sentinel tables, label-eligibility invariants in TRD/architecture/workflow rules, and Phase 4 plan. Discrimination/calibration are reported only on sentinel negatives; panel below the D8 minimum is marked underpowered. |
 
 ---
 
@@ -444,7 +476,7 @@ baseline is measured; no target numbers are committed here.
 
 | Level | Metrics |
 |---|---|
-| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier, calibration; latency |
+| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier, calibration on sentinel-panel negatives only (underpowered below the D8 minimum); latency |
 | Operational | Report-to-review time, backlog, verified case rate, delivery, sync success |
 | User | Task completion, comprehension, repeat use, alert usefulness, opt-out |
 | Agricultural | Lead time, visit prioritisation, credible outcome indicators |

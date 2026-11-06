@@ -187,8 +187,8 @@ A forecast is only meaningful with a precise target.
 | Field | Definition |
 |---|---|
 | Prediction unit | Target condition × crop × geography × issue time × horizon |
-| Event | First verified case, incidence threshold, escalation, or another operational outcome — choose explicitly |
-| Negative | Verified absence within adequate coverage; never "no report" |
+| Event | First evidence-eligible case (D7); exact outcome per D1/D5 |
+| Negative | Verified absence from a pre-registered sentinel-panel visit; never "no report" or "no visit" |
 | Horizon | Aligned to decisions and input reliability (nowcast by default; 7-day outlook only when validated) |
 | Spatial unit | Smallest geography the inputs support without implying false precision |
 | Consumer | Extension worker and farmer SMS/WhatsApp outlook |
@@ -209,7 +209,7 @@ Rules:
 | Weather windows | Rolling rainfall, temperature ranges, humidity summaries, consecutive wet days | Must exist at `issue_time`; store `source_timestamp` |
 | Crop | Crop type, growth stage, planting window, variety, irrigation context | From crop cycle or calendar |
 | Seasonal | Week of year, monsoon period, days since planting | Deterministic |
-| Historical pressure | Lagged verified cases, nearby verified reports, prior-season occurrence | Verified only |
+| Historical pressure | Lagged eligible labels, nearby verified reports, prior-season occurrence | Eligible labels only (D7) |
 | Coverage | Active reporters, field visits, data completeness | Required for the no-score gate |
 
 **Leakage rule:** every feature must be computable at `issue_time`. Store the feature
@@ -246,7 +246,9 @@ Rules:
 Risk bands derive from validated probabilities or a documented, expert-approved score.
 Arbitrary thresholds create false confidence.
 
-- Assess reliability diagrams, Brier score and log loss on temporal holdout data.
+- Assess reliability diagrams, Brier score and log loss on temporal holdout data. Report
+  discrimination and calibration only on sentinel-panel negatives; a presence-only training
+  set does not license these metrics (D7).
 - Balance false alarms against missed outbreaks; state the cost of each error type.
 - Bands (`low`, `moderate`, `high`, `urgent`, `insufficient_data`) have operational meanings
   and approved actions.
@@ -303,7 +305,9 @@ Rules:
 - [ ] Per-class metrics, confusion matrix, sample counts and calibration reported.
 - [ ] Abstention rate reported beside every accuracy/F1 figure.
 - [ ] Feature snapshot persisted for every scored forecast; re-run reproduces the band.
-- [ ] Unverified reports excluded from forecast features (tested).
+- [ ] Forecast labels exclude `unverified`, `needs_visit`, `duplicate`, `unresolved` and
+      `rejected`; `confirmed` and `probable` (with evidence tier) obey the as-of cutoffs;
+      missing sentinel visits are not negatives (tested).
 - [ ] `probability` null unless calibration approved.
 - [ ] Model registry shows `approved` before serving.
 - [ ] No fabricated metric anywhere in reports or UI.

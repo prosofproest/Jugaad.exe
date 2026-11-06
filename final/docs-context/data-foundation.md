@@ -282,7 +282,9 @@ institutional datasets. Each source carries a permission record and a reliabilit
 ### 8.2 Verification tiers
 
 Store `confirmed`, `probable`, `unverified` and `rejected` separately. Forecast features use
-verified records only; `unverified` is never promoted by a model.
+`confirmed`, and `probable` with its evidence tier, subject to the as-of rule in D7:
+`verified_at <= cutoff` and event date `<= cutoff`. `unverified`, `needs_visit`, `duplicate`,
+`unresolved` and `rejected` are never promoted by a model.
 
 ### 8.3 Spatio-temporal features
 
@@ -293,7 +295,9 @@ they are not used.
 ### 8.4 Bias correction
 
 Include surveillance intensity or reporting coverage as a feature or an explicit
-uncertainty indicator. An unobserved area is not a negative observation.
+uncertainty indicator. An unobserved area is not a negative observation. A verified negative
+comes only from a scheduled sentinel-panel visit inside the label window (D7); a missing visit
+is not an absence.
 
 ### 8.5 Deduplication
 

@@ -58,6 +58,7 @@ Rules:
 | Read observation | own | area | area + escalated | area (read-only) | all (audited) |
 | Upload image | own | own + on-behalf | no | no | no |
 | Request review | own | area | no | no | no |
+| Record sentinel visit | no | area (scheduled) | area (scheduled) | no | no (manages panel) |
 | Read own assessment | own | own | — | — | — |
 | Read queue | no | area | area + escalations | area (read-only) | all |
 | Assign case | no | self only | area | no | all |
