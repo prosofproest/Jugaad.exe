@@ -23,6 +23,7 @@
 | 0 | | | | |
 | 1 | | | | |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
+| 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
 
 ---
 
@@ -324,20 +325,49 @@ only policy in the repository is explicitly labelled `synthetic_unit_test` and
 
 ## Gate 5 — Alerts and notifications (P1)
 
-- [ ] Alerts generated from forecasts, **never** from raw reports
-- [ ] Gates: coverage, freshness, approved advisory, opt-in
-- [ ] Dedupe key + cooldown + suppression
-- [ ] Alert persisted before dispatch
-- [ ] In-app delivery + inbox
-- [ ] Email delivery with provider receipt
-- [ ] Optional SMS with explicit opt-in
-- [ ] Delivery status and failure reason recorded
-- [ ] Retry with backoff; no duplicate sends
-- [ ] Alert history and feedback endpoint
-- [ ] Correct-recipient test: only opted-in users in the affected area receive the alert
-- [ ] Pause/kill-switch tested
+Backend advisory/alert machinery from `final/feature-specs/07-advisory-and-alerts.md` is
+implemented and unit-tested. This is **not** pilot evidence: no delivery provider, no
+authenticated user routes, no field deployment and no approved production advisory exist.
+
+- [x] Alerts generated from forecasts, **never** from raw reports
+  - **Evidence:** `backend/app/modules/alerts/trigger.py` accepts only a
+    `ForecastSnapshot`; `tests/test_alert_trigger.py`.
+- [x] Gates: coverage, freshness, approved advisory, opt-in
+  - **Evidence:** `tests/test_alert_trigger.py::test_every_gate_blocks_the_alert`
+    covers demo, paused, inactive, stale, insufficient band, below-minimum band, low
+    coverage, missing drivers, missing advisory, expired advisory and no recipients.
+- [x] Dedupe key + cooldown + suppression
+  - **Evidence:** `tests/test_alert_dispatch.py::test_replaying_the_same_forecast_creates_no_duplicate`,
+    `::test_cooldown_suppresses_repeats_but_allows_after_expiry`.
+- [x] Alert persisted before dispatch
+  - **Evidence:** `tests/test_alert_dispatch.py::test_alert_is_persisted_before_the_provider_is_called`.
+- [ ] In-app delivery + inbox. Backend inbox query exists and is tested; no HTTP endpoint
+      or client, because Phase 2 authentication/roles do not exist.
+- [ ] Email delivery with provider receipt. No email provider, credentials or partner
+      channel decision exists.
+- [ ] Optional SMS with explicit opt-in. Channel preference exists; no SMS provider or
+      gateway is configured.
+- [x] Delivery status and failure reason recorded
+  - **Evidence:** `tests/test_alert_dispatch.py::test_missing_provider_is_recorded_as_a_failure_not_a_send`,
+    `::test_failed_provider_is_retried_and_never_marked_sent`.
+- [x] Retry with backoff; no duplicate sends
+  - **Evidence:** `::test_retry_backoff_delays_between_attempts`,
+    `::test_transient_provider_failure_recovers_on_retry`,
+    `::test_replaying_the_same_forecast_creates_no_duplicate`.
+- [ ] Alert history and feedback endpoint. Service-level history and owner-scoped
+      feedback exist and are tested; no HTTP access because auth/roles are missing.
+- [x] Correct-recipient test: only opted-in users in the affected area receive the alert
+  - **Evidence:** `tests/test_alert_trigger.py::test_recipient_selection_filters_scope_language_channel_and_opt_out`,
+    `tests/test_alert_dispatch.py::test_high_risk_generates_exactly_one_alert_with_recorded_delivery`.
+- [x] Pause/kill-switch tested
+  - **Evidence:** `tests/test_alert_dispatch.py::test_pause_stops_dispatch_until_resumed`.
 
 **Gate 5 exit criteria:** a test proves high risk -> exactly one alert -> correct recipients -> recorded delivery status; re-running creates no duplicates.
+
+**Met at service level** by `test_high_risk_generates_exactly_one_alert_with_recorded_delivery`
+and `test_replaying_the_same_forecast_creates_no_duplicate`. Not met as a Gate 5 exit:
+there is no production provider, no pilot site, no approved production advisory and no
+field evidence.
 
 ---
 
