@@ -6,7 +6,7 @@ API-only client for the PS-03 modular monolith. It consumes the versioned
 
 > Folder note: the source documents call this app `web/`; the implementation
 > lives in `frontend/` because that folder already existed in the repository.
-> See ADR-007 in `final/docs-context/progress-tracker.md`.
+> See ADR-009 in `final/docs-context/progress-tracker.md`.
 
 ## Commands
 
@@ -24,20 +24,61 @@ requests; see `.env.example`. Server components read `API_BASE_URL` first
 (compose sets it to `http://api:8000`) so they use the container network while
 the browser uses the public origin.
 
-## Scope in Phase 2 §5.1
+## Routes
 
-Engineering foundation only:
+| Route | What it does | Evidence |
+| --- | --- | --- |
+| `/` | Reports API reachability and explains the two separate outputs. | live smoke, build |
+| `/chat` | Conversation list: create, open and delete; empty and API-unreachable states. | live smoke, build |
+| `/chat/[conversationId]` | Thread with structured assessment replies, idempotent retry, demo badge and delete. | live smoke, build |
+| `/outlook` | Honest “not available in this phase” state for the separate area-outlook output. | build, manual check |
+| `/review` | Honest “locked” state for the expert review portal; no fabricated cases. | build, manual check |
 
-- `/` reports platform reachability and explains the two separate outputs.
-- `/chat` is a chat shell that exercises the `/v1/conversations` contract,
-  including idempotent retry via the same `client_message_id`.
-- Demo responses from the API are labelled `demo` in the UI; the client never
-  invents an assessment.
+The web chat is the Phase 2 §5.7 surface, not a new model. It renders the
+server's structured `AssessmentCard` fields; it never parses prose into a
+diagnosis and never invents a result. An image attachment sends **filename
+metadata only** — the upload/media pipeline and any real image model are not
+connected in this phase.
+
+## Design system
+
+`design/tokens.json` is the semantic token source
+(`final/feature-specs/01-design-system.md`). `app/globals.css` mirrors those
+values as CSS variables until a generator exists; update both in one change.
+Risk and status namespaces stay separate.
+
+## Scope
+
+Implemented:
+
+- conversation list, thread, create and delete;
+- honest placeholder routes for area outlook and expert review (no fabricated data);
+- text and image-metadata composer (file picker and drag-and-drop, preview,
+  10 MB guard);
+- structured assessment card with assessed / abstained / unsupported / failed
+  states, confidence band, calibration status, model version and generation
+  time;
+- demo labelling, offline notice, failed-send retry with the same
+  `client_message_id`, and empty/error states.
+
+Not implemented in this phase:
+
+- image upload, presigned URLs and media storage;
+- real image inference (replies are labelled demo);
+- chat context fields (crop, stage, area) — the crop list is blocked on D1;
+- expert review from chat, advisories, area outlook;
+- authentication and per-user ownership (the backend uses a single demo owner);
+- localisation catalogs (copy is currently English-only in components).
 
 ## Verified locally
 
-| Command | Result |
+| Check | Result |
 | --- | --- |
-| `npm run typecheck` | pass |
-| `npm run lint` | pass |
-| `npm run build` | pass (Next.js 16.4.5, Node 24) |
+| `npm run typecheck` | pass (2026-11-06) |
+| `npm run lint` | pass (2026-11-06) |
+| `npm run build` | pass; routes `/`, `/_not-found`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review` |
+| Live smoke | `/chat` listed a created conversation; thread rendered title, demo badge and the abstained assessment; delete returned the empty state |
+
+The production build and live smoke used the local FastAPI dev server with the
+in-memory demo conversation store. No real image upload or model inference was
+exercised.

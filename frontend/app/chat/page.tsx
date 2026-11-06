@@ -1,23 +1,28 @@
-import { ChatPanel } from "@/components/chat-panel";
+import type { Metadata } from "next";
 
-export const metadata = {
-  title: "Photo assessment — PS-03",
+import { ChatIndex } from "@/components/chat-index";
+import { ApiError, listConversations, type Conversation } from "@/lib/api";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Photo assessment",
 };
 
-export default function ChatPage() {
-  return (
-    <>
-      <h1>Photo assessment</h1>
-      <p>
-        <span className="badge badge-muted">separate output</span> This screen is
-        the photo-assessment track only. It never shows area outlook or a merged
-        risk number.
-      </p>
-      <ChatPanel />
-      <p className="muted">
-        An area outlook is a different output with its own data, model version and
-        timestamp. It is not available in this phase.
-      </p>
-    </>
-  );
+export default async function ChatPage() {
+  let conversations: Conversation[] = [];
+  let error: string | null = null;
+
+  try {
+    conversations = await listConversations();
+  } catch (caught) {
+    error =
+      caught instanceof ApiError
+        ? `${caught.status} ${caught.problem?.code ?? "api_error"} — ${
+            caught.problem?.detail ?? caught.problem?.title ?? "request failed"
+          }`
+        : "The API is unreachable. Check that the backend is running.";
+  }
+
+  return <ChatIndex initialConversations={conversations} initialError={error} />;
 }

@@ -2,6 +2,7 @@
 
 **Companion to:** `ARCHITECTURE-COMPLIANCE-REPORT.md`
 **Baseline verified:** 2026-11-06 — verdict **NOT COMPLIANT**
+**Checklist reconciled against the repository:** 2026-11-06 — verdict **unchanged: NOT COMPLIANT**
 **Purpose:** Convert the audit findings into an ordered, verifiable work plan.
 
 ---
@@ -16,20 +17,25 @@
 5. If an item cannot be verified, leave it unchecked and mark it `NOT VERIFIED` — do not mark it done.
 6. Re-run the [final verification matrix](#final-verification-matrix) after each gate.
 
+> **Work-log rule.** Completed work is recorded in [Work completed since baseline](#work-completed-since-baseline-reconciled-2026-11-06) with its evidence. Ticking a box never changes the audit verdict; only the compliance definition of done and a re-run audit can do that.
+
 **Evidence log**
 
 | Gate | Date | Verified by | Command / artefact | Result |
 |---|---|---|---|---|
-| 0 | | | | |
-| 1 | | | | |
+| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `git log --oneline`; `progress-tracker.md` §4–§5; search for `final/backend` | **Open** — ADRs recorded in the tracker but no `docs/adr/` file; D1–D6 and D9–D12 open; docs largely reconciled |
+| 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 187 backend tests pass; web typecheck, lint and build pass; no auth, readiness, domain tables or media |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
+| — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 and Gate 1 remain unmet |
 
 ---
 
-## Baseline snapshot (already verified)
+## Baseline snapshot (historical, pre-scaffold)
 
-Do not re-litigate these; they are the starting point.
+Do not re-litigate these; they are the starting point recorded by the audit. Several
+lines are now out of date because Phase 2 §5.1 work landed afterwards — use the
+work log below for the current state.
 
 - [x] Repository enumerated — documentation + health-only backend scaffold
 - [x] `pytest -q` -> **3 passed** (`backend/tests/test_health.py`)
@@ -41,25 +47,55 @@ Do not re-litigate these; they are the starting point.
 
 ---
 
+## Work completed since baseline (reconciled 2026-11-06)
+
+This section records the user's work process against the checklist. A row is added only
+where the repository contains the artefact; nothing here closes a gate on its own.
+
+| # | Work completed | Evidence in repository | Checklist items affected |
+|---|---|---|---|
+| W-01 | Repository structure created for the approved stack: `backend/`, `frontend/`, `mobile/`, `database/`, `deploy/`, `ml/`, `chatbot/`, CI | directory tree; `.github/workflows/ci.yml` | 0.4, Gate 10, Gate 11 |
+| W-02 | Architecture decisions recorded (modular monolith, SQLAlchemy/Alembic as schema authority, API-only web, rules-first forecast, ONNX CPU inference, Flutter + SMS/WhatsApp, full-stack scope, chat as a wrapper, `frontend/` naming) | `progress-tracker.md` §5 ADR-001…ADR-009 (ADR-005/006 still *Proposed*; the rest *Accepted*) | 0.1 |
+| W-03 | Scientific-integrity decisions D7, D8 and D13 accepted; D1–D6 and D9–D12 remain open with owners and needs-by dates | `progress-tracker.md` §4 | 0.2 (partial) |
+| W-04 | Product/technical docs reconciled with the implemented stack; false "no scaffold" claims and stale `final/backend` paths removed | `final/PRD.md` line 6; `final/TRD.md` line 6; search across `final/` for `final/backend` → 0 matches; `progress-tracker.md` changelog | 0.3 |
+| W-05 | Backend foundation: app factory, RFC 7807 problem details, request-ID middleware, JSON logging, environment settings, CORS, health route | `backend/app/main.py`, `core/errors.py`, `core/logging.py`, `core/middleware.py`; `tests/test_errors.py`, `test_logging.py`, `test_request_context.py` | 1.5 (liveness only), Gate 9 |
+| W-06 | Persistence baseline: SQLAlchemy base/session and Alembic revision `0001_baseline` (no domain tables yet) | `backend/app/db/base.py`, `db/session.py`, `db/migrations/versions/0001_baseline.py`, `alembic.ini` | 1.3 (baseline only) |
+| W-07 | Demo conversations API: threads, messages, idempotent send (`Idempotency-Key` must equal `client_message_id`), retry, delete; structured `Assessment` reply with state, reason, candidates, confidence band, `model_version`, `generated_at`, `is_demo` | `backend/app/api/v1/conversations.py`, `modules/conversations/*`; OpenAPI `/v1/conversations` | Phase 2 §5.7 (backend subset) |
+| W-08 | Web chat surface: `/chat` list, `/chat/[conversationId]` thread, structured assessment card, metadata-only image composer with drag/drop and 10 MB guard, offline notice, idempotent retry, delete with confirm | `frontend/app/chat/*`, `components/assessment-card.tsx`, `chat-composer.tsx`, `chat-index.tsx`, `chat-thread.tsx`, `message-bubble.tsx`, `sidebar-nav.tsx`, `lib/api.ts` | Phase 2 §5.7 (web subset) |
+| W-09 | Honest empty-state surfaces for the other outputs: `/outlook` (no score without inputs) and `/review` (locked until auth/review exist) | `frontend/app/outlook/page.tsx`, `frontend/app/review/page.tsx`; production build emits both routes | R1/R3/R4 evidence; no feature claim |
+| W-10 | Design tokens source committed and mirrored into CSS | `design/tokens.json`, `frontend/app/globals.css`; `frontend/README.md` §Design system | Phase 2 §5.1 design foundation |
+| W-11 | Flutter shell committed with API client and widget test; **not run locally** | `mobile/pubspec.yaml`, `mobile/lib/*`, `mobile/test/widget_test.dart`; CI mobile job | Gate 10 (Defined, not verified) |
+| W-12 | Deploy and CI scaffolding: API/web Dockerfiles, base + dev compose override, dev/staging env templates, CI jobs for backend/web/mobile/compose/image builds | `backend/Dockerfile`, `frontend/Dockerfile`, `deploy/*`, `.github/workflows/ci.yml` | Gate 11 (defined, not run) |
+| W-13 | Test evidence refreshed: 187 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 187 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
+| W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
+
+---
+
 ## Gate 0 — Resolve the architecture conflict (BLOCKING)
 
 Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
+
+> **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation and the demo-backed
+> web chat surface (§5.7) were built under the explicit instruction recorded in
+> `progress-tracker.md` §2. The exception permits foundation-only work; it does **not**
+> close Gate 0 or authorise domain features.
 
 ### 0.1 Architecture Decision Record
 
 - [ ] Create `docs/adr/0001-target-architecture.md`
   - **Done when:** it states the chosen database, storage, auth provider, frontend stack, role model, language list, model-output semantics, guidance policy, and forecast approach — with rejected alternatives and consequences.
-- [ ] Choose the database: **Firestore** (target) *or* **PostgreSQL + PostGIS** (documented) — record the decision
-- [ ] Choose image storage: **Cloudinary** (target) *or* **S3-compatible** (documented)
-- [ ] Choose the frontend: **single web app**, **web + mobile**, or **Flutter + Next.js**
-- [ ] Choose the auth mechanism: phone OTP / email+password / MFA scope
-- [ ] Confirm the role list: target (farmer, admin) vs documented (farmer, extension worker, pathologist, admin)
-- [ ] Confirm the language list: **English + Kannada**, or documented "one unnamed local language + English"
-- [ ] Define confidence semantics: validated numeric probability vs qualitative band + abstention
-- [ ] Define severity: model output vs expert-review field
-- [ ] Define guidance policy: curated approved content vs LLM-generated — if generated, define validator + approval + audit
-- [ ] Define outbreak approach: rules-based nowcast first vs ML model
-- [ ] Confirm notification channels: in-app + email + optional SMS, or documented SMS/WhatsApp/push
+  - **Evidence (2026-11-06):** the decisions exist as ADR-001…ADR-009 in `progress-tracker.md` §5, but no `docs/adr/` directory or ADR file exists. **Not done.**
+- [x] Choose the database: **PostgreSQL 16 + PostGIS** (Firestore rejected) — ADR-002; `architecture-context.md` §2; `05-data-layer.md` §2
+- [x] Choose image storage: **S3-compatible private bucket** (Cloudinary rejected) — `architecture-context.md` §2; `05-data-layer.md` §8
+- [x] Choose the frontend: **Next.js web app + Flutter mobile app** — ADR-007; `architecture-context.md` §2
+- [x] Choose the auth mechanism: **phone OTP for farmers; provisioned staff accounts; MFA for pathologist/agronomist/admin** — `03-auth-and-roles.md` §2 (provisioning) and §4.1–§4.2 (flows)
+- [x] Confirm the role list: **five roles — farmer, extension worker, pathologist, agronomist, admin** — D13; `03-auth-and-roles.md` §2
+- [x] Confirm the language list: **one local language + English** — `ui-context.md` §9; `02-reporting-and-capture.md` §8. The specific local language is still unnamed.
+- [x] Define confidence semantics: **qualitative band + abstention; numeric probability only when calibration is approved** — D8; `ml-models.md` §6
+- [x] Define severity: **expert-review field recorded with crop-specific criteria** — `PRD.md` §6.2 reviewer actions; `02-reporting-and-capture.md` §4
+- [x] Define guidance policy: **curated, expert-approved, versioned, non-chemical content; no LLM** — `07-advisory-and-alerts.md` §1
+- [x] Define outbreak approach: **rules-based nowcast first; ML only after verified seasons** — ADR-004; `06-forecast-and-risk-map.md` §2
+- [x] Confirm notification channels: **adapter interface for SMS / WhatsApp / push** — `architecture-context.md` §2
 
 ### 0.2 Resolve blocking product decisions D1–D6
 
@@ -70,33 +106,41 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 - [ ] D5 — Primary success metric
 - [ ] D6 — Advisory legality / chemical-advice position
   - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4 with a date and owner.
+  - **Evidence (2026-11-06):** D7, D8 and D13 are accepted in §4. D1–D6 and D9–D12 remain open, each with an owner and a needs-by date, so **0.2 is not closed**.
 
 ### 0.3 Reconcile documentation
 
-- [ ] Update `final/PRD.md` — remove false "initial scaffold exists" claim (line 6)
-- [ ] Update `final/TRD.md` — remove false "backend/web/mobile scaffold exists" claim (line 6)
-- [ ] Update `final/docs-context/architecture-context.md` — one stack only
-- [ ] Update `final/feature-specs/03-auth-and-roles.md` — roles, auth mechanism
-- [ ] Update `final/feature-specs/05-data-layer.md` — chosen database/storage
-- [ ] Update `final/feature-specs/06-forecast-and-risk-map.md` — chosen forecast approach
-- [ ] Update `final/feature-specs/07-advisory-and-alerts.md` — guidance policy + channels
-- [ ] Update `final/docs-context/progress-tracker.md` — reflect real state, not aspirational state
-- [ ] Remove or correct every reference to `final/backend` (actual path is `backend/`)
-- [ ] **Done when:** a full-text search finds no contradictory stack, role, or language claims.
+- [x] Update `final/PRD.md` — false "initial scaffold exists" claim corrected (line 6 now records the Phase 2 scaffold and unverified mobile app)
+- [x] Update `final/TRD.md` — false "backend/web/mobile scaffold exists" claim corrected (line 6 now records the real scaffold state)
+- [x] Update `final/docs-context/architecture-context.md` — one stack only (PostgreSQL/PostGIS, S3-compatible, Flutter + Next.js)
+- [x] Update `final/feature-specs/03-auth-and-roles.md` — five roles and phone-OTP/MFA mechanism recorded
+- [x] Update `final/feature-specs/05-data-layer.md` — PostgreSQL/PostGIS and S3-compatible storage recorded
+- [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — rules-based nowcast baseline recorded
+- [x] Update `final/feature-specs/07-advisory-and-alerts.md` — curated non-chemical guidance policy recorded
+- [x] Update `final/docs-context/progress-tracker.md` — reflects the real state, including the Gate-1 exception and the demo chat surface
+- [x] Remove or correct every reference to `final/backend` (actual path is `backend/`) — a search across `final/` returns 0 matches; the only remaining hits are this checklist and the audit report describing the correction
+- [x] **Done when:** a full-text search finds no contradictory stack, role, or language claims. Open values (D1, D2, D9, D12) are marked open, not contradictory.
 
 ### 0.4 Repository hygiene
 
 - [ ] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `dist/`, `build/` to `.gitignore`
-- [ ] Delete or rebuild the broken `backend/.venv` (contains only pip; `pyvenv.cfg` points at `final\backend\.venv`)
+  - **Evidence (2026-11-06):** all are present except `dist/`. `.gitignore` covers `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` and `build/`, but not `dist/`. **Partially done.**
+- [x] Delete or rebuild the broken `backend/.venv` — `.venv` now resolves to this repository and runs the suite; `pyvenv.cfg` points at `backend\.venv`
 - [ ] Add a lockfile (`uv.lock`, `poetry.lock`, or `requirements.lock`)
+  - **Evidence (2026-11-06):** only `frontend/package-lock.json` exists; the backend has no lockfile. **Not done.**
 - [ ] Confirm the documented quickstart works from a clean clone on the supported Python version
   - **Done when:** `pip install -r requirements.txt && pytest` succeeds with zero manual steps.
+  - **Evidence (2026-11-06):** the local venv runs 187 tests, but a clean-clone install has not been repeated and the backend has no lockfile. **Not verified.**
 
 **Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
 
 ---
 
 ## Gate 1 — Security and data foundation (P0)
+
+> **Status (2026-11-06):** open. The repository has a liveness probe, problem-details
+> errors, structured logs and an Alembic baseline, but no authentication, authorization,
+> domain schema or media pipeline. No data-bearing endpoint is safe to expose.
 
 ### 1.1 Authentication
 
@@ -143,9 +187,10 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 ### 1.5 Real health checks
 
 - [ ] Separate **liveness** (`/health`) from **readiness** (`/ready`)
+  - **Evidence (2026-11-06):** only `/health` and `/v1/health` exist and both are documented as liveness; no `/ready` route exists.
 - [ ] Readiness checks database, object storage, AI service, and required external providers
 - [ ] Readiness returns `503` when a dependency is down
-- [ ] Health payload exposes no secrets
+- [x] Health payload exposes no secrets — payload is `status`, `service`, `version`, `environment`, `timestamp`; no credentials or connection strings (`backend/app/api/v1/health.py`, `backend/tests/test_health.py`)
 - [ ] A test proves readiness fails when a dependency is stubbed to fail
 
 **Gate 1 exit criteria:** an unauthenticated user can reach nothing but health/docs; a farmer cannot read another farmer's data; an admin route rejects non-admins; data and images persist and are retrievable; readiness fails when dependencies fail.
@@ -449,32 +494,36 @@ injects persisted geometry and an approved `MapPolicy`.
 
 ## Gate 9 — Observability and reliability (P2)
 
-- [ ] Structured JSON logs with request IDs
-- [ ] No PII or secrets in logs
+- [x] Structured JSON logs with request IDs — `backend/app/core/logging.py`, `core/middleware.py`; `tests/test_logging.py`, `test_request_context.py`
+- [x] No PII or secrets in logs — exception logging keeps only `error_type` (payload text is dropped); `tests/test_logging.py::test_exception_logging_keeps_only_the_error_type`. Conversation text is not logged.
 - [ ] Metrics: request rate/latency/errors, inference latency, abstention rate, forecast no-score rate, alert delivery failure rate
 - [ ] Error tracking with stack traces
 - [ ] Tracing across upload → inference → persistence
 - [ ] Alerts for model failure, weather staleness, no-score spikes, delivery failures
-- [ ] Global exception handler with a consistent error envelope
+- [x] Global exception handler with a consistent error envelope — RFC 7807 `application/problem+json`; `backend/app/core/errors.py`; `tests/test_errors.py`
 - [ ] Timeouts and circuit breakers on all external calls
 - [ ] Graceful shutdown
 
 **Gate 9 exit criteria:** a forced dependency failure produces a logged, traceable, alertable event that does not crash the app.
+
+> The three ticked rows landed with the §5.1 foundation while Gate 0/1 remain open. They are true on their own but **do not close Gate 9**: metrics, tracing, error tracking and dependency-failure proofs are still missing.
 
 ---
 
 ## Gate 10 — Testing and CI/CD (P2)
 
 - [ ] Unit tests for services and rules
+  - **Evidence (2026-11-06):** 187 tests cover health, the error envelope, request IDs, logging, OpenAPI, conversations, the image-triage decision/quality-gate/OOD/calibration/evaluation/explanation/registry path, and advisory/alert dispatch. No real-database integration or module-boundary service test exists. **Not done.**
 - [ ] Integration tests per module (real DB/emulator, not mocks)
 - [ ] Contract tests against the OpenAPI schema
 - [ ] Security tests: cross-user, cross-role, unauthenticated, object-level
 - [ ] E2E: farmer flow, outbreak flow, admin flow
 - [ ] Negative tests: abstention, quality failure, stale weather, no-score, upload failure
 - [ ] Model tests: preprocessing parity, golden fixtures, calibration sanity
-- [ ] Frontend: build, lint, typecheck
+- [x] Frontend: build, lint, typecheck — `npm run typecheck`, `npm run lint`, `npm run build` all pass on 2026-11-06; build emits `/`, `/_not-found`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review`
 - [ ] Load test: report submission and alert dispatch
 - [ ] CI runs all of the above on every PR
+  - **Evidence (2026-11-06):** `.github/workflows/ci.yml` defines backend, web, mobile, compose and image-build jobs, but no CI run is recorded in the repository. **Not verified.**
 - [ ] Coverage threshold enforced
 - [ ] A red CI blocks merge
 
@@ -485,7 +534,9 @@ injects persisted geometry and an approved `MapPolicy`.
 ## Gate 11 — Deployment and operations (P2/P3)
 
 - [ ] Container image (or chosen deploy target)
+  - **Evidence (2026-11-06):** `backend/Dockerfile` and `frontend/Dockerfile` exist and the CI job builds them; local image builds have not been run (no Docker daemon). **Not verified.**
 - [ ] Environment-specific configuration (dev/staging/prod)
+  - **Evidence (2026-11-06):** dev and staging templates exist (`deploy/.env.example`, `deploy/.env.staging.example`); no production profile is defined.
 - [ ] Secrets in a secret manager, not in `.env` in production
 - [ ] TLS enforced
 - [ ] Rate limiting, OTP throttling, account lockout
@@ -494,7 +545,7 @@ injects persisted geometry and an approved `MapPolicy`.
 - [ ] Backup schedule + documented RTO/RPO
 - [ ] Restore drill executed and recorded
 - [ ] Rollback procedure
-- [ ] Docs site / API docs restricted or authenticated in production
+- [x] Docs site / API docs restricted or authenticated in production — `backend/app/main.py` sets `docs_url`, `redoc_url` and `openapi_url` to `None` when the environment is production (`core/config.py::is_production`); re-verified 2026-11-06 with `APP_ENVIRONMENT=production python -c "from app.main import create_app; ..."` → all three `None`. No automated test asserts this yet.
 - [ ] Accessibility and performance budgets
 
 **Gate 11 exit criteria:** a deploy can be rolled back, a backup restored, and a dependency failure survived — each demonstrated once.
@@ -522,22 +573,26 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 
 | # | Check | Expected evidence | Status |
 |---|---|---|---|
-| 1 | Clean install | fresh clone -> install -> tests pass | MISSING |
-| 2 | Tests | full suite green, count recorded | PARTIAL (103 tests; assessment module covered, product E2E missing) |
-| 3 | OpenAPI security | `securitySchemes` present | MISSING |
-| 4 | Unauthenticated admin route | `401` | MISSING |
-| 5 | Farmer cross-tenant read | `403`/`404` with no data leak | MISSING |
-| 6 | Upload -> inference | prediction returned with model version | MISSING |
-| 7 | Diagnosis persisted | record retrievable in history | MISSING |
-| 8 | Image retrievable via signed URL | `200`, URL expires | MISSING |
-| 9 | Weather affects risk | two fixtures -> different scores | MISSING |
-| 10 | Risk -> alert | one deduped alert, correct recipients | MISSING |
-| 11 | Map uses API data | layer changes when records change | MISSING |
-| 12 | Admin sees real data | count matches database | MISSING |
-| 13 | Audit event written | login / role change / record view present | MISSING |
-| 14 | Kannada complete | no English leaks on Kannada UI | MISSING |
-| 15 | Readiness degrades | `503` when a dependency is down | MISSING |
-| 16 | CI enforces | red test blocks merge | MISSING |
+| 1 | Clean install | fresh clone -> install -> tests pass | PARTIAL — scaffold builds, but no backend lockfile and no clean-clone run recorded |
+| 2 | Tests | full suite green, count recorded | PARTIAL - 187 backend tests pass (health, conversations, triage/decision, advisories/alerts); no domain-service integration, real-DB or E2E tests |
+| 3 | OpenAPI security | `securitySchemes` present | MISSING — chat and health routes are unauthenticated |
+| 4 | Unauthenticated admin route | `401` | MISSING — no admin route exists |
+| 5 | Farmer cross-tenant read | `403`/`404` with no data leak | MISSING — no auth or ownership model |
+| 6 | Upload -> inference | prediction returned with model version | MISSING — demo chat uses an in-memory labelled demo reply; no upload or model |
+| 7 | Diagnosis persisted | record retrievable in history | MISSING — demo messages are in-memory only |
+| 8 | Image retrievable via signed URL | `200`, URL expires | MISSING — metadata-only composer; no media storage |
+| 9 | Weather affects risk | two fixtures -> different scores | MISSING — no weather ingestion or forecast |
+| 10 | Risk -> alert | one deduped alert, correct recipients | MISSING — no alerts module |
+| 11 | Map uses API data | layer changes when records change | MISSING — no map; `/outlook` is an honest empty state |
+| 12 | Admin sees real data | count matches database | MISSING — no admin surface or API |
+| 13 | Audit event written | login / role change / record view present | MISSING — no audit module |
+| 14 | Kannada complete | no English leaks on Kannada UI | MISSING — one local language + English is specified but no locale catalogs exist |
+| 15 | Readiness degrades | `503` when a dependency is down | MISSING — only liveness `/health` exists |
+| 16 | CI enforces | red test blocks merge | PARTIAL — `.github/workflows/ci.yml` is defined; no CI run or branch-protection evidence recorded |
+
+> Rows 1, 2 and 16 are **PARTIAL** because scaffolding evidence exists, not because the
+> audited capability is satisfied. No row may be marked **PASS** until the work-log
+> evidence proves the expected result.
 
 ---
 
@@ -552,7 +607,6 @@ The project may be re-labelled from **NOT COMPLIANT** only when:
 - [ ] Every row in the final verification matrix is **PASS** (no `NOT VERIFIED`, no `PARTIAL`)
 - [ ] The audit report is re-run and a new verdict is recorded with a date
 
-Until then, the correct description remains: **documentation-only design with a
-health-check scaffold and an unconfigured image-triage decision/serving slice**. No
-trained model, field dataset, approved operating point or field result exists, so no
-"calibrated, field-tested" claim may be made.
+Until then, the correct description remains: **documentation plus Phase 2 engineering
+scaffolding (a demo-backed web chat surface and no real model) — not a compliant
+application**. Gate 0 and Gate 1 remain open.

@@ -47,6 +47,17 @@ export interface SendResult {
   assistant_message: Message;
 }
 
+export interface AttachmentInput {
+  filename: string;
+  content_type: string;
+}
+
+export interface SendMessageInput {
+  clientMessageId: string;
+  text?: string;
+  image?: AttachmentInput;
+}
+
 export interface Health {
   status: string;
   service: string;
@@ -109,6 +120,10 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     throw new ApiError(response.status, problem);
   }
 
+  if (response.status === 204) {
+    return undefined as T;
+  }
+
   return (await response.json()) as T;
 }
 
@@ -116,17 +131,33 @@ export function getHealth(): Promise<Health> {
   return request<Health>("/health");
 }
 
-export function createConversation(): Promise<Conversation> {
+export function listConversations(): Promise<Conversation[]> {
+  return request<Conversation[]>("/v1/conversations");
+}
+
+export function createConversation(title = "Photo assessment"): Promise<Conversation> {
   return request<Conversation>("/v1/conversations", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title: "Photo assessment" }),
+    body: JSON.stringify({ title }),
   });
+}
+
+export function getConversation(conversationId: string): Promise<Conversation> {
+  return request<Conversation>(`/v1/conversations/${conversationId}`);
+}
+
+export function deleteConversation(conversationId: string): Promise<void> {
+  return request<void>(`/v1/conversations/${conversationId}`, { method: "DELETE" });
+}
+
+export function listMessages(conversationId: string): Promise<Message[]> {
+  return request<Message[]>(`/v1/conversations/${conversationId}/messages`);
 }
 
 export function sendMessage(
   conversationId: string,
-  input: { clientMessageId: string; text?: string },
+  input: SendMessageInput,
 ): Promise<SendResult> {
   return request<SendResult>(`/v1/conversations/${conversationId}/messages`, {
     method: "POST",
@@ -137,6 +168,22 @@ export function sendMessage(
     body: JSON.stringify({
       client_message_id: input.clientMessageId,
       text: input.text ?? null,
+      image: input.image
+        ? {
+            filename: input.image.filename,
+            content_type: input.image.content_type,
+          }
+        : null,
     }),
   });
+}
+
+export function retryMessage(
+  conversationId: string,
+  messageId: string,
+): Promise<Message> {
+  return request<Message>(
+    `/v1/conversations/${conversationId}/messages/${messageId}/retry`,
+    { method: "POST" },
+  );
 }

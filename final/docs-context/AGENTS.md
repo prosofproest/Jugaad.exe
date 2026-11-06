@@ -5,8 +5,8 @@
 repository. It states what the system is, what must never be violated, and how work is
 planned, built, tested and documented.
 
-**Status:** documentation plus an engineering scaffold (Phase 2 §5.1). No product
-feature is implemented; demo paths are labelled.
+**Status:** documentation plus engineering scaffolds (Phase 2 §5.1) and the web chat
+surface (§5.7, demo backend). No real model is connected; demo paths are labelled.
 **Last updated:** 2026-11-06
 
 ---
@@ -147,9 +147,9 @@ reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds no schema
 of its own — SQLAlchemy models and Alembic migrations in `backend/` are the
 single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
-Nothing beyond the Phase 2 §5.1 foundation exists in these folders. Do not create
-scaffolding that implies a decision has been made unless the decision is recorded
-in `progress-tracker.md`.
+Nothing beyond the Phase 2 §5.1 foundation and the demo-backed web chat surface
+(§5.7) exists in these folders. Do not create scaffolding that implies a decision
+has been made unless the decision is recorded in `progress-tracker.md`.
 
 ---
 
@@ -170,7 +170,8 @@ each agent's `README.md`.
 | Web install | `cd frontend && npm ci` | 346 packages |
 | Web typecheck | `cd frontend && npm run typecheck` | pass |
 | Web lint | `cd frontend && npm run lint` | pass |
-| Web build | `cd frontend && npm run build` | pass; 3 routes |
+| Web build | `cd frontend && npm run build` | pass; 6 routes |
+| Web chat smoke | `uvicorn` + `next start`, then create/list/open/delete a conversation | pass; list, thread, demo badge, delete and empty state observed |
 | Compose parse | `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml config --quiet` | pass |
 | Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | **NOT RUN — Flutter not installed**; CI job defined |
 | Container builds | `docker build -t ps03-api:ci backend` and `docker build -t ps03-web:ci frontend` | **NOT RUN — daemon unavailable**; CI builds |
