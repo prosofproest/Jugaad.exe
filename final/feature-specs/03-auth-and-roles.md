@@ -1,6 +1,7 @@
 # 03 — Auth, roles and consent
 
-**Status:** Draft
+**Status:** Draft — backend §5.2 slice implemented in memory (2026-11-06). Persistence,
+retrofitting the existing demo routes, and the D10/D11-dependent behaviour remain open.
 **Owner:** Backend lead (TBD)
 **Depends on:** `05-data-layer.md`
 **Implements:** identity, session management, role-based access, consent capture, privacy
@@ -253,6 +254,46 @@ Error codes: `invalid_credentials`, `mfa_required`, `otp_expired`, `otp_rate_lim
 - [ ] Every role change, export and admin record view writes an audit event.
 - [ ] No endpoint returns farmer PII to an unauthorised role.
 - [ ] Passwords, OTPs and tokens never appear in logs.
+
+### 10.1 Implementation evidence (2026-11-06)
+
+Implemented in `backend/app/modules/identity/` with routes in `app/api/v1/auth.py`,
+`me.py` and `admin.py`. Storage is process-local (see the gap list below), so this is
+evidence for the HTTP/service contract, not for durable production behaviour.
+
+Verified by `backend/tests/test_identity_*.py` (64 tests) and the full suite
+(`294 passed`):
+
+- Phone OTP registration/sign-in with expiry, attempt caps and per-phone/IP throttling;
+  the code never appears in a response or audit detail.
+- Provisioned staff accounts only for the four staff roles; farmers self-register.
+  `farmer` cannot be assigned by an admin, and staff cannot be promoted to `farmer`.
+- Five roles only, deny-by-default dependencies on `/v1/me` and `/v1/admin`, and a
+  `403` for a role that is not named on the route.
+- Password + TOTP login for staff. `pathologist`, `agronomist` and `admin` cannot be
+  assigned without an MFA secret, and their sessions require a TOTP challenge.
+- Rotating refresh tokens with reuse detection that revokes the whole family; role and
+  status changes invalidate existing sessions.
+- Versioned, plain-language consent records capturing version, timestamp, channel and
+  text hash; required consent blocks gated actions; optional research consent does not.
+- Privacy requests, self-export with a recorded written purpose, soft account deletion
+  with queued-report guard, and a credential-only retention job.
+- Audited role changes, admin record views (reason required) and exports (purpose
+  required), with no full phone numbers, emails, passwords or MFA secrets in details.
+
+**Not yet satisfied (do not read the checklist above as complete):**
+
+- Persistence: there is no SQLAlchemy model or Alembic migration for identity. A process
+  restart loses users, sessions, OTPs and consents.
+- The existing demo routes (`/v1/conversations`, assessments, advisories, map) are still
+  unauthenticated, so the object-level and area-scoping criteria cannot be proven yet.
+- D10 is open, so case/image/derived-data retention and hard deletion are not implemented;
+  deletion is soft and only schedules `hard_delete_after` when a policy is supplied.
+- D11 is open, so on-behalf capture and offline-session semantics are not implemented.
+- Real SMS delivery and password reset by email need providers that are not chosen; the
+  production OTP adapter fails closed.
+- Password hashing uses stdlib `scrypt` instead of the specified Argon2id, to avoid an
+  unapproved dependency. This deviation is recorded in the progress tracker.
 
 ---
 

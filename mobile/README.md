@@ -3,10 +3,11 @@
 API-only Flutter client for the PS-03 modular monolith. It consumes the same
 versioned `/v1` API as the web app and never connects to the database.
 
-> **Verification status: UNVERIFIED.** Flutter is not installed on the machine
-> where this scaffold was authored, so `flutter analyze`, `flutter test` and a
-> device run have **not** been executed. Treat this folder as a compile-target
-> sketch until CI or a developer with the Flutter SDK confirms it.
+> **Verification status: analyze + test verified (2026-11-06).** `flutter pub get`,
+> `flutter analyze` and `flutter test` pass with Flutter 3.47.9 / Dart 3.13.7 on
+> Windows 11. Platform runners are still absent and no device or APK run has been
+> performed, so device behaviour remains unverified until `flutter create .` is run
+> and an APK is built.
 
 ## First run (requires the Flutter SDK)
 
@@ -42,11 +43,15 @@ No secrets are compiled into the app. Auth and media upload are later phases.
 - Chat: sends text to `/v1/conversations`, reuses `client_message_id` (also
   sent as `Idempotency-Key`) on retry, and labels demo replies.
 
-## Expected checks once Flutter is available
+## Verification checks
 
-| Command | Expected |
+| Command | Result (2026-11-06) |
 | --- | --- |
-| `flutter pub get` | resolves `http` and `flutter_lints` |
-| `flutter analyze` | no issues |
-| `flutter test` | widget test passes |
-| `flutter build apk --debug` | builds with generated `android/` |
+| `flutter pub get` | pass — resolved 30 packages (`http` 1.6.0, `flutter_lints` 5.0.0) |
+| `flutter analyze` | pass — “No issues found!” |
+| `flutter test` | pass — 1 widget test |
+| `flutter build apk --debug` | not run — `android/` not generated |
+
+Environment: Flutter 3.47.9 (stable), Dart 3.13.7, Windows 11 25H2. Android SDK
+36.1.0 and the Android Studio JBR are installed, so an APK build is the next
+verification step once the runners exist.

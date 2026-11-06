@@ -5,7 +5,8 @@ Update this file in the same change as any scope, schema, API or decision change
 
 **Last updated:** 2026-11-06
 **Current phase:** Phase 0 — Discovery (documentation complete, decisions open; Phase 2 §5.1
-engineering foundation present under a recorded Gate-1 exception, no feature work)
+engineering foundation and the §5.2 identity backend slice present under a recorded Gate-1
+exception; no real model or durable identity store; mobile analyze/test verified locally)
 
 ---
 
@@ -67,10 +68,15 @@ handbook approved by a pathologist.
 
 - [~] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
       Alembic baseline, local compose, dev/staging env templates, structured
-      logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Gate 1 is **not
-      met**; foundation-only work proceeds under an explicit user instruction
-      recorded 2026-11-06 and adds no schema or feature behaviour.
-- [ ] Auth, roles, consent (`03-auth-and-roles.md`).
+      logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Mobile
+      `flutter analyze` and `flutter test` pass locally (Flutter 3.47.9); no APK
+      or device run yet. Gate 1 is **not met**; foundation-only work proceeds
+      under an explicit user instruction recorded 2026-11-06 and adds no schema
+      or feature behaviour.
+- [~] Auth, roles, consent (`03-auth-and-roles.md`) — backend §5.2 slice implemented
+      in memory (OTP, staff MFA, five roles, consent versioning, privacy requests,
+      audited admin views/exports). Durable persistence, demo-route auth and the
+      D10/D11-dependent behaviour remain open.
 - [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
 - [ ] Observation API with idempotency and presigned uploads.
 - [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
@@ -162,9 +168,9 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; identity + observations next (needs Gate 1 exception) |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; §5.2 identity slice (OTP, staff MFA, roles, consent, privacy, audit) in memory. Next: SQLAlchemy/Alembic persistence and route auth (needs Gate 1 exception) |
 | Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
-| Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass (2026-11-06) |
+| Web | `[~]` | Next.js desktop shell in `frontend/` with persistent section sidebar, dashboard and honest locked/not-available routes; typecheck, lint, build and live smoke pass (2026-11-06) |
 | Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
@@ -518,7 +524,10 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Reconciled the partner-added `database/` Phase-1 artifacts with D7/D8/D10/D13: forecast negatives come only from sentinel visits (image healthy/hard negatives are not forecast negatives); added the D8 prediction-decision table and D7 sentinel site/visit fields; verification rows now name the pathologist, not the agronomist; retention/controller references now point to D10. |
 | 2026-11-06 | Phase 2 §5.1 engineering foundation: FastAPI app factory with RFC 7807 problem details, request-id middleware and JSON logs; SQLAlchemy session + Alembic `0001_baseline`; Next.js web client in `frontend/` (typecheck, lint and build pass); Flutter shell in `mobile/` (committed, unverified — no SDK); compose with PostGIS, API and web images; env templates for dev/staging; CI for backend, web, mobile, compose and image builds; `TEST-MATRIX.md`. No feature work; Gate 1 remains unmet. Added ADR-009. |
 | 2026-11-06 | Web chat surface (Phase 2 §5.7, demo backend): `/chat` conversation list and `/chat/[conversationId]` thread; structured assessment card with assessed/abstained/unsupported/failed states; metadata-only image picker and drag-and-drop; idempotent retry and conversation delete; honest not-available routes for `/outlook` and `/review`. Added `design/tokens.json` and an application shell with mirrored CSS variables. Typecheck, lint, production build and live smoke pass. Upload/media, real inference, auth scoping and the mobile surface remain open; no gate is claimed. |
+| 2026-11-06 | Desktop web shell: persistent section sidebar (Overview, Photo assessment, Area outlook, Review queue) with active-state marker and skip link; desktop dashboard with platform status and separate-output cards; collapses to a horizontal nav below 1024px and single-column grids below 640px; locked `/review` boundary page with no fabricated cases; `/outlook` now reads the five independent `/v1/map/layers/*` endpoints and shows each layer's own state (`map_not_configured` is explicit, never a merged risk value). Typecheck, lint, production build and live route smoke pass. |
 | 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
+| 2026-11-06 | Verified the Flutter client locally after installing Flutter 3.47.9 (stable, Dart 3.13.7): `flutter pub get` resolved 30 packages, `flutter analyze` reported no issues, `flutter test` passed the single widget test. Updated `TEST-MATRIX.md` FND-11 to Verified (analyze + test), the mobile README, `AGENTS.md` §5, PRD/TRD status lines and `IMPLEMENTATION-CHECKLIST.md` W-11. Still open: `android/`/`ios/` runners, an APK build, a device/emulator smoke and a recorded CI run. No gate is claimed. |
+| 2026-11-06 | Phase 2 §5.2 identity backend slice: phone OTP for farmers, provisioned staff accounts, five-role deny-by-default dependencies, password+TOTP login, rotating refresh tokens with family revocation, versioned consent capture, privacy requests/self-export/soft deletion, credential-only retention job, and audited role changes, admin record views and exports. 64 new tests; full backend suite 294 passed. Deliberately **not** done: durable SQLAlchemy/Alembic persistence, authentication of the existing demo chat/assessment/advisory/map routes, real SMS/email providers, password reset, Argon2id (stdlib `scrypt` used instead), and D10/D11-dependent retention/on-behalf/offline behaviour. Gate 1 remains unmet and no gate is claimed. |
 
 ---
 
@@ -528,9 +537,9 @@ L = likelihood, I = impact, both H/M/L.
 2. Draft the data acquisition plan (partner MoUs, archive access, collection targets).
 3. Draft the labelling handbook for the chosen crop and target list.
 4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Verify the committed mobile scaffold (`flutter analyze`, `flutter test`, an APK) and
-   build both container images; then expand only after Gate 0, starting with identity +
-   observations + audit + `conversations`.
+5. Finish mobile verification (generate `android/`/`ios/` runners, build a debug APK,
+   device smoke) and build both container images; then expand only after Gate 0,
+   starting with identity + observations + audit + `conversations`.
 
 ---
 

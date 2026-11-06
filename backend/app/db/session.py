@@ -31,9 +31,18 @@ def get_session_factory() -> sessionmaker[Session]:
 
 
 def get_session() -> Iterator[Session]:
-    """FastAPI dependency: one transaction-scoped session per request."""
+    """FastAPI dependency: one transaction-scoped session per request.
+
+    The request commits when it returns and rolls back if it raises, so a
+    multi-row turn (user message + assistant reply + event) is atomic.
+    """
+
     session = get_session_factory()()
     try:
         yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()

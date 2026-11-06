@@ -41,6 +41,9 @@ services:
       APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ps03}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ps03}
       # Comma-separated or JSON list; pydantic-settings accepts JSON.
       APP_CORS_ORIGINS: '["${WEB_ORIGIN:-http://localhost:3000}"]'
+      # Local default only; a production deployment must inject a unique
+      # >=32-character secret from the platform secret store.
+      APP_AUTH_SECRET: ${APP_AUTH_SECRET:-dev-only-insecure-secret-change-me}
     command:
       - sh
       - -c

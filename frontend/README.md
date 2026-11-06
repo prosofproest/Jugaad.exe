@@ -31,8 +31,13 @@ the browser uses the public origin.
 | `/` | Reports API reachability and explains the two separate outputs. | live smoke, build |
 | `/chat` | Conversation list: create, open and delete; empty and API-unreachable states. | live smoke, build |
 | `/chat/[conversationId]` | Thread with structured assessment replies, idempotent retry, demo badge and delete. | live smoke, build |
-| `/outlook` | Honest “not available in this phase” state for the separate area-outlook output. | build, manual check |
-| `/review` | Honest “locked” state for the expert review portal; no fabricated cases. | build, manual check |
+| `/outlook` | Independent map-layer states (verified, unverified, modelled risk, coverage, boundaries) fetched from `/v1/map/layers/*`; explicit “not configured” state, never a merged risk value. | live smoke, build |
+| `/review` | Honest “locked” state for the expert review portal; no fabricated cases. | live smoke, build |
+
+The desktop shell is a persistent left sidebar (Overview, Photo assessment, Area
+outlook, Review queue) with an active-section marker, a skip link and a top bar.
+Below 1024px the sidebar collapses into a horizontal scrollable nav. Layout
+reflows to a single column and the dashboard grids stack at 640px.
 
 The web chat is the Phase 2 §5.7 surface, not a new model. It renders the
 server's structured `AssessmentCard` fields; it never parses prose into a
@@ -77,7 +82,7 @@ Not implemented in this phase:
 | `npm run typecheck` | pass (2026-11-06) |
 | `npm run lint` | pass (2026-11-06) |
 | `npm run build` | pass; routes `/`, `/_not-found`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review` |
-| Live smoke | `/chat` listed a created conversation; thread rendered title, demo badge and the abstained assessment; delete returned the empty state |
+| Live smoke | `/`, `/chat`, `/outlook`, `/review` returned 200; `/chat/conv_missing` returned 404; the sidebar nav and platform status rendered. `/chat` listed a created conversation; the thread rendered title, demo badge and the abstained assessment; delete returned the empty state. `/outlook` rendered all five layer cards as “Not configured” with the new map router and “0 of 5 layers serving data”; no value was merged into a risk number |
 
 The production build and live smoke used the local FastAPI dev server with the
 in-memory demo conversation store. No real image upload or model inference was

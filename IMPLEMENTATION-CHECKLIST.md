@@ -64,10 +64,11 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-08 | Web chat surface: `/chat` list, `/chat/[conversationId]` thread, structured assessment card, metadata-only image composer with drag/drop and 10 MB guard, offline notice, idempotent retry, delete with confirm | `frontend/app/chat/*`, `components/assessment-card.tsx`, `chat-composer.tsx`, `chat-index.tsx`, `chat-thread.tsx`, `message-bubble.tsx`, `sidebar-nav.tsx`, `lib/api.ts` | Phase 2 §5.7 (web subset) |
 | W-09 | Honest empty-state surfaces for the other outputs: `/outlook` (no score without inputs) and `/review` (locked until auth/review exist) | `frontend/app/outlook/page.tsx`, `frontend/app/review/page.tsx`; production build emits both routes | R1/R3/R4 evidence; no feature claim |
 | W-10 | Design tokens source committed and mirrored into CSS | `design/tokens.json`, `frontend/app/globals.css`; `frontend/README.md` §Design system | Phase 2 §5.1 design foundation |
-| W-11 | Flutter shell committed with API client and widget test; **not run locally** | `mobile/pubspec.yaml`, `mobile/lib/*`, `mobile/test/widget_test.dart`; CI mobile job | Gate 10 (Defined, not verified) |
+| W-11 | Flutter shell committed with API client and widget test; **analyze + test verified locally** (Flutter 3.47.9, 2026-11-06); no APK/device run | `mobile/pubspec.yaml`, `mobile/lib/*`, `mobile/test/widget_test.dart`; `flutter analyze` → clean, `flutter test` → 1 passed; CI mobile job | Gate 10 (analyze/test verified; build not verified) |
 | W-12 | Deploy and CI scaffolding: API/web Dockerfiles, base + dev compose override, dev/staging env templates, CI jobs for backend/web/mobile/compose/image builds | `backend/Dockerfile`, `frontend/Dockerfile`, `deploy/*`, `.github/workflows/ci.yml` | Gate 11 (defined, not run) |
 | W-13 | Test evidence refreshed: 216 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 216 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
 | W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
+| W-15 | Phase 2 §5.2 identity backend slice: phone OTP, provisioned staff + MFA, five roles, consent versioning, privacy requests/self-export/soft delete, credential-only retention and audited role/admin-view/export events; 64 identity tests | `backend/app/modules/identity/*`, `backend/app/api/v1/auth.py`, `me.py`, `admin.py`; `cd backend && .venv/Scripts/python -m pytest -q` → 294 passed; `TEST-MATRIX.md` §2a | 1.1 (partial), 1.2 (partial), Gate 7 (partial), Gate 12 (partial) |
 
 ---
 
@@ -75,10 +76,10 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 
 Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
 
-> **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation and the demo-backed
-> web chat surface (§5.7) were built under the explicit instruction recorded in
-> `progress-tracker.md` §2. The exception permits foundation-only work; it does **not**
-> close Gate 0 or authorise domain features.
+> **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation, the demo-backed
+> web chat surface (§5.7) and the §5.2 identity backend slice were built under the explicit
+> instruction recorded in `progress-tracker.md` §2. The exception permits foundation-only
+> work; it does **not** close Gate 0 or authorise domain features.
 
 ### 0.1 Architecture Decision Record
 
@@ -110,7 +111,7 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 0.3 Reconcile documentation
 
-- [x] Update `final/PRD.md` — false "initial scaffold exists" claim corrected (line 6 now records the Phase 2 scaffold and unverified mobile app)
+- [x] Update `final/PRD.md` — false "initial scaffold exists" claim corrected (line 6 now records the Phase 2 scaffold and mobile verification status)
 - [x] Update `final/TRD.md` — false "backend/web/mobile scaffold exists" claim corrected (line 6 now records the real scaffold state)
 - [x] Update `final/docs-context/architecture-context.md` — one stack only (PostgreSQL/PostGIS, S3-compatible, Flutter + Next.js)
 - [x] Update `final/feature-specs/03-auth-and-roles.md` — five roles and phone-OTP/MFA mechanism recorded
@@ -138,31 +139,43 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ## Gate 1 — Security and data foundation (P0)
 
-> **Status (2026-11-06):** open. The repository has a liveness probe, problem-details
-> errors, structured logs and an Alembic baseline, but no authentication, authorization,
-> domain schema or media pipeline. No data-bearing endpoint is safe to expose.
+> **Status (2026-11-06):** partial. The repository has a liveness probe, problem-details
+> errors, structured logs and an Alembic baseline, plus an in-memory §5.2 identity slice
+> (OTP, staff MFA, roles, consent, privacy, audit). Identity state is lost on restart, the
+> demo chat/assessment/advisory/map routes are still unauthenticated, and there is no
+> domain schema or media pipeline. No data-bearing demo endpoint is safe to expose.
 
 ### 1.1 Authentication
 
-- [ ] Farmer registration and login
-  - **Done when:** a real credential exchange issues a token; a bad credential returns `401`; a test covers both.
-- [ ] Admin/staff login with MFA
-  - **Done when:** MFA is enforced for admin roles and cannot be bypassed by a direct API call.
-- [ ] Access + refresh token lifecycle (or documented equivalent)
-- [ ] Session revocation / logout
+- [x] Farmer registration and login
+  - **Evidence (2026-11-06):** `POST /v1/auth/otp/request` + `/otp/verify` issue a farmer token; a bad/expired code returns `401`; covered by `backend/tests/test_identity_otp.py` and `test_identity_api.py`. **In-memory only.**
+- [x] Admin/staff login with MFA
+  - **Evidence (2026-11-06):** password + TOTP; `pathologist`/`agronomist`/`admin` cannot be assigned without an MFA secret and their sessions require the second factor; `test_identity_staff.py`. Cannot be bypassed on the new routes; in-memory only.
+- [x] Access + refresh token lifecycle (or documented equivalent)
+  - **Evidence (2026-11-06):** 15-minute HS256 access token, rotating refresh token with family revocation on reuse; `test_identity_otp.py`.
+- [x] Session revocation / logout
+  - **Evidence (2026-11-06):** `/v1/auth/logout` and `/logout-all`; role/status changes bump `token_version`; `test_identity_otp.py`, `test_identity_staff.py`.
 - [ ] Device binding or session list (if required by chosen design)
-- [ ] Consent capture and versioning
+  - Refresh records carry an optional `device_id`, but there is no session-list endpoint.
+- [x] Consent capture and versioning
+  - **Evidence (2026-11-06):** `/v1/me/consents` records version, timestamp, channel and text hash; a version change forces re-consent; optional research consent is non-blocking; `test_identity_consent_privacy.py`.
 - [ ] Persist auth state and verify it survives a restart
+  - Identity storage is a process-local store; no SQLAlchemy model or Alembic migration exists yet.
 
 ### 1.2 Authorization
 
-- [ ] Role and permission model defined in one place (not scattered conditionals)
-- [ ] Deny-by-default route dependencies
-  - **Done when:** calling an admin route unauthenticated returns `401`, and with a farmer token returns `403` — not `404`.
+- [x] Role and permission model defined in one place (not scattered conditionals)
+  - **Evidence:** `app/modules/identity/models.py` (`ROLES`, `STAFF_ROLES`, `MFA_REQUIRED_ROLES`) and `dependencies.py` (`require_roles`).
+- [x] Deny-by-default route dependencies
+  - **Evidence (new routes):** unauthenticated `/v1/me` and `/v1/admin/users` return `401`; a farmer token on `/v1/admin/users` returns `403`; `test_identity_api.py`. **The pre-existing demo feature routes are not yet protected.**
 - [ ] Object-level ownership checks on every farmer record
-- [ ] Role-change events are audited
+  - The demo conversation/assessment/map stores have no owner field and their routes are unauthenticated.
+- [x] Role-change events are audited
+  - **Evidence:** `user.role_changed` with actor, before/after roles and a required reason; `test_identity_staff.py`.
 - [ ] Permission-matrix test covering every role x every protected route
-- [ ] OpenAPI now reports real security schemes (`components.securitySchemes` is no longer `None`)
+  - Only the identity routes are covered; the feature routes have no auth matrix yet.
+- [x] OpenAPI now reports real security schemes (`components.securitySchemes` is no longer `None`)
+  - **Evidence:** `HTTPBearer` is declared and applied to `/v1/me` and `/v1/admin/*`; `test_identity_api.py`. Demo routes remain public.
 
 ### 1.3 Persistence
 
@@ -461,16 +474,16 @@ injects persisted geometry and an approved `MapPolicy`.
 ## Gate 7 — Admin management (P1)
 
 - [ ] Admin dashboard
-- [ ] User list / create / disable / reset
-- [ ] Role assignment + revocation with audit
+- [~] User list / create / disable / reset — list, staff create and disable are implemented in memory; password reset is not
+- [~] Role assignment + revocation with audit — implemented in memory, audited with a reason
 - [ ] Report management: list, filter, detail, moderation
 - [ ] Alert management: list, pause, acknowledge, policy editor
 - [ ] Model health: version, latency, abstention rate, last success
 - [ ] System health: dependency status from the readiness probe
 - [ ] Error and failure visibility
-- [ ] Audit log: generation, persistence, search, export
-- [ ] Every admin record view is audited with a reason
-- [ ] Admin-only access enforced server-side (not just hidden in UI)
+- [~] Audit log: generation, persistence, search, export — generation only (in-memory append-only); no search/export or durable table
+- [~] Every admin record view is audited with a reason — implemented for the identity user record; no case/report views yet
+- [x] Admin-only access enforced server-side (not just hidden in UI) — `/v1/admin/*` requires the `admin` role; `test_identity_api.py`
 
 **Gate 7 exit criteria:** an admin can see real data, an unaudited admin view is impossible, and a farmer token gets `403` on every admin route.
 
@@ -539,7 +552,7 @@ injects persisted geometry and an approved `MapPolicy`.
   - **Evidence (2026-11-06):** dev and staging templates exist (`deploy/.env.example`, `deploy/.env.staging.example`); no production profile is defined.
 - [ ] Secrets in a secret manager, not in `.env` in production
 - [ ] TLS enforced
-- [ ] Rate limiting, OTP throttling, account lockout
+- [x] Rate limiting, OTP throttling, account lockout — per-phone/IP OTP limits and staff lockout are implemented in memory; no shared/distributed limiter yet
 - [ ] CSRF strategy if cookies are used
 - [ ] Upload malware/type checks
 - [ ] Backup schedule + documented RTO/RPO
@@ -554,11 +567,11 @@ injects persisted geometry and an approved `MapPolicy`.
 
 ## Gate 12 — Data governance and compliance (P2)
 
-- [ ] Consent versioning and withdrawal
-- [ ] Retention policy per data class
-- [ ] User data export
-- [ ] User data deletion (including images and derived records)
-- [ ] Audit trail immutable and queryable
+- [x] Consent versioning and withdrawal — implemented in memory (`/v1/me/consents`)
+- [ ] Retention policy per data class — D10 is open; only expired credentials are purged
+- [~] User data export — self-export of identity records with a written purpose; case/image/derived records do not exist yet
+- [ ] User data deletion (including images and derived records) — soft delete only; hard delete needs D10
+- [~] Audit trail immutable and queryable — append-only in memory; no durable table or query/export surface
 - [ ] Demo data labelled and excluded from real alerts
 - [ ] Privacy notice and language coverage
 - [ ] Access-review process for admin roles
@@ -574,10 +587,10 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 | # | Check | Expected evidence | Status |
 |---|---|---|---|
 | 1 | Clean install | fresh clone -> install -> tests pass | PARTIAL — scaffold builds, but no backend lockfile and no clean-clone run recorded |
-| 2 | Tests | full suite green, count recorded | PARTIAL - 216 backend tests pass (health, conversations, triage/decision, advisories/alerts, map layers); no domain-service integration, real-DB or E2E tests |
-| 3 | OpenAPI security | `securitySchemes` present | MISSING — chat and health routes are unauthenticated |
-| 4 | Unauthenticated admin route | `401` | MISSING — no admin route exists |
-| 5 | Farmer cross-tenant read | `403`/`404` with no data leak | MISSING — no auth or ownership model |
+| 2 | Tests | full suite green, count recorded | PARTIAL - 294 backend tests pass (health, conversations, triage/decision, advisories/alerts, map layers, identity); no domain-service integration, real-DB or E2E tests |
+| 3 | OpenAPI security | `securitySchemes` present | PARTIAL — `HTTPBearer` present and applied to `/v1/me` and `/v1/admin/*`; the demo chat/assessment/advisory/map routes remain unauthenticated |
+| 4 | Unauthenticated admin route | `401` | PASS — `/v1/admin/users` returns `401` without a token and `403` with a farmer token (`test_identity_api.py`) |
+| 5 | Farmer cross-tenant read | `403`/`404` with no data leak | MISSING — no owner field on the demo conversation/assessment stores |
 | 6 | Upload -> inference | prediction returned with model version | MISSING — demo chat uses an in-memory labelled demo reply; no upload or model |
 | 7 | Diagnosis persisted | record retrievable in history | MISSING — demo messages are in-memory only |
 | 8 | Image retrievable via signed URL | `200`, URL expires | MISSING — metadata-only composer; no media storage |
@@ -585,7 +598,7 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 | 10 | Risk -> alert | one deduped alert, correct recipients | MISSING — no alerts module |
 | 11 | Map uses API data | layer changes when records change | MISSING - backend layer API exists (Gate 6 slice) but no map client; `/outlook` is an honest empty state |
 | 12 | Admin sees real data | count matches database | MISSING — no admin surface or API |
-| 13 | Audit event written | login / role change / record view present | MISSING — no audit module |
+| 13 | Audit event written | login / role change / record view present | PARTIAL — identity events are written in memory (login, role change, admin view, export, retention); no durable audit table or query surface |
 | 14 | Kannada complete | no English leaks on Kannada UI | MISSING — one local language + English is specified but no locale catalogs exist |
 | 15 | Readiness degrades | `503` when a dependency is down | MISSING — only liveness `/health` exists |
 | 16 | CI enforces | red test blocks merge | PARTIAL — `.github/workflows/ci.yml` is defined; no CI run or branch-protection evidence recorded |
