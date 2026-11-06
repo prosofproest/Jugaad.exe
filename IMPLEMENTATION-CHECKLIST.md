@@ -22,6 +22,7 @@
 |---|---|---|---|---|
 | 0 | | | | |
 | 1 | | | | |
+| 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 
 ---
 
@@ -215,6 +216,91 @@ Distinguish these three deliverables; do not let one masquerade as another.
 
 **Gate 3 exit criteria:** predictions come from a versioned artefact; a training run can be reproduced; forecast output is explainable and gated.
 
+### 3.4 Phase 3 image-triage slice — machinery and tests (2026-11-06)
+
+**Entry condition is not met.** Gate 2 is not closed and no field dataset or frozen
+test set exists. This slice therefore claims **machinery and automated tests only**.
+It does not claim a trained model, an approved operating point, field performance or a
+"field-tested" capability. D1 (crop/targets), D3 (verifier capacity) and the D8 floor
+values are still required before a model can be fitted or served.
+
+No production crop list, class taxonomy or numeric operating point is committed. The
+only policy in the repository is explicitly labelled `synthetic_unit_test` and
+`is_demo: true`; the deployment refuses to serve without a real policy and registry.
+
+**Implemented and verified**
+
+- [x] Versioned triage policy: supported crops, class taxonomy, per-class `tau_c`,
+      margin, entropy, OOD threshold, quality thresholds and confidence bands. Missing
+      or invalid values fail closed; there are no built-in defaults.
+      **Evidence:** `backend/app/modules/assessments/policy.py`;
+      `backend/tests/fixtures/synthetic_policy.json`.
+- [x] Server quality gate with `pass | blurry | dark | overexposed | low_resolution |
+      no_plant`, versioned thresholds, all failing flags retained and a stable primary
+      reason. A missing metric fails closed.
+      **Evidence:** `backend/app/modules/assessments/quality.py`;
+      `backend/tests/test_quality_gate.py`.
+- [x] D8 decision function: per-class `tau_c`, top-1/top-2 margin, normalised entropy,
+      OOD threshold, deterministic reason precedence, and no candidate list on
+      abstention.
+      **Evidence:** `backend/app/modules/assessments/decision.py`;
+      `backend/tests/test_decision.py`.
+- [x] Temperature scaling fitted on a dedicated calibration split, with minimum-sample
+      refusal, deterministic artefact checksum and ECE/Brier/NLL diagnostics.
+      **Evidence:** `backend/app/modules/assessments/calibration.py`;
+      `backend/tests/test_calibration.py`.
+- [x] Bounded OOD score (`1 - max softmax`), threshold fitted on held-out classes at a
+      declared false-accept rate, with unknown-vs-known AUROC and false-accept rate
+      reported at the shipped threshold.
+      **Evidence:** `backend/app/modules/assessments/ood.py`; `backend/tests/test_ood.py`.
+- [x] Model registry: approval state, artefact checksum, retirement, and taxonomy /
+      calibration version matching. Unapproved, retired or mismatched models refuse to
+      serve.
+      **Evidence:** `backend/app/modules/assessments/registry.py`;
+      `backend/tests/test_registry.py`.
+- [x] Bounded inference boundary: timeout, retry, typed failures, and a safe `failed`
+      user outcome when no model is configured or the configuration is invalid.
+      **Evidence:** `backend/app/modules/assessments/inference.py`;
+      `backend/tests/test_triage_service.py`.
+- [x] Append-only prediction record storing model, taxonomy, preprocessing and
+      calibration versions, the full threshold set, OOD score, quality gate/version and
+      input snapshot reference. Idempotent on `client_assessment_id`; mutation is
+      rejected.
+      **Evidence:** `backend/app/modules/assessments/store.py`,
+      `backend/app/modules/assessments/service.py`;
+      `backend/tests/test_triage_service.py`.
+- [x] Versioned assessment API: `POST /v1/assessments`,
+      `GET /v1/assessments/{id}` and paginated history, with abstention,
+      unsupported-crop and safe-failure paths.
+      **Evidence:** `backend/app/api/v1/assessments.py`;
+      `backend/tests/test_assessments_api.py`.
+- [x] Safe explanation layer: every message contains "not a diagnosis", reason-code
+      copy and next steps; a validator blocks chemical prescription and diagnostic
+      claims.
+      **Evidence:** `backend/app/modules/assessments/explanation.py`;
+      `backend/tests/test_explanation.py`.
+- [x] Evaluation harness: per-class precision/recall, macro F1, confusion matrix,
+      top-k accuracy, abstention rate, and calibration only when calibration is
+      approved.
+      **Evidence:** `backend/app/modules/assessments/evaluation.py`;
+      `backend/tests/test_evaluation.py`.
+- [x] Evidence run: `python -m pytest -q` -> **103 passed**;
+      `python -m compileall -q app` -> **COMPILE_OK** (2026-11-06).
+
+**Deliberately not ticked — no evidence, or blocked on a decision/data**
+
+- [ ] Trained model artefact and approved registry entry. No dataset; D1 open.
+- [ ] Preprocessing parity with training. No training pipeline exists.
+- [ ] OOD threshold and AUROC/FAR measured on real held-out classes. The code exists;
+      no held-out-class data exists.
+- [ ] D8 image floor values pre-registered before the frozen test set is opened. Values
+      are not measured.
+- [ ] Frozen field test set, evaluation report, subgroup breakdowns and robustness
+      tests. No field images or labels.
+- [ ] `AssessmentCard` rendered in the web/mobile clients. Backend contract only.
+- [ ] Inference latency and abstention-rate telemetry aggregated. Per-prediction latency
+      is recorded; no metrics endpoint exists.
+
 ---
 
 ## Gate 4 — Outbreak prediction pipeline (P1)
@@ -380,7 +466,7 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 | # | Check | Expected evidence | Status |
 |---|---|---|---|
 | 1 | Clean install | fresh clone -> install -> tests pass | MISSING |
-| 2 | Tests | full suite green, count recorded | PARTIAL (3 tests) |
+| 2 | Tests | full suite green, count recorded | PARTIAL (103 tests; assessment module covered, product E2E missing) |
 | 3 | OpenAPI security | `securitySchemes` present | MISSING |
 | 4 | Unauthenticated admin route | `401` | MISSING |
 | 5 | Farmer cross-tenant read | `403`/`404` with no data leak | MISSING |
@@ -409,4 +495,7 @@ The project may be re-labelled from **NOT COMPLIANT** only when:
 - [ ] Every row in the final verification matrix is **PASS** (no `NOT VERIFIED`, no `PARTIAL`)
 - [ ] The audit report is re-run and a new verdict is recorded with a date
 
-Until then, the correct description remains: **documentation-only design with a health-check scaffold**.
+Until then, the correct description remains: **documentation-only design with a
+health-check scaffold and an unconfigured image-triage decision/serving slice**. No
+trained model, field dataset, approved operating point or field result exists, so no
+"calibrated, field-tested" claim may be made.

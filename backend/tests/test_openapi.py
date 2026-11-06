@@ -26,8 +26,15 @@ def test_single_versioned_prefix_is_used() -> None:
 
 def test_two_outputs_are_not_merged_in_the_contract() -> None:
     paths = client.get("/openapi.json").json()["paths"]
+    schema = client.get("/openapi.json").json()
 
-    # Area outlook endpoints arrive in Phase 4 and must never be folded into
-    # the photo-assessment or chat endpoints.
+    # Photo assessment is served as its own resource. Area outlook arrives in
+    # Phase 4 as a separate resource and must never be folded into assessment
+    # or chat.
+    assert "/v1/assessments" in paths
     assert "/v1/forecasts" not in paths
-    assert "/v1/assessments" not in paths
+    assert all("forecast" not in path for path in paths if "assessment" in path)
+
+    assessment_schema = schema["components"]["schemas"]["AssessmentResponse"]
+    assert "band" not in assessment_schema["properties"]
+    assert "coverage" not in assessment_schema["properties"]

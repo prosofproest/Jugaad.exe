@@ -22,6 +22,14 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/v1"
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Photo-assessment deployment configuration. Both paths must be supplied
+    # by the deployment; there is deliberately no built-in taxonomy, crop list
+    # or operating point.
+    assessment_policy_path: str | None = None
+    model_registry_path: str | None = None
+    assessment_inference_timeout_s: float = 5.0
+    assessment_inference_attempts: int = 2
+
     # Logging: one JSON event per line, no payloads and no PII.
     log_level: str = "INFO"
 

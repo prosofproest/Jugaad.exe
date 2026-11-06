@@ -1,0 +1,46 @@
+{
+  "schema_version": "1.0",
+  "taxonomy_version": "synthetic-taxonomy-1",
+  "default_model_version": "synthetic-model-1",
+  "fixture_kind": "synthetic_unit_test",
+  "is_demo": true,
+  "supported_crops": ["test_crop"],
+  "classes": [
+    {
+      "label": "lesion_like",
+      "display_name": "synthetic lesion-like pattern",
+      "tau_c": 0.55
+    },
+    {
+      "label": "healthy_like",
+      "display_name": "synthetic healthy-like pattern",
+      "tau_c": 0.6
+    },
+    {
+      "label": "other_like",
+      "display_name": "synthetic other pattern",
+      "tau_c": 0.7
+    }
+  ],
+  "decision": {
+    "margin": 0.15,
+    "entropy": 0.7,
+    "ood_max": 0.4,
+    "ood_enabled": true
+  },
+  "confidence_bands": {
+    "high_min": 0.8,
+    "medium_min": 0.65
+  },
+  "quality": {
+    "version": "qg-synthetic-1",
+    "min_width": 640,
+    "min_height": 480,
+    "min_laplacian_variance": 100.0,
+    "min_mean_luma": 35.0,
+    "max_mean_luma": 225.0,
+    "max_clipped_fraction": 0.1,
+    "min_plant_presence": 0.5
+  },
+  "max_candidates": 3
+}
