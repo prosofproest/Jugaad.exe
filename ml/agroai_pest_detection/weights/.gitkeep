@@ -1,0 +1,7 @@
+# Placeholder directory for bundled YOLO11s weights (.pt).
+#
+# Pre-trained weights (best.pt) are downloaded automatically from
+# Hugging Face (Yashwanth1508/AgroAI-pest-detection) on first load. To
+# bundle weights locally instead, copy best.pt into this directory.
+#
+# Weights are NOT committed to this repository (large binary). See README.md.

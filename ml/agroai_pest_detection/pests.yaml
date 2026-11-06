@@ -1,0 +1,23 @@
+# IP102 dataset class reference (102 pest species).
+#
+# The authoritative class list is published with the IP102 benchmark and should be
+# synced from the source repo / Hugging Face model card:
+# https://huggingface.co/Yashwanth1508/AgroAI-pest-detection
+#
+# Placeholder entries below illustrate the expected format. Replace with the full
+# 102-class name list from pests.yaml in the source repository.
+
+path: ../dataset
+train: train/images
+val: val/images
+test: test/images
+
+nc: 102
+names:
+  0: rice_leaf_roller
+  1: paddy_stem_maggot
+  2: brown_plant_hopper
+  3: aphids
+  4: mole_cricket
+  5: blister_beetle
+  ...
