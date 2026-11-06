@@ -186,56 +186,66 @@ measurement, before which gate* — the rule for setting the value is itself the
 
 ### D1 — Crop + targets + zone `[?]`
 
+**Partially answered 2026-11-06: long-term coverage should span horticulture crops and
+their pest/disease targets. This is not yet a v1 scope.** "All horticulture crops" cannot
+be a supported list in v1 because the supported list drives abstention (R2), image-data
+collection, weather calibration and validation; an unbounded list would make
+"unsupported crop" meaningless and cannot be trained or evaluated honestly.
+
+**Still required before D1 can close:**
+
+- an explicit **initial supported crop list** (the docs recommend one crop, e.g. potato
+  late blight, with 3–5 targets plus healthy/abiotic/unknown);
+- the **single agro-climatic zone** (state/district/block) and its boundary version;
+- the **supported target list** for those crops.
+
+**Scope note:** "pesticides" is read as pest and disease *targets*, not pesticide product
+advice. D6 and R5 keep all chemical prescriptions out of the product.
+
+**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (still open). The remaining
+table of options is retained for the decision meeting.
+
 | Option | Consequence |
 |---|---|
 | Potato late blight | Validated weather model exists (BLITECAST/SimCast); forecast credible on day one; narrow advisory |
 | Tomato late blight / early blight / leaf curl | More targets, more public data, weaker forecast baseline for non-blight targets |
 | Rice blast / BLB / brown spot | Large farmer base, harder image data, blast weather models exist |
 
-Recommended default: **potato late blight**, one zone, plus healthy + abiotic look-alike +
-unknown. Final choice requires local economic and partner input.
-**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (target 2026-11-20).
+### D2 — Nowcast or 7-day outlook `[x]`
 
-### D2 — Nowcast or 7-day outlook `[?]`
+**Accepted 2026-11-06: nowcast over the last 10 days.** A 7-day outlook is deferred until
+at least one season of verified outcomes exists. **Owner:** Agronomist + ML lead.
+**Recorded:** 2026-11-06.
 
-| Option | Consequence |
-|---|---|
-| Nowcast (last 10 days) | No historical outcome data needed; more accurate; still actionable |
-| 7-day outlook | Needs validation against outcomes; risk of overclaiming in year one |
+### D3 — Verifier, capacity, SLA `[x]`
 
-Recommended default: **nowcast for v1**, add outlook when a season of verified outcomes
-exists. **Owner:** Agronomist + ML lead. **Needs by:** Gate 0.
+**Accepted 2026-11-06: extension-worker-first verification with pathologist escalation.**
+A published SLA and workload cap are required; their numeric values and the partner
+commitment are set before the pilot (Gate 5), not invented here. Extension workers triage
+and escalate; only pathologists verify escalated cases. **Owner:** Programme lead + partner.
+**Recorded:** 2026-11-06.
 
-### D3 — Verifier, capacity, SLA `[?]`
+### D4 — Owning/paying institution `[x]`
 
-| Option | Consequence |
-|---|---|
-| Extension-worker-first | Scales; needs training and triage rules; pathologist for escalation |
-| Pathologist-first | Higher label quality; immediate backlog; not viable at volume |
+**Accepted 2026-11-06: grant/NGO-funded pilot, with operations handed to a cooperative
+or crop insurer.** Input-company funding of the advisory layer stays rejected on trust
+grounds. The named institution and written data-ownership/exit agreement are still required
+before the pilot; the ownership model itself is settled. **Owner:** Product lead.
+**Recorded:** 2026-11-06.
 
-Recommended default: **extension-first**, pathologist escalation, published SLA and
-workload cap. **Owner:** Programme lead + partner. **Needs by:** Gate 0.
+### D5 — Primary outcome metric `[x]`
 
-### D4 — Owning/paying institution `[?]`
+**Accepted 2026-11-06: median lead time from the first farmer report to verified expert
+confirmation**, compared with the existing advisory baseline and pre-registered before the
+pilot. Secondary metrics: prioritisation accuracy and false-alert burden.
+**Owner:** Product lead + evaluator. **Recorded:** 2026-11-06.
 
-Options: government agriculture department, cooperative/FPO, NGO programme, crop insurer.
-Recommended default: **grant/NGO-funded pilot → cooperative or insurer operations**.
-Input-company funding for the advisory layer is rejected on trust grounds.
-**Owner:** Product lead. **Needs by:** Gate 0.
+### D6 — Legal position on advisory content `[x]`
 
-### D5 — Primary outcome metric `[?]`
-
-Recommended default: **median lead time from first farmer report to verified expert
-confirmation**, versus the existing advisory baseline, pre-registered. Secondary:
-prioritisation accuracy, false-alert burden.
-**Owner:** Product lead + evaluator. **Needs by:** Gate 0.
-
-### D6 — Legal position on advisory content `[?]`
-
-Options: non-chemical only (recommended), approved chemical content with legal sign-off
-(not recommended for v1), no advisory in v1 (weakens product).
-Recommended default: **non-chemical + escalation**, legal review before pilot.
-**Owner:** Programme lead + legal. **Needs by:** Gate 0 (legal sign-off before Gate 5).
+**Accepted 2026-11-06: non-chemical guidance only, with escalation to a human.** Legal
+review is required before the pilot. This confirms R5: no pesticide, herbicide, fungicide
+or dosage content, and no chemical-use instructions in any advisory or chat response.
+**Owner:** Programme lead + legal. **Recorded:** 2026-11-06; legal sign-off gates Gate 5.
 
 ### D7 — Forecast event, negative class and label eligibility `[x]`
 
