@@ -302,7 +302,25 @@ class SendResult {
   final Message assistantMessage;
 }
 
-class ApiClient {
+/// The seam the outbox/sync layer uses, so tests can substitute a fake API.
+abstract interface class ChatApi {
+  Future<String> createConversation();
+
+  Future<SendResult> sendMessage({
+    required String conversationId,
+    required String clientMessageId,
+    String? text,
+    ImageReference? image,
+  });
+
+  Future<UploadDescriptor> uploadImage({
+    required Uint8List bytes,
+    required String filename,
+    required String contentType,
+  });
+}
+
+class ApiClient implements ChatApi {
   ApiClient({http.Client? client, String? baseUrl})
     : _client = client ?? http.Client(),
       _baseUrl = baseUrl ?? apiBaseUrl;
@@ -315,11 +333,13 @@ class ApiClient {
     return Health.fromJson(json);
   }
 
+  @override
   Future<String> createConversation() async {
     final json = await _post('/v1/conversations', {'title': 'Photo assessment'});
     return json['conversation_id'] as String;
   }
 
+  @override
   Future<SendResult> sendMessage({
     required String conversationId,
     required String clientMessageId,
@@ -341,6 +361,7 @@ class ApiClient {
   /// Upload raw image bytes. The backend validates the declared type, the real
   /// decode, the size ceiling and the demo quality gate before storing anything.
   /// The returned `upload_id` is what the chat message references.
+  @override
   Future<UploadDescriptor> uploadImage({
     required Uint8List bytes,
     required String filename,

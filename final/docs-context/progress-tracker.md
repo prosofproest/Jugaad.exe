@@ -4,7 +4,7 @@
 Update this file in the same change as any scope, schema, API or decision change.
 
 **Last updated:** 2026-11-06
-**Current phase:** Phase 0 / Phase 1 — Discovery & Data Platform (architecture decided in ADR-009/010/011; Phase 1 data layer, weather/boundary/historical ingestion, and zero-imputation forecast gates implemented in `database/` with 38 unit tests passing; backend identity, persisted chat, content-safety gate and optional vision adapter present under recorded Gate-1 exception; 336 backend tests passing).
+**Current phase:** Phase 0 / Phase 1 — Discovery & Data Platform (architecture decided in ADR-009/010/011; Phase 1 data layer, weather/boundary/historical ingestion, and zero-imputation forecast gates implemented in `database/` with 38 unit tests passing; backend identity, persisted chat, content-safety gate and optional vision adapter present under recorded Gate-1 exception; 374 backend tests passing). Phase 3 has a **reproducible synthetic-only ML scaffold** (`ml/`, 23 tests) proving manifest → grouped split → train → evaluate → promotion plumbing; it ships no trained image model, real dataset or operating point, so **Gate 3 remains open**. Gate 4 has a deterministic demo-rules harness and synthetic input-sensitivity/reproducibility tests, but no approved operating point, real weather provider or field evaluation, so **Gate 4 remains open**.
 
 ---
 
@@ -80,21 +80,30 @@ handbook approved by a pathologist.
 - [x] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
       Alembic baseline, local compose, dev/staging env templates, structured
       logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Mobile
-      `flutter analyze` and `flutter test` pass locally (Flutter 3.47.9); no APK
-      or device run yet. Gate 1 is **not met**; foundation-only work proceeds
+      `flutter analyze` and `flutter test` pass locally (Flutter 3.47.9); a debug APK
+      built and an emulator capture/offline smoke passed (real-device camera and iOS
+      unverified). Gate 1 is **not met**; foundation-only work proceeds
       under an explicit user instruction recorded 2026-11-06 and adds no schema
       or feature behaviour.
 - [~] Auth, roles, consent (`03-auth-and-roles.md`): Backend identity service, phone OTP,
       staff MFA, JWT tokens, RBAC, scoped permissions (`can_confirm`, `can_approve_advisory`),
       consent versioning, privacy requests/self-export/soft delete, audited admin views/exports in `backend/app/api/v1/auth.py`, `me.py`, `admin.py`.
-- [ ] Mobile context + capture + quality feedback + offline queue (`02-...`): Flutter shell committed; capture UI pending.
+- [~] Mobile context + capture + quality feedback + offline queue (`02-...`):
+      camera/gallery capture with preview, 10 MB/JPEG-PNG-WebP checks, upload-first
+      contract, persisted outbox (`ps03.chat.outbox.v1`), `queued`/`failed` bubbles with
+      Retry/Delete, and flush on manual action, a 15 s page timer and app resume.
+      `flutter analyze` clean; `flutter test` 14 passed. Crop context, quality-feedback
+      copy beyond the server card, platform runners, APK and device/airplane-mode runs
+      remain open.
 - [~] Observation API with idempotency and signed uploads: `POST /v1/observations`,
       `POST /v1/observations/{id}/images`, `POST /v1/observations/{id}/images/{id}/confirm` in `backend/app/api/v1/observations.py`.
 - [~] Web frontend shell + mobile app shell consuming the same `/v1` API (`frontend/` and `mobile/`).
 - [~] Conversational capture: `conversations` module + chat on web and mobile
-      (`08-conversational-capture.md`). **Backend + web slice implemented and persisted**
+      (`08-conversational-capture.md`). **Backend + web + mobile capture slice implemented**
       (Alembic `0002_chat_persistence`): conversation list/thread, structured assessment
-      card, metadata-only image composer, idempotent turns, review requests, and the web thread/composer/card.
+      card, image composer (web) and camera/gallery capture (mobile), upload-first
+      messages, idempotent turns, review requests, and a durable mobile outbox with
+      `queued`/`failed` states. Mobile is unit-verified only.
 - [x] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
       `review_requested`) and chemical-content validator (`backend/app/modules/assessments/explanation.py`, `backend/app/modules/advisories/validator.py`).
 - [~] Expert review queue and decision flow (`04-expert-review.md`): Triage queue, claim,
@@ -104,14 +113,23 @@ handbook approved by a pathologist.
 - [ ] End-to-end test: report → upload → review, including airplane mode.
 - [~] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
       Web + API path verified (14 backend tests and a live upload → demo assessment →
-      review smoke); mobile path and browser automation remain open.
+      review smoke). Mobile upload/send/retry/offline-queue semantics are unit-verified
+      (`mobile/test/*`, 14 tests); a device or airplane-mode run and browser automation
+      remain open.
 
 **Gate 2:** a report can be captured offline, synced once, reviewed, and audited, on a
 low-end device; chat image → assessment works on web and mobile. No predictive model
 required; any demo reply is labelled.
 
-### Phase 3 — Image AI `[ ]`
+### Phase 3 — Image AI `[~]`
 
+- [~] Reproducible ML **scaffold** only (`ml/`): dataset-manifest contract (licence,
+  provenance, checksum, permissions), synthetic label map, grouped/stratified splits
+  with leakage checks, deterministic baseline, evaluation through the backend Gate 3
+  harness, fail-closed promotion and model card. Verified with 23 tests on a
+  clearly-labelled synthetic fixture; no real dataset, image extractor, trained image
+  model, calibration artefact or operating point exists, and synthetic output can
+  never be approved for serving. **Gate 3 stays open.**
 - [ ] Quality gate model (blur, exposure, resolution, no-plant).
 - [ ] Field-image baseline; public data used for pretraining only.
 - [ ] Group-held-out field test set frozen before model selection.
@@ -125,17 +143,17 @@ threshold on the frozen field-only test set, with sample counts and confidence i
 abstention behaviour is reported on hard negatives. A performance number that does not
 clear the pre-registered floor fails the gate.
 
-### Phase 4 — Forecasting `[ ]`
+### Phase 4 — Forecasting `[~]`
 
-- [ ] Event definition and spatial unit documented (`06-...`).
-- [ ] Versioned, expert-approved rules baseline (e.g. blight risk index).
-- [ ] Weather ingestion with source timestamps and freshness checks.
-- [ ] Feature snapshot persisted per forecast run.
-- [ ] No-score behaviour for stale/low-coverage inputs.
-- [ ] Risk bands with operational meanings and approved actions.
-- [ ] Separate map layers + coverage panel.
-- [ ] Temporal holdout evaluation; calibration report.
-- [ ] Alert trigger, dedupe, cooldown, delivery status.
+- [x] Event definition and spatial unit documented (`06-forecast-and-risk-map.md`; D7 accepted 2026-11-06).
+- [~] Versioned, expert-approved rules baseline (e.g. blight risk index) — *deterministic demo rules in `backend/app/modules/forecast/rules.py`; no expert-approved index or operating point*.
+- [x] Weather ingestion with source timestamps and freshness checks (`database/ingestion/weather_ingest.py`; the backend snapshot path reads `WeatherSnapshot`).
+- [x] Feature snapshot persisted per forecast run (`FeatureSnapshot` stores weather, coverage, rule score and rule contributions).
+- [x] No-score behaviour for stale/low-coverage inputs (`insufficient_data`, `probability = NULL`, typed `reason_code`; tested).
+- [~] Risk bands with operational meanings and approved actions — *bands implemented; thresholds are unapproved demo configuration and no operational action mapping is approved*.
+- [~] Separate map layers + coverage panel — *five separate `/v1/map/layers/*` endpoints and the `/outlook` reader exist; boundary geometry is not served and no merged risk layer is built*.
+- [ ] Temporal holdout evaluation; calibration report — *no field data, sentinel panel, D8 forecast floors or approved operating point*.
+- [x] Alert trigger, dedupe, cooldown, delivery status (`backend/app/modules/alerts/`; Gate 5 delivery channels remain open).
 
 **Gate 4:** the D7 event definition, label eligibility rule, sentinel-panel membership and
 visit schedule are fixed and frozen before the test season; the D8 forecast floors are
@@ -143,6 +161,13 @@ pre-registered and **met** on sentinel-panel negatives; the D9 coverage, freshne
 suppression values are recorded and approved; the forecast is reproducible from a stored
 snapshot; the no-score path is verified against those values; the map never merges reports and
 predictions.
+
+**Status (2026-11-06):** D7 is recorded and the backend can reproduce a scored band from a
+stored feature snapshot on synthetic fixtures (`backend/tests/test_forecast_rules.py`,
+`backend/tests/test_forecast_service.py`). **Still open:** a real weather provider and
+scheduled ingestion runner, D8 forecast floors, approved D9 values, D1b pilot zone/boundary
+version, and an expert-approved operating point. No field performance, calibration or
+outbreak claim is made. Gate 4 is **not met**.
 
 ### Phase 5 — Pilot `[ ]`
 
@@ -182,12 +207,12 @@ epidemic season.
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1a |
 | Data platform | `[x]` | Reference schema (40 tables), Alembic migrations, storage rules, backup design, demo seed, weather/boundary/historical ingestion, and zero-imputation forecast gate verified in `database/` (38 unit tests pass); `backend/` remains schema authority |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo/OpenAI-compatible engine, content-safety gate, review requests); §5.2 identity slice in memory; 336 unit tests passing |
-| Mobile | `[~]` | Flutter shell committed; `flutter analyze` and `flutter test` verified locally |
-| Web | `[~]` | Next.js desktop shell in `frontend/` with persistent sidebar, `/chat` surface, `/outlook`, `/review`; typecheck, lint, and build pass |
-| Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo/OpenAI-compatible engine → content-safety gate → review); mobile shell only. Real assessment waits on Phase 3, D8 and live key |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo/OpenAI-compatible engine, content-safety gate, review requests); §5.2 identity slice in memory; 375 unit tests passing |
+| Mobile | `[~]` | Flutter client with photo capture, upload-first chat, assessment card and a persisted offline outbox; `flutter analyze` clean and `flutter test` 14 passed. Platform runners committed, debug APK built, emulator capture/offline smoke passed; real-device camera and iOS unverified. Single mobile stack per ADR-013 |
+| Web | `[~]` | Next.js app in `frontend/` with chat, outlook, review, weather and workspace pages (`map`, `scan`, `analysis`, `assistant`, `farms`, `settings`); typecheck, lint and build pass |
+| Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo/OpenAI-compatible engine → content-safety gate → review) and the mobile capture + offline-queue client (unit-verified). Real assessment waits on Phase 3, D8 and a live key |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
-| Forecast | `[~]` | Rules baseline, domain models, weather ingestion, boundary geometry loader, historical occurrences, and forecast gates implemented in `database/ingestion/` and `database/schema/01-schema.sql` |
+| Forecast | `[~]` | Deterministic demo rules (`backend/app/modules/forecast/rules.py`) wired through the persisted forecast service; synthetic input-sensitivity and snapshot-reproducibility tests; rules, domain models, weather ingestion, boundary loader, historical occurrences and forecast gates in `database/ingestion/`; no approved operating point, real provider or scheduled runner |
 | MLOps | `[~]` | `model_registry` schema, triggers, checksum verification, and demo entries implemented in `database/` |
 | Security/privacy | `[~]` | Object storage rules (TTL ≤ 10m) & RBAC matrix implemented; DPIA drafted |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
@@ -504,6 +529,7 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 | ADR-010 | v1 roles: farmer, extension_worker, admin, pathologist, agronomist; `can_confirm` for confirmation | Accepted | 2026-11-06 |
 | ADR-011 | Open crop catalogue with a validated-target allowlist | Accepted | 2026-11-06 |
 | ADR-012 | Next.js web app lives in `frontend/` (source documents say `web/`) | Accepted | 2026-11-06 |
+| [ADR-013](adr/0013-mobile-stack.md) | Flutter is the single mobile client; the Expo prototype is not adopted | Accepted | 2026-11-06 |
 
 ---
 
@@ -566,6 +592,9 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added the optional OpenAI-compatible vision engine behind the `AssessmentEngine` seam (`APP_CHAT_ENGINE=openai_compatible`): the adapter posts a downscaled JPEG plus `APP_CHAT_LABELS` to `{APP_CHAT_BASE_URL}/chat/completions`, accepts JSON-only candidates, drops unknown labels and renders reply text from fixed templates. Missing key/model/labels, timeouts, HTTP failures and malformed output are explicit `failed` states; a model abstention is `abstained`/`model_abstained`. `is_demo` stays true until `APP_CHAT_LABELS_APPROVED=true`, so no D1/D2 taxonomy is invented in code. `httpx` moved to runtime dependencies; compose passes the chat variables and mounts a media volume. 19 engine tests and 1 API wiring test; full suite 336 passed. Verified with a mock transport and a live uvicorn run against a local OpenAI-compatible HTTP stub: upload → `assessed`, `is_demo=false`, `model_version=stub-vision-1`, one approved candidate, template text, persisted review and 2 messages. No real vendor call was made. |
 | 2026-11-06 | **Phase 1 Weather, Boundaries, Historical Occurrences & Forecast Gate Ingestion:** Implemented `database/ingestion/weather_ingest.py` (variables, physical bounds, freshness, spatial matching method, leaf-wetness proxy), `boundary_loader.py` (EPSG:4326 GeoJSON MultiPolygon validation, coordinate range check, WKT conversion, boundary version propagation), `historical_ingest.py` (verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, dedupe history logging), and `forecast_gate.py` (strict pre-flight gating with explicit `insufficient_data` refusal, `probability = NULL`, zero silent imputation). Updated `01-schema.sql` (added table `historical_occurrences` [#40], `ck_weather_spatial_method`, `ck_hist_dates`, `ck_hist_tier`, `ck_forecasts_no_imputation`, and `check_weather_sufficiency` plpgsql function) and `02-demo-seed.sql`. All 38 unit tests pass in `database/tests/`. |
 | 2026-11-06 | Merged `origin/main` (`c5ba4f7`) into the local Gate 0 line, resolving docs and lockfile conflicts. Upstream already contained the integrated assessments, mapping, alerts, auth, identity and observations work; local D1–D6 decisions, the consolidated ADR, and the Gate 0 closure were retained. Backend suite and lockfile to be regenerated and re-verified as part of the merge commit. |
+| 2026-11-06 | **Mobile capture + offline queue (CHAT-02/CHAT-04, spec 08 §10):** the Flutter client now takes a photo or picks one from the gallery, previews/removes it, enforces the 10 MB and JPEG/PNG/WebP contract, uploads with `POST /v1/uploads`, and sends a message that references `image.upload_id` with `Idempotency-Key`. A turn is written to a persisted outbox (`ps03.chat.outbox.v1`) before the first call; `queued`/`failed` bubbles expose Retry/Delete, flush runs on manual action, a 15 s page timer and app resume, and the upload id and conversation id are persisted so retries reuse the same `client_message_id`. A missing local image becomes a visible failed turn, never a fabricated reply. `image_picker` 1.2.4, `shared_preferences` 2.5.6 and `http_parser` 4.1.2 added; `flutter analyze` clean and `flutter test` **14 passed** (Flutter 3.47.9 / Dart 3.13.7). Platform runners, an APK build, a device/airplane-mode smoke and the presigned-upload path (CHAT-NF-03) remain open; no gate is claimed. |
+| 2026-11-06 | **Gate 4 forecast rules harness (partial):** extracted the inline demo scoring from `backend/app/modules/forecast/service.py` into pure `backend/app/modules/forecast/rules.py`; missing variables are skipped rather than imputed and the temperature window requires both bounds. `FeatureSnapshot.features` now records the rule result and contributions so a forecast can be re-derived. Added 21 synthetic-fixture tests in `backend/tests/test_forecast_rules.py` and `test_forecast_service.py`: dry vs wet weather changes score/band, a verified report changes the score with weather held constant, identical inputs reproduce the stored result, and missing/stale weather, low coverage, missing calendar and boundary mismatch return `insufficient_data` with `probability = NULL`. Backend suite **374 passed**. Still open: real weather provider, scheduler/runner, D8 floors, approved D9 values, D1b, and an expert-approved operating point; Gate 4 is **not met**. |
+| 2026-11-06 | **Mobile stack decided (ADR-013):** Flutter `mobile/` is the single mobile client; the merged Expo prototype at `frontend/mobile/` was removed (recoverable at `ebcc5df`) because it had no network layer, offline queue, tests or device evidence, while Flutter speaks `/v1` and passes 14 tests with a built APK. `frontend/tsconfig.json` and `eslint.config.mjs` now exclude `mobile`; web typecheck and build pass. Reconciled the React Native statements in `architecture-context.md`, `ui-context.md`, `code-standards.md`, `phase-plan.md`, `project-overview.md`, `components/README.md`, `feature-specs/01-design-system.md`, `feature-specs/08-conversational-capture.md`, `README.md`, `summary.md` and `totalcontent.md` to Flutter, and corrected the ADR-006 index entry. The merged workspace pages were then fixed to derive selection state instead of setting it in effects, so web typecheck, lint and build pass. ML lint and format were made clean and `weights/*.pt`, `*.pth` and `*.onnx` are now git-ignored. No gate is claimed. |
 
 ---
 

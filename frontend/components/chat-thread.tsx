@@ -202,7 +202,7 @@ export function ChatThread({
           <h1>{conversation.title}</h1>
           <p className="small muted" style={{ marginBottom: 0 }}>
             Started{" "}
-            <time dateTime={conversation.created_at}>
+            <time dateTime={conversation.created_at} suppressHydrationWarning>
               {new Date(conversation.created_at).toLocaleString()}
             </time>
           </p>

@@ -15,9 +15,19 @@ tracker, per-frame assessments, non-diagnostic summary; Alembic
 staff MFA, five roles, consent, privacy, audit). No real model is connected by
 default; demo paths are labelled, the provider adapter is mock- and local-stub
 tested (no vendor call), the shipped video detector is a demo heuristic, and
-identity state is lost on restart. The mobile client passes `flutter analyze` and
-`flutter test`; no APK or device run yet.
-**Last updated:** 2026-11-06
+identity state is lost on restart. A **synthetic-only ML scaffold** exists in `ml/`
+(manifest contract, grouped splits, deterministic baseline, backend-harness
+evaluation, fail-closed promotion, model card; 23 tests) but it ships no trained
+image model, real dataset, calibration artefact or operating point. A
+**synthetic-fixture forecast rules harness** exists in
+`backend/app/modules/forecast/rules.py` with 21 tests proving input sensitivity,
+snapshot reproducibility and no-score refusal; it uses demo points/thresholds and
+has no real weather provider, approved operating point or field evaluation. The
+mobile client adds photo capture and a persisted offline queue; `flutter analyze`
+is clean and 14 tests pass, the `android/` and `ios/` runners are committed, a debug
+APK builds, and an emulator smoke covered gallery capture → upload → assessment →
+airplane-mode queueing → reconnect flush. Real-device camera and iOS remain
+unverified. **Last updated:** 2026-11-06
 
 ---
 
@@ -145,9 +155,9 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 ├── docs-context/                 # this folder: operating context for agents
 ├── feature-specs/                # feature-level specifications
 ├── backend/                      # FastAPI modular monolith (scaffold)
-├── mobile/                       # Flutter capture app (scaffold; analyze/test verified)
+├── mobile/                       # Flutter capture app (capture + offline queue; analyze/test verified)
 ├── frontend/                     # Next.js web app (scaffold; source docs say web/)
-├── ml/                           # training, evaluation, export to ONNX (planned)
+├── ml/                           # synthetic-only training/eval scaffold (no model)
 ├── database/                     # database workspace; schema authority is backend Alembic
 └── deploy/                       # compose, environment templates, runbooks (scaffold)
 ```
@@ -160,7 +170,8 @@ single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
 Nothing beyond the Phase 2 §5.1 foundation, the persisted demo chat slice
 (§5.7), the in-memory §5.2 identity backend slice, the demo-labelled video-reading machinery (spec 09),
-and the Phase 1 weather/boundaries/historical ingestion components exists in these folders.
+the mobile capture + offline-queue slice (spec 08 §10),
+the synthetic-only `ml/` scaffold, and the Phase 1 weather/boundaries/historical ingestion components exists in these folders.
 Do not create scaffolding that implies a decision has been made unless the decision is recorded in `progress-tracker.md`.
 
 ---
@@ -173,19 +184,23 @@ paths are in each agent's `README.md`.
 
 | Task | Command | Last result |
 |---|---|---|
-| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 353 passed |
-| Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean for the identity slice; pre-existing failures remain elsewhere |
-| Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean for the identity slice; pre-existing differences remain elsewhere |
+| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 375 passed |
+| Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean |
+| Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean (141 files formatted) |
 | Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence`, `0003_video_persistence` |
 | Review migration SQL offline | `cd backend && .venv\Scripts\python -m alembic upgrade head --sql` | SQL emitted |
 | Backend dev server | `cd backend && .venv\Scripts\python -m uvicorn app.main:app --reload --port 8000` | `/health` returned 200 |
 | Web install | `cd frontend && npm ci` | 346 packages |
 | Web typecheck | `cd frontend && npm run typecheck` | pass |
 | Web lint | `cd frontend && npm run lint` | pass |
-| Web build | `cd frontend && npm run build` | pass; 6 routes |
+| Web build | `cd frontend && npm run build` | pass; 17 routes |
 | Web chat smoke | `uvicorn` + `next start`, then upload a photo, send it, request review, open the thread and delete | pass; upload → `demo-chat-0.1` assessment → persisted review → preview byte-match → 415 rejection; list, thread, demo badge, delete and empty state observed |
+| ML scaffold tests | `cd ml && ..\backend\.venv\Scripts\python -m pytest` | 23 passed (synthetic fixture only) |
+| ML scaffold lint | `cd ml && ..\backend\.venv\Scripts\python -m ruff check .` | pass |
+| ML scaffold format check | `cd ml && ..\backend\.venv\Scripts\python -m ruff format --check .` | pass |
+| ML scaffold run | `cd ml && ..\backend\.venv\Scripts\python -m pest_ml.pipeline` | pass; artefacts under `ml/artifacts` (git-ignored), status `evaluated` only |
 | Compose parse | `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml config --quiet` | pass |
-| Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | pass — 30 packages resolved; analyze clean; 1 widget test passed (Flutter 3.47.9) |
+| Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | pass — dependencies resolved; analyze clean; **14 tests passed** (Flutter 3.47.9 / Dart 3.13.7) |
 | Container builds | `docker build -t ps03-api:ci backend` and `docker build -t ps03-web:ci frontend` | **NOT RUN — daemon unavailable**; CI builds |
 
 `alembic upgrade head` against a live database has not been run (no local
@@ -193,8 +208,10 @@ PostGIS). The offline SQL path is verified; applying it is not.
 
 Never document a command you have not run in this repository. The container-build
 row is marked NOT RUN on purpose and must be converted to evidence before the
-containers are called working. Mobile analyze/test are verified; an APK build and
-device run remain unverified until platform runners are generated and committed.
+containers are called working. Mobile analyze/test are verified, including the
+capture/offline contract tests; the debug APK and an emulator airplane-mode run are
+verified, while real-device camera capture, iOS and background execution remain
+unverified.
 
 ---
 

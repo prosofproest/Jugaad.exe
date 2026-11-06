@@ -22,12 +22,13 @@ durable record.
 | ADR-003 | Web portals are API-only clients | Accepted | 2026-11-06 |
 | ADR-004 | Rules-based forecast before ML | Accepted | 2026-11-06 |
 | ADR-005 | ONNX Runtime CPU inference for pilot | Proposed | 2026-11-06 |
-| ADR-006 | Flutter capture + SMS/WhatsApp delivery | Superseded by ADR-009 / ADR-010 | 2026-11-06 |
+| ADR-006 | Flutter capture + SMS/WhatsApp delivery | Capture confirmed by ADR-013; delivery open | 2026-11-06 |
 | ADR-007 | Full-stack delivery: one API, web app and mobile app in scope | Accepted | 2026-11-06 |
 | ADR-008 | Chat is a `conversations` wrapper, not a generative diagnosis | Accepted | 2026-11-06 |
 | [ADR-009](0009-data-platform.md) | PostgreSQL/PostGIS + Cloudinary as the v1 data platform | Accepted | 2026-11-06 |
 | [ADR-010](0010-v1-roles.md) | v1 roles: farmer, extension_worker, admin | Accepted | 2026-11-06 |
 | [ADR-011](0011-open-crop-catalogue.md) | Open crop catalogue with a validated-target allowlist | Accepted | 2026-11-06 |
+| [ADR-013](0013-mobile-stack.md) | Flutter is the single mobile client; Expo prototype not adopted | Accepted | 2026-11-06 |
 
 ## Open ADRs
 

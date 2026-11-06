@@ -119,7 +119,7 @@ separate `OutlookCard`, opened from a link, with its own timestamp and coverage.
 ## 3. Tokens
 
 Single source of truth: `design/tokens.json` (created at scaffold), consumed by Tailwind
-(web) and the React Native theme provider. Do not hard-code values in components.
+(web) and the Flutter theme. Do not hard-code values in components.
 
 ### Colour (semantic, not decorative)
 
@@ -175,8 +175,8 @@ Rules:
 
 ## 4. Component inventory
 
-Shared web components live in `/components`; React Native equivalents in
-`frontend/mobile/src/components/`. Each component has states, not variants-by-boolean.
+Shared web components live in `/components`; Flutter equivalents in `mobile/lib/src/`.
+Each component has states, not variants-by-boolean.
 
 ### Core
 
@@ -223,7 +223,7 @@ Shared web components live in `/components`; React Native equivalents in
 
 ## 5. Screen inventory
 
-### Mobile (React Native)
+### Mobile (Flutter)
 
 | Screen | Spec | Key states |
 |---|---|---|
@@ -330,7 +330,7 @@ Stale, insufficient and abstained are **not** error states and must not use erro
 ## 9. Localisation
 
 - v1 ships **one** local language plus English for staff tooling.
-- All strings externalised (i18n catalogues shared by web and React Native; English +
+- All strings externalised (i18n catalogues shared by web and Flutter; English +
   Kannada).
 - Agronomic terms reviewed by a local expert, not machine-translated.
 - Allow 40% text expansion; no fixed-width buttons with text.

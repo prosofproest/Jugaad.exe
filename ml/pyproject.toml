@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ps03-ml-scaffold"
+version = "0.1.0"
+description = "Reproducible synthetic-only ML scaffold (no trained model or dataset)"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.setuptools.packages.find]
+include = ["pest_ml*"]
+
+[tool.pytest.ini_options]
+pythonpath = [".", "../backend"]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["pest_ml", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.per-file-ignores]
+# Colab-generated wrapper notebooks: long embedded URLs cannot be wrapped.
+"agroai_pest_detection.py" = ["E501"]
+"plantdiseasedetection.py" = ["E501"]

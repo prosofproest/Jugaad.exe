@@ -42,6 +42,29 @@ jobs:
           alembic upgrade head --sql > "${RUNNER_TEMP}/migrations.sql"
           test -s "${RUNNER_TEMP}/migrations.sql"
 
+  ml:
+    name: ML scaffold (lint, test — synthetic fixtures only)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      # The scaffold reuses the backend's evaluation and registry modules.
+      - name: Install backend dependencies
+        run: pip install -r ../backend/requirements.txt
+      - name: Ruff lint
+        run: ruff check .
+      - name: Ruff format
+        run: ruff format --check .
+      - name: Pytest
+        run: pytest
+
   frontend:
     name: Web (typecheck, lint, build)
     runs-on: ubuntu-latest
@@ -84,8 +107,9 @@ jobs:
         run: flutter analyze
       - name: Test
         run: flutter test
-      # Platform runners (android/, ios/) are generated locally with
-      # `flutter create .` until a device build is part of the plan.
+      # Platform runners (android/, ios/) are committed. Device builds are not
+      # part of CI yet: no emulator/device build step runs here, and the APK and
+      # emulator smoke evidence is recorded in mobile/README.md and TEST-MATRIX.md.
 
   compose:
     name: Deploy (compose config and image builds)

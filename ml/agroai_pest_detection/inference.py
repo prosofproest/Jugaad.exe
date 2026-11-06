@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional
 
 from .model import PestDetector, load_detector
 
@@ -12,8 +11,8 @@ def detect_pests(
     image_path: str | Path,
     *,
     conf: float = 0.25,
-    detector: Optional[PestDetector] = None,
-) -> List[dict]:
+    detector: PestDetector | None = None,
+) -> list[dict]:
     """Run pest detection on a single image and return normalized detections.
 
     Each detection dict: ``{"class_id", "class_name", "confidence", "bbox_xyxy"}``.
@@ -22,7 +21,7 @@ def detect_pests(
         detector = load_detector()
 
     results = detector.predict(str(image_path), conf=conf, verbose=False)
-    detections: List[dict] = []
+    detections: list[dict] = []
     for result in results:
         boxes = result.boxes
         if boxes is None:

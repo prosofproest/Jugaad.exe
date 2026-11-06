@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 
 import { AnalysisReport } from "@/components/workspace/analysis-report";
 import {
@@ -23,18 +24,24 @@ import type { Analysis } from "@/lib/workspace/types";
 type Filter = "all" | "pending" | "verified" | "high";
 
 export default function AnalysisPage() {
+  return (
+    <Suspense fallback={null}>
+      <AnalysisWorkspace />
+    </Suspense>
+  );
+}
+
+function AnalysisWorkspace() {
+  const searchParams = useSearchParams();
   const { state, createAnalysis } = useWorkspace();
   const [filter, setFilter] = useState<Filter>("all");
-  const [activeId, setActiveId] = useState<string | null>(state.analyses[0]?.id ?? null);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
   const [compareOpen, setCompareOpen] = useState(false);
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const focus = params.get("focus");
-    if (focus && state.analyses.some((analysis) => analysis.id === focus)) {
-      setActiveId(focus);
-    }
-  }, [state.analyses]);
+  const focus = searchParams.get("focus");
+  const focusedId =
+    focus && state.analyses.some((analysis) => analysis.id === focus) ? focus : null;
+  const activeId = selectedId ?? focusedId ?? state.analyses[0]?.id ?? null;
 
   const filtered = useMemo(
     () =>
@@ -52,7 +59,7 @@ export default function AnalysisPage() {
   const unsyncedAnalyses = state.captures.filter((capture) => !capture.analysisId);
 
   function select(analysis: Analysis) {
-    setActiveId(analysis.id);
+    setSelectedId(analysis.id);
     window.history.replaceState(null, "", `/analysis?focus=${analysis.id}`);
   }
 
@@ -99,7 +106,7 @@ export default function AnalysisPage() {
                 onClick={() => {
                   const analysis = createAnalysis(capture.id);
                   if (analysis) {
-                    setActiveId(analysis.id);
+                    setSelectedId(analysis.id);
                     setCompareOpen(false);
                   }
                 }}

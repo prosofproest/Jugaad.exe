@@ -12,7 +12,6 @@ import {
   Icon,
   Modal,
   PageHeader,
-  ProgressBar,
   StatCard,
   Tabs,
 } from "@/components/workspace/ui";

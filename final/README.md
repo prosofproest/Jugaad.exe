@@ -38,7 +38,7 @@ when evidence is insufficient and shows data coverage wherever risk is displayed
 | `project-overview.md` | Problem, vision, users, stakeholders, scope, use cases, objectives, programme shape |
 | `architecture-context.md` | Stack, components, module boundaries, flows, invariants, security, deployment |
 | `ui-context.md` | Wording, tokens, components, screens, states, maps, accessibility, surface detail |
-| `code-standards.md` | Python/TS conventions (React Native + Next.js), API, security, ML reproducibility, testing, monitoring |
+| `code-standards.md` | Python/Dart/TS conventions (Flutter + Next.js), API, security, ML reproducibility, testing, monitoring |
 | `ai-workflow-rules.md` | Agent procedure, honesty rules, hard stops, handoff format |
 | `data-foundation.md` | Data strategy, image collection, labelling, cleaning, splits, weather, history |
 | `ml-models.md` | Image and forecast model design, training, evaluation, calibration, explainability |

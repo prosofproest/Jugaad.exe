@@ -294,7 +294,7 @@ Implementation points
  Technology stack selection
 Technology choices should reflect team skills, deployment cost, device constraints and maintainability. The report recommends practical, widely supported tools rather than a large collection of fashionable technologies.
 Mobile
-Flutter or React Native can support Android-first delivery and shared code. Native camera and local storage integrations must be tested.
+Flutter supports Android-first delivery and shared code (ADR-013). Native camera and local storage integrations must be tested.
 Backend
 Python FastAPI or Django REST are suitable for model integration and typed APIs. Select one framework and standardise validation.
 ML

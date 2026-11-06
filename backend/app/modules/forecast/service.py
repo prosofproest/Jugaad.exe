@@ -28,11 +28,9 @@ from app.db.models import (
     WeatherSnapshot,
 )
 from app.modules.audit.service import record_audit
+from app.modules.forecast.rules import score_weather
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
-
-BAND_RANK = {"insufficient_data": 0, "low": 1, "moderate": 2, "high": 3, "urgent": 4}
-COVERAGE_RANK = {"unknown": 0, "low": 1, "partial": 2, "good": 3}
 
 
 def _now() -> datetime:
@@ -210,16 +208,6 @@ def coverage_for_area(db: Session, geo_code: str, *, now: datetime | None = None
     return {"coverage": coverage, "detail": details}
 
 
-def _band_from_score(score: float, thresholds: dict) -> str:
-    if score >= float(thresholds.get("urgent", 0.9)):
-        return "urgent"
-    if score >= float(thresholds.get("high", 0.75)):
-        return "high"
-    if score >= float(thresholds.get("moderate", 0.5)):
-        return "moderate"
-    return "low"
-
-
 def _config_value(db: Session, key: str, default):
     from app.db.models import SystemConfig
 
@@ -335,31 +323,16 @@ def generate_forecast(
                 "verified_reports_14d": coverage["detail"]["verified_reports_14d"],
             }
         )
-        score = 0.0
-        if float(variables.get("rainfall_mm_10d", 0) or 0) >= 40:
-            score += 0.25
-            drivers.append("recent_rainfall")
-        if int(variables.get("consecutive_wet_days", 0) or 0) >= 4:
-            score += 0.2
-            drivers.append("consecutive_wet_days")
-        if float(variables.get("relative_humidity_mean", 0) or 0) >= 80:
-            score += 0.2
-            drivers.append("high_humidity")
-        if (
-            15 <= float(variables.get("temp_min_c", 0) or 0)
-            and float(variables.get("temp_max_c", 0) or 0) <= 28
-        ):
-            score += 0.15
-            drivers.append("temperature_window")
-        if float(variables.get("leaf_wetness_hours", 0) or 0) >= 30:
-            score += 0.1
-            drivers.append("leaf_wetness")
-        if coverage["detail"]["verified_reports_14d"] > 0:
-            score += 0.1
-            drivers.append("verified_local_reports")
         thresholds = _config_value(db, "risk_band_thresholds", {})
-        risk_band = _band_from_score(round(score, 3), thresholds)
-        features["rule_score"] = round(score, 3)
+        result = score_weather(
+            variables,
+            verified_reports_14d=coverage["detail"]["verified_reports_14d"],
+            thresholds=thresholds,
+        )
+        drivers = list(result.drivers)
+        risk_band = result.risk_band
+        features["rule_score"] = result.score
+        features["rule_result"] = result.as_feature_dict()
 
     snapshot = FeatureSnapshot(
         crop_code=crop_code,

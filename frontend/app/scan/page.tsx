@@ -31,7 +31,7 @@ export default function ScanPage() {
   const { state, addCapture, syncCaptures, createAnalysis } = useWorkspace();
   const [mediaType, setMediaType] = useState<"image" | "video">("image");
   const [farmId, setFarmId] = useState(state.farms[0]?.id ?? "");
-  const [subjectId, setSubjectId] = useState(state.cropGroups[0]?.id ?? "");
+  const [selectedSubjectId, setSubjectId] = useState<string | null>(null);
   const [part, setPart] = useState<PlantPart>("leaf");
   const [notes, setNotes] = useState("");
   const [gps, setGps] = useState<{ lat: number; lng: number } | null>(null);
@@ -45,15 +45,13 @@ export default function ScanPage() {
 
   const farm = state.farms.find((item) => item.id === farmId);
   const farmGroups = useMemo(() => state.cropGroups.filter((group) => group.farmId === farmId), [state.cropGroups, farmId]);
+  const subjectId =
+    selectedSubjectId && farmGroups.some((group) => group.id === selectedSubjectId)
+      ? selectedSubjectId
+      : (farmGroups[0]?.id ?? "");
   const subject = state.cropGroups.find((group) => group.id === subjectId);
   const subjectPlants = state.plants.filter((plant) => plant.cropGroupId === subjectId);
   const queued = state.captures.filter((capture) => capture.syncState !== "synced").length;
-
-  useEffect(() => {
-    if (subjectId && !farmGroups.some((group) => group.id === subjectId)) {
-      setSubjectId(farmGroups[0]?.id ?? "");
-    }
-  }, [farmGroups, subjectId]);
 
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);

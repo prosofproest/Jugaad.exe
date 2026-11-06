@@ -101,16 +101,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [navOpen, setNavOpen] = useState(false);
   const [menu, setMenu] = useState<"none" | "profile" | "notifications" | "language">("none");
   const menuRef = useRef<HTMLDivElement>(null);
+  const [previousPathname, setPreviousPathname] = useState(pathname);
 
   const t = (key: NavKey) => translate(state.currentUser.language, key);
   const unread = state.notifications.filter((item) => !item.read).length;
   const queued = state.captures.filter((item) => item.syncState !== "synced").length;
   const pendingReviews = state.analyses.filter((item) => item.reviewStatus === "pending").length;
 
-  useEffect(() => {
+  if (previousPathname !== pathname) {
+    setPreviousPathname(pathname);
     setNavOpen(false);
     setMenu("none");
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (menu === "none") return;
