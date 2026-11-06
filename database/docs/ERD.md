@@ -1,0 +1,2005 @@
+# CropSentinel AI — Master Database Entity-Relationship Diagrams
+
+> **Generated directly from SQLAlchemy 2.0 ORM Metadata** (`Base.metadata`).
+> Reflects all 11 database domains, 76 tables, primary keys, foreign keys, and relationships.
+
+## Table of Contents
+- [1. Complete Master Database ERD](#1-complete-master-database-erd)
+- [2. User and Farm ERD](#2-user-and-farm-erd)
+- [3. Crop and Plant ERD](#3-crop-and-plant-erd)
+- [4. Media ERD](#4-media-erd)
+- [5. Pest and Disease ERD](#5-pest-and-disease-erd)
+- [6. AI Analysis ERD](#6-ai-analysis-erd)
+- [7. Pest Management ERD](#7-pest-management-erd)
+- [8. Hotspot and Outbreak ERD](#8-hotspot-and-outbreak-erd)
+- [9. Recovery and Inspection ERD](#9-recovery-and-inspection-erd)
+- [10. Chatbot and Knowledge ERD](#10-chatbot-and-knowledge-erd)
+- [11. Notification ERD](#11-notification-erd)
+
+---
+
+## 1. Complete Master Database ERD
+```mermaid
+erDiagram
+    ai_analysis {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        CHAR_36 requested_by "FK"
+        VARCHAR_30 status 
+        VARCHAR_50 analysis_type 
+        INTEGER processing_time_ms 
+        JSON raw_response 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    ai_confidence {
+        CHAR_36 id "PK"
+        CHAR_36 prediction_id "FK"
+        VARCHAR_100 class_label 
+        NUMERIC_5__4 probability 
+        VARCHAR_50 calibration_method 
+        FLOAT entropy_score 
+        DATETIME created_at 
+    }
+    ai_detections {
+        CHAR_36 id "PK"
+        CHAR_36 prediction_id "FK"
+        VARCHAR_100 label 
+        NUMERIC_6__4 bbox_x_min 
+        NUMERIC_6__4 bbox_y_min 
+        NUMERIC_6__4 bbox_x_max 
+        NUMERIC_6__4 bbox_y_max 
+        NUMERIC_5__4 detection_confidence 
+        TEXT mask_rle 
+        DATETIME created_at 
+    }
+    ai_feedback {
+        CHAR_36 id "PK"
+        CHAR_36 diagnosis_record_id "FK"
+        CHAR_36 prediction_id "FK"
+        CHAR_36 user_id "FK"
+        VARCHAR_50 feedback_type 
+        CHAR_36 corrected_pest_id "FK"
+        CHAR_36 corrected_disease_id "FK"
+        TEXT comments 
+        DATETIME submitted_at 
+    }
+    ai_model_versions {
+        CHAR_36 id "PK"
+        VARCHAR_100 model_name 
+        VARCHAR_50 version_tag 
+        VARCHAR_50 model_family 
+        VARCHAR_64 weights_digest_sha256 
+        VARCHAR_50 training_dataset_version 
+        FLOAT f1_score 
+        FLOAT accuracy 
+        VARCHAR_50 inference_runtime 
+        BOOLEAN is_active 
+        DATETIME deployed_at 
+        DATETIME retired_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    ai_predictions {
+        CHAR_36 id "PK"
+        CHAR_36 analysis_id "FK"
+        CHAR_36 model_version_id "FK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        VARCHAR_150 primary_diagnosis 
+        NUMERIC_5__4 confidence_score 
+        VARCHAR_20 severity_level 
+        DATETIME inference_timestamp 
+        BOOLEAN is_superseded 
+        DATETIME created_at 
+    }
+    alert_rules {
+        CHAR_36 id "PK"
+        VARCHAR_100 rule_name 
+        VARCHAR_50 event_type 
+        TEXT condition_expression 
+        NUMERIC_8__4 threshold_value 
+        VARCHAR_50 target_role 
+        BOOLEAN is_active 
+        CHAR_36 created_by "FK"
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    behavioral_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_50 attractant_type 
+        INTEGER trap_density_per_hectare 
+        INTEGER replacement_interval_days 
+        VARCHAR_100 monitoring_threshold 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    biological_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_150 agent_name 
+        VARCHAR_50 agent_type 
+        CHAR_36 target_pest_id "FK"
+        VARCHAR_100 release_rate 
+        VARCHAR_100 optimal_timing 
+        TEXT conservation_practices 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    chat_messages {
+        CHAR_36 id "PK"
+        CHAR_36 session_id "FK"
+        VARCHAR_20 sender_type 
+        TEXT message_text 
+        INTEGER sequence_number 
+        JSON cited_sources 
+        DATETIME sent_at 
+    }
+    chat_sessions {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_150 title 
+        VARCHAR_10 language 
+        VARCHAR_20 channel 
+        BOOLEAN is_active 
+        DATETIME started_at 
+        DATETIME ended_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    chatbot_feedback {
+        CHAR_36 id "PK"
+        CHAR_36 message_id "FK"
+        CHAR_36 user_id "FK"
+        INTEGER rating 
+        BOOLEAN is_helpful 
+        TEXT feedback_text 
+        DATETIME submitted_at 
+    }
+    chemical_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_150 active_ingredient 
+        VARCHAR_100 chemical_class 
+        VARCHAR_200 mode_of_action 
+        VARCHAR_50 resistance_risk_group 
+        VARCHAR_20 toxicity_class 
+        INTEGER phi_days 
+        INTEGER rei_hours 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    crop_groups {
+        CHAR_36 id "PK"
+        VARCHAR_50 code 
+        VARCHAR_100 name 
+        TEXT description 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    crop_growth_stages {
+        CHAR_36 id "PK"
+        CHAR_36 crop_type_id "FK"
+        VARCHAR_50 stage_name 
+        INTEGER stage_order 
+        INTEGER typical_duration_days 
+        VARCHAR_20 water_requirement_level 
+        DATETIME created_at 
+    }
+    crop_instances {
+        CHAR_36 id "PK"
+        CHAR_36 plot_id "FK"
+        CHAR_36 crop_type_id "FK"
+        VARCHAR_100 variety 
+        VARCHAR_30 season 
+        DATE planting_date 
+        DATE expected_harvest_date 
+        DATE actual_harvest_date 
+        VARCHAR_30 status 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    crop_symptoms {
+        CHAR_36 id "PK"
+        CHAR_36 crop_type_id "FK"
+        CHAR_36 disease_id "FK"
+        CHAR_36 pest_id "FK"
+        VARCHAR_150 symptom_name 
+        TEXT characteristic_appearance 
+        VARCHAR_50 typical_growth_stage 
+        TEXT visual_diagnostic_rules 
+        DATETIME created_at 
+    }
+    crop_types {
+        CHAR_36 id "PK"
+        CHAR_36 group_id "FK"
+        VARCHAR_50 code 
+        VARCHAR_100 common_name 
+        VARCHAR_150 botanical_name 
+        TEXT description 
+        FLOAT optimal_temp_min_c 
+        FLOAT optimal_temp_max_c 
+        FLOAT optimal_rainfall_mm 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    cultural_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_50 practice_type 
+        TEXT implementation_protocol 
+        VARCHAR_100 recommended_timing 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    diagnosis_records {
+        CHAR_36 id "PK"
+        CHAR_36 analysis_id "FK"
+        CHAR_36 prediction_id "FK"
+        CHAR_36 verified_by "FK"
+        CHAR_36 confirmed_pest_id "FK"
+        CHAR_36 confirmed_disease_id "FK"
+        VARCHAR_50 confirmation_status 
+        TEXT expert_notes 
+        DATETIME diagnosed_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    disease_symptoms {
+        CHAR_36 id "PK"
+        CHAR_36 disease_id "FK"
+        VARCHAR_50 affected_plant_part 
+        TEXT symptom_description 
+        VARCHAR_20 severity_scale 
+        BOOLEAN is_primary_symptom 
+        DATETIME created_at 
+    }
+    diseases {
+        CHAR_36 id "PK"
+        VARCHAR_150 common_name 
+        VARCHAR_200 scientific_name 
+        VARCHAR_50 pathogen_type 
+        CHAR_36 vector_pest_id "FK"
+        TEXT description 
+        TEXT favorable_conditions 
+        TEXT economic_impact 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    farm_boundaries {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        TEXT boundary_polygon 
+        FLOAT perimeter_meters 
+        FLOAT area_sqm 
+        FLOAT elevation_meters 
+        BOOLEAN is_active 
+        DATETIME recorded_at 
+    }
+    farm_locations {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        VARCHAR_255 address_line 
+        VARCHAR_100 village_or_town 
+        VARCHAR_100 taluk_or_subdistrict 
+        VARCHAR_100 district 
+        VARCHAR_100 state 
+        VARCHAR_100 country 
+        VARCHAR_20 postal_code 
+        TEXT centroid 
+    }
+    farm_members {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        CHAR_36 user_id "FK"
+        VARCHAR_30 access_level 
+        BOOLEAN is_active 
+        DATETIME joined_at 
+    }
+    farm_plots {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        CHAR_36 section_id "FK"
+        VARCHAR_50 plot_code 
+        VARCHAR_50 soil_type 
+        VARCHAR_50 irrigation_source 
+        FLOAT area_sqm 
+        TEXT plot_polygon 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    farm_sections {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        VARCHAR_50 section_code 
+        VARCHAR_100 name 
+        TEXT description 
+        TEXT section_polygon 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    farms {
+        CHAR_36 id "PK"
+        VARCHAR_200 name 
+        VARCHAR_100 registration_number 
+        FLOAT total_area_sqm 
+        CHAR_36 owner_id "FK"
+        VARCHAR_20 status 
+        BOOLEAN is_demo 
+        DATETIME created_at 
+        DATETIME updated_at 
+        DATETIME deleted_at 
+    }
+    hotspot_regions {
+        CHAR_36 id "PK"
+        VARCHAR_150 region_name 
+        TEXT boundary_geom 
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        VARCHAR_20 risk_level 
+        INTEGER active_case_count 
+        DATE start_date 
+        DATE end_date 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    infestation_history {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 crop_instance_id "FK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        DATE outbreak_start_date 
+        VARCHAR_20 peak_severity 
+        DATE containment_date 
+        FLOAT crop_loss_percentage 
+        DATETIME recorded_at 
+    }
+    inspection_assignments {
+        CHAR_36 id "PK"
+        CHAR_36 inspection_id "FK"
+        CHAR_36 agent_id "FK"
+        CHAR_36 assigned_by "FK"
+        DATETIME assigned_at 
+        VARCHAR_50 role_in_inspection 
+        VARCHAR_30 status 
+    }
+    inspections {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        CHAR_36 plot_id "FK"
+        CHAR_36 inspector_id "FK"
+        DATE scheduled_date 
+        DATETIME conducted_at 
+        VARCHAR_30 status 
+        INTEGER overall_health_rating 
+        TEXT findings_summary 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    ipm_methods {
+        CHAR_36 id "PK"
+        VARCHAR_50 code 
+        VARCHAR_150 title 
+        VARCHAR_50 category 
+        TEXT description 
+        VARCHAR_20 environmental_impact_rating 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    knowledge_articles {
+        CHAR_36 id "PK"
+        VARCHAR_255 title 
+        VARCHAR_255 slug 
+        INTEGER version 
+        CHAR_36 author_id "FK"
+        VARCHAR_100 category 
+        TEXT summary 
+        TEXT content 
+        VARCHAR_20 status 
+        BOOLEAN is_current 
+        DATETIME published_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    knowledge_chunks {
+        CHAR_36 id "PK"
+        CHAR_36 article_id "FK"
+        INTEGER chunk_index 
+        TEXT content_chunk 
+        INTEGER token_count 
+        DATETIME created_at 
+    }
+    knowledge_embeddings {
+        CHAR_36 id "PK"
+        CHAR_36 chunk_id "FK"
+        VARCHAR_100 embedding_model 
+        TEXT embedding_vector 
+        INTEGER dimension 
+        DATETIME created_at 
+    }
+    mechanical_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_150 method_name 
+        VARCHAR_200 equipment_needed 
+        VARCHAR_20 labor_intensity 
+        TEXT execution_steps 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    media_analysis_links {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        CHAR_36 analysis_id "FK"
+        CHAR_36 frame_id "FK"
+        DATETIME linked_at 
+    }
+    media_files {
+        CHAR_36 id "PK"
+        CHAR_36 uploader_id "FK"
+        VARCHAR_50 storage_provider 
+        VARCHAR_100 bucket_name 
+        VARCHAR_500 object_key 
+        VARCHAR_255 file_name 
+        INTEGER file_size_bytes 
+        VARCHAR_100 mime_type 
+        VARCHAR_64 file_hash_sha256 
+        VARCHAR_20 media_type 
+        FLOAT duration_seconds 
+        INTEGER width_px 
+        INTEGER height_px 
+        DATETIME capture_timestamp 
+        DATETIME upload_timestamp 
+        BOOLEAN is_quarantined 
+        VARCHAR_255 quarantine_reason 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    media_frames {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        INTEGER frame_number 
+        INTEGER timestamp_offset_ms 
+        VARCHAR_500 frame_object_key 
+        INTEGER width_px 
+        INTEGER height_px 
+        FLOAT quality_score 
+        DATETIME created_at 
+    }
+    media_locations {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        TEXT location 
+        FLOAT altitude_meters 
+        FLOAT gps_accuracy_meters 
+        FLOAT heading_degrees 
+        DATETIME captured_at 
+    }
+    media_observations {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        CHAR_36 observation_id "FK"
+        VARCHAR_50 media_role 
+        DATETIME attached_at 
+    }
+    monitoring_coverage {
+        CHAR_36 id "PK"
+        VARCHAR_150 area_name 
+        TEXT boundary 
+        INTEGER assigned_scouts_count 
+        INTEGER scouting_frequency_days 
+        DATE last_monitored_date 
+        FLOAT coverage_percentage 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    notifications {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_200 title 
+        TEXT body 
+        VARCHAR_50 notification_type 
+        VARCHAR_20 priority 
+        VARCHAR_20 status 
+        VARCHAR_20 channel 
+        INTEGER retry_count 
+        DATETIME sent_at 
+        DATETIME read_at 
+        DATETIME created_at 
+    }
+    outbreak_predictions {
+        CHAR_36 id "PK"
+        TEXT region_geom 
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        NUMERIC_5__4 predicted_risk_score 
+        INTEGER forecast_horizon_days 
+        CHAR_36 prediction_model_version "FK"
+        DATETIME prediction_timestamp 
+        DATETIME valid_from 
+        DATETIME valid_until 
+        DATETIME created_at 
+    }
+    pest_categories {
+        CHAR_36 id "PK"
+        VARCHAR_50 code 
+        VARCHAR_100 name 
+        TEXT description 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pest_control_options {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        CHAR_36 crop_type_id "FK"
+        CHAR_36 ipm_method_id "FK"
+        TEXT strategy_summary 
+        VARCHAR_100 applicability_window 
+        VARCHAR_20 effectiveness_rating 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pest_damage_records {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 plant_observation_id "FK"
+        VARCHAR_50 damage_type 
+        FLOAT affected_area_percentage 
+        INTEGER severity_index 
+        DATETIME recorded_at 
+    }
+    pest_host_crops {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 crop_type_id "FK"
+        VARCHAR_30 susceptibility_level 
+        INTEGER damage_severity_rating 
+        TEXT notes 
+        DATETIME created_at 
+    }
+    pest_life_cycles {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        VARCHAR_50 stage_name 
+        INTEGER stage_duration_days_min 
+        INTEGER stage_duration_days_max 
+        BOOLEAN damaging_stage 
+        FLOAT favorable_temperature_min 
+        FLOAT favorable_temperature_max 
+        FLOAT favorable_humidity_min 
+        DATETIME created_at 
+    }
+    pest_reports {
+        CHAR_36 id "PK"
+        CHAR_36 reporter_id "FK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 reported_pest_id "FK"
+        CHAR_36 reported_disease_id "FK"
+        TEXT report_location 
+        VARCHAR_20 severity 
+        DATETIME observation_date 
+        VARCHAR_30 status 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pesticide_registrations {
+        CHAR_36 id "PK"
+        CHAR_36 chemical_control_id "FK"
+        VARCHAR_100 registration_number 
+        VARCHAR_100 registering_authority 
+        VARCHAR_150 registered_trade_name 
+        CHAR_36 approved_crop_id "FK"
+        CHAR_36 approved_pest_id "FK"
+        VARCHAR_100 approved_dosage_per_ha 
+        DATE approval_date 
+        DATE expiry_date 
+        VARCHAR_30 status 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pests {
+        CHAR_36 id "PK"
+        CHAR_36 pest_category_id "FK"
+        VARCHAR_150 common_name 
+        VARCHAR_200 scientific_name 
+        TEXT description 
+        TEXT identification_guide 
+        TEXT economic_threshold 
+        VARCHAR_30 quarantine_status 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    physical_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_50 control_mechanism 
+        TEXT technical_parameters 
+        TEXT installation_guide 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    plant_observations {
+        CHAR_36 id "PK"
+        CHAR_36 plant_id "FK"
+        CHAR_36 observer_id "FK"
+        DATETIME observation_date 
+        TEXT visual_symptoms 
+        INTEGER vigor_score 
+        FLOAT foliage_damage_pct 
+        TEXT observation_notes 
+        DATETIME created_at 
+    }
+    planting_records {
+        CHAR_36 id "PK"
+        CHAR_36 crop_instance_id "FK"
+        VARCHAR_100 seed_lot_number 
+        VARCHAR_200 seed_source 
+        VARCHAR_50 sowing_method 
+        FLOAT planting_density_per_sqm 
+        TEXT fertilization_notes 
+        CHAR_36 recorded_by "FK"
+        DATETIME recorded_at 
+    }
+    plants {
+        CHAR_36 id "PK"
+        CHAR_36 crop_instance_id "FK"
+        VARCHAR_50 tag_or_id 
+        INTEGER row_number 
+        INTEGER column_number 
+        TEXT plant_location 
+        VARCHAR_30 health_status 
+        DATE planted_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    recovery_comparisons {
+        CHAR_36 id "PK"
+        CHAR_36 recovery_record_id "FK"
+        CHAR_36 baseline_media_id "FK"
+        CHAR_36 current_media_id "FK"
+        FLOAT symptom_reduction_percentage 
+        INTEGER foliage_regrowth_score 
+        TEXT comparison_notes 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    recovery_records {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 crop_instance_id "FK"
+        CHAR_36 treatment_record_id "FK"
+        CHAR_36 inspection_id "FK"
+        VARCHAR_30 recovery_status 
+        FLOAT recovery_percentage 
+        DATETIME assessed_at 
+        CHAR_36 assessor_id "FK"
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    regional_pest_statistics {
+        CHAR_36 id "PK"
+        VARCHAR_50 region_code 
+        DATE date_bucket 
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        INTEGER total_reports 
+        INTEGER verified_count 
+        FLOAT incidence_rate 
+        FLOAT average_severity 
+        DATETIME calculated_at 
+    }
+    risk_history {
+        CHAR_36 id "PK"
+        VARCHAR_50 region_code 
+        DATETIME timestamp 
+        CHAR_36 pest_id "FK"
+        NUMERIC_5__4 historical_risk_score 
+        TEXT weather_conditions 
+        VARCHAR_100 source_run_id 
+        DATETIME recorded_at 
+    }
+    scheduled_tasks {
+        CHAR_36 id "PK"
+        VARCHAR_100 task_name 
+        VARCHAR_50 task_type 
+        CHAR_36 target_user_id "FK"
+        DATETIME scheduled_time 
+        VARCHAR_50 recurrence_pattern 
+        VARCHAR_20 status 
+        DATETIME last_run_at 
+        DATETIME next_run_at 
+        INTEGER retry_count 
+        DATETIME created_at 
+    }
+    scouting_records {
+        CHAR_36 id "PK"
+        CHAR_36 inspection_id "FK"
+        TEXT waypoint_location 
+        INTEGER plant_count_inspected 
+        INTEGER infested_plant_count 
+        CHAR_36 pest_id "FK"
+        TEXT notes 
+        DATETIME recorded_at 
+    }
+    seasonal_history {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        INTEGER season_year 
+        VARCHAR_30 season_name 
+        CHAR_36 crop_type_id "FK"
+        FLOAT total_yield_kg 
+        VARCHAR_20 pest_pressure_rating 
+        TEXT weather_summary 
+        DATETIME recorded_at 
+    }
+    spread_observations {
+        CHAR_36 id "PK"
+        CHAR_36 hotspot_id "FK"
+        TEXT observation_location 
+        FLOAT spread_direction_degrees 
+        FLOAT spread_rate_km_per_day 
+        DATETIME observed_at 
+        CHAR_36 recorder_id "FK"
+        DATETIME created_at 
+    }
+    sync_logs {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_100 device_id 
+        VARCHAR_50 sync_entity_type 
+        DATETIME client_timestamp 
+        DATETIME server_timestamp 
+        INTEGER records_synced 
+        VARCHAR_30 sync_status 
+        VARCHAR_50 conflict_resolution_strategy 
+        TEXT error_details 
+        DATETIME created_at 
+    }
+    treatment_effectiveness {
+        CHAR_36 id "PK"
+        CHAR_36 treatment_record_id "FK"
+        DATETIME evaluation_date 
+        INTEGER days_post_treatment 
+        FLOAT pest_mortality_percentage 
+        INTEGER crop_recovery_score 
+        BOOLEAN phytotoxicity_observed 
+        CHAR_36 evaluator_id "FK"
+        TEXT evaluation_notes 
+        DATETIME created_at 
+    }
+    treatment_records {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 crop_instance_id "FK"
+        CHAR_36 applied_by "FK"
+        CHAR_36 ipm_method_id "FK"
+        CHAR_36 chemical_control_id "FK"
+        CHAR_36 registration_id "FK"
+        DATETIME application_date 
+        VARCHAR_100 dosage_applied 
+        VARCHAR_150 weather_conditions_at_spray 
+        VARCHAR_200 safety_equipment_used 
+        TEXT notes 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    user_alert_preferences {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        BOOLEAN push_enabled 
+        BOOLEAN sms_enabled 
+        BOOLEAN email_enabled 
+        VARCHAR_5 quiet_hours_start 
+        VARCHAR_5 quiet_hours_end 
+        VARCHAR_20 min_priority_threshold 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    user_permissions {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_100 permission_code 
+        VARCHAR_100 scope 
+        DATETIME granted_at 
+        DATETIME expires_at 
+    }
+    user_preferences {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_10 preferred_language 
+        VARCHAR_50 timezone 
+        VARCHAR_20 theme 
+        VARCHAR_20 notification_frequency 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    user_profiles {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_100 first_name 
+        VARCHAR_100 last_name 
+        VARCHAR_500 avatar_url 
+        TEXT bio 
+        TEXT address 
+        VARCHAR_20 preferred_contact_method 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    user_roles {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_50 role 
+        BOOLEAN is_active 
+        CHAR_36 granted_by "FK"
+        DATETIME granted_at 
+    }
+    user_sessions {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_255 session_token_hash 
+        VARCHAR_45 ip_address 
+        TEXT user_agent 
+        VARCHAR_100 device_id 
+        DATETIME expires_at 
+        DATETIME created_at 
+        DATETIME revoked_at 
+    }
+    users {
+        CHAR_36 id "PK"
+        VARCHAR_64 username 
+        VARCHAR_320 email 
+        VARCHAR_20 phone_e164 
+        VARCHAR_255 password_hash 
+        VARCHAR_20 status 
+        BOOLEAN is_demo 
+        DATETIME created_at 
+        DATETIME updated_at 
+        DATETIME deleted_at 
+    }
+    verified_cases {
+        CHAR_36 id "PK"
+        CHAR_36 pest_report_id "FK"
+        CHAR_36 verifier_id "FK"
+        TEXT confirmed_location 
+        CHAR_36 confirmed_pest_id "FK"
+        CHAR_36 confirmed_disease_id "FK"
+        VARCHAR_20 confidence_level 
+        DATETIME verified_at 
+        TEXT notes 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    media_files ||--o{ ai_analysis : "media_file_id"
+    users ||--o{ ai_analysis : "requested_by"
+    ai_predictions ||--o{ ai_confidence : "prediction_id"
+    ai_predictions ||--o{ ai_detections : "prediction_id"
+    diagnosis_records ||--o{ ai_feedback : "diagnosis_record_id"
+    ai_predictions ||--o{ ai_feedback : "prediction_id"
+    users ||--o{ ai_feedback : "user_id"
+    pests ||--o{ ai_feedback : "corrected_pest_id"
+    diseases ||--o{ ai_feedback : "corrected_disease_id"
+    diseases ||--o{ ai_predictions : "disease_id"
+    pests ||--o{ ai_predictions : "pest_id"
+    ai_analysis ||--o{ ai_predictions : "analysis_id"
+    ai_model_versions ||--o{ ai_predictions : "model_version_id"
+    users ||--o{ alert_rules : "created_by"
+    ipm_methods ||--o{ behavioral_controls : "ipm_method_id"
+    ipm_methods ||--o{ biological_controls : "ipm_method_id"
+    pests ||--o{ biological_controls : "target_pest_id"
+    chat_sessions ||--o{ chat_messages : "session_id"
+    users ||--o{ chat_sessions : "user_id"
+    users ||--o{ chatbot_feedback : "user_id"
+    chat_messages ||--o{ chatbot_feedback : "message_id"
+    ipm_methods ||--o{ chemical_controls : "ipm_method_id"
+    crop_types ||--o{ crop_growth_stages : "crop_type_id"
+    farm_plots ||--o{ crop_instances : "plot_id"
+    crop_types ||--o{ crop_instances : "crop_type_id"
+    diseases ||--o{ crop_symptoms : "disease_id"
+    pests ||--o{ crop_symptoms : "pest_id"
+    crop_types ||--o{ crop_symptoms : "crop_type_id"
+    crop_groups ||--o{ crop_types : "group_id"
+    ipm_methods ||--o{ cultural_controls : "ipm_method_id"
+    ai_predictions ||--o{ diagnosis_records : "prediction_id"
+    ai_analysis ||--o{ diagnosis_records : "analysis_id"
+    pests ||--o{ diagnosis_records : "confirmed_pest_id"
+    diseases ||--o{ diagnosis_records : "confirmed_disease_id"
+    users ||--o{ diagnosis_records : "verified_by"
+    diseases ||--o{ disease_symptoms : "disease_id"
+    pests ||--o{ diseases : "vector_pest_id"
+    farms ||--o{ farm_boundaries : "farm_id"
+    farms ||--o{ farm_locations : "farm_id"
+    users ||--o{ farm_members : "user_id"
+    farms ||--o{ farm_members : "farm_id"
+    farms ||--o{ farm_plots : "farm_id"
+    farm_sections ||--o{ farm_plots : "section_id"
+    farms ||--o{ farm_sections : "farm_id"
+    users ||--o{ farms : "owner_id"
+    pests ||--o{ hotspot_regions : "pest_id"
+    diseases ||--o{ hotspot_regions : "disease_id"
+    diseases ||--o{ infestation_history : "disease_id"
+    farm_plots ||--o{ infestation_history : "farm_plot_id"
+    crop_instances ||--o{ infestation_history : "crop_instance_id"
+    pests ||--o{ infestation_history : "pest_id"
+    users ||--o{ inspection_assignments : "assigned_by"
+    users ||--o{ inspection_assignments : "agent_id"
+    inspections ||--o{ inspection_assignments : "inspection_id"
+    users ||--o{ inspections : "inspector_id"
+    farms ||--o{ inspections : "farm_id"
+    farm_plots ||--o{ inspections : "plot_id"
+    users ||--o{ knowledge_articles : "author_id"
+    knowledge_articles ||--o{ knowledge_chunks : "article_id"
+    knowledge_chunks ||--o{ knowledge_embeddings : "chunk_id"
+    ipm_methods ||--o{ mechanical_controls : "ipm_method_id"
+    ai_analysis ||--o{ media_analysis_links : "analysis_id"
+    media_frames ||--o{ media_analysis_links : "frame_id"
+    media_files ||--o{ media_analysis_links : "media_file_id"
+    users ||--o{ media_files : "uploader_id"
+    media_files ||--o{ media_frames : "media_file_id"
+    media_files ||--o{ media_locations : "media_file_id"
+    plant_observations ||--o{ media_observations : "observation_id"
+    media_files ||--o{ media_observations : "media_file_id"
+    users ||--o{ notifications : "user_id"
+    ai_model_versions ||--o{ outbreak_predictions : "prediction_model_version"
+    pests ||--o{ outbreak_predictions : "pest_id"
+    diseases ||--o{ outbreak_predictions : "disease_id"
+    ipm_methods ||--o{ pest_control_options : "ipm_method_id"
+    crop_types ||--o{ pest_control_options : "crop_type_id"
+    diseases ||--o{ pest_control_options : "disease_id"
+    pests ||--o{ pest_control_options : "pest_id"
+    pests ||--o{ pest_damage_records : "pest_id"
+    plant_observations ||--o{ pest_damage_records : "plant_observation_id"
+    pests ||--o{ pest_host_crops : "pest_id"
+    crop_types ||--o{ pest_host_crops : "crop_type_id"
+    pests ||--o{ pest_life_cycles : "pest_id"
+    users ||--o{ pest_reports : "reporter_id"
+    pests ||--o{ pest_reports : "reported_pest_id"
+    farm_plots ||--o{ pest_reports : "farm_plot_id"
+    diseases ||--o{ pest_reports : "reported_disease_id"
+    pests ||--o{ pesticide_registrations : "approved_pest_id"
+    chemical_controls ||--o{ pesticide_registrations : "chemical_control_id"
+    crop_types ||--o{ pesticide_registrations : "approved_crop_id"
+    pest_categories ||--o{ pests : "pest_category_id"
+    ipm_methods ||--o{ physical_controls : "ipm_method_id"
+    plants ||--o{ plant_observations : "plant_id"
+    users ||--o{ plant_observations : "observer_id"
+    users ||--o{ planting_records : "recorded_by"
+    crop_instances ||--o{ planting_records : "crop_instance_id"
+    crop_instances ||--o{ plants : "crop_instance_id"
+    recovery_records ||--o{ recovery_comparisons : "recovery_record_id"
+    media_files ||--o{ recovery_comparisons : "current_media_id"
+    media_files ||--o{ recovery_comparisons : "baseline_media_id"
+    inspections ||--o{ recovery_records : "inspection_id"
+    farm_plots ||--o{ recovery_records : "farm_plot_id"
+    users ||--o{ recovery_records : "assessor_id"
+    treatment_records ||--o{ recovery_records : "treatment_record_id"
+    crop_instances ||--o{ recovery_records : "crop_instance_id"
+    diseases ||--o{ regional_pest_statistics : "disease_id"
+    pests ||--o{ regional_pest_statistics : "pest_id"
+    pests ||--o{ risk_history : "pest_id"
+    users ||--o{ scheduled_tasks : "target_user_id"
+    inspections ||--o{ scouting_records : "inspection_id"
+    pests ||--o{ scouting_records : "pest_id"
+    crop_types ||--o{ seasonal_history : "crop_type_id"
+    farm_plots ||--o{ seasonal_history : "farm_plot_id"
+    users ||--o{ spread_observations : "recorder_id"
+    hotspot_regions ||--o{ spread_observations : "hotspot_id"
+    users ||--o{ sync_logs : "user_id"
+    treatment_records ||--o{ treatment_effectiveness : "treatment_record_id"
+    users ||--o{ treatment_effectiveness : "evaluator_id"
+    ipm_methods ||--o{ treatment_records : "ipm_method_id"
+    pesticide_registrations ||--o{ treatment_records : "registration_id"
+    crop_instances ||--o{ treatment_records : "crop_instance_id"
+    users ||--o{ treatment_records : "applied_by"
+    farm_plots ||--o{ treatment_records : "farm_plot_id"
+    chemical_controls ||--o{ treatment_records : "chemical_control_id"
+    users ||--o{ user_alert_preferences : "user_id"
+    users ||--o{ user_permissions : "user_id"
+    users ||--o{ user_preferences : "user_id"
+    users ||--o{ user_profiles : "user_id"
+    users ||--o{ user_roles : "user_id"
+    users ||--o{ user_roles : "granted_by"
+    users ||--o{ user_sessions : "user_id"
+    diseases ||--o{ verified_cases : "confirmed_disease_id"
+    users ||--o{ verified_cases : "verifier_id"
+    pest_reports ||--o{ verified_cases : "pest_report_id"
+    pests ||--o{ verified_cases : "confirmed_pest_id"
+```
+
+---
+
+## 2. User and Farm ERD
+```mermaid
+erDiagram
+    users {
+        CHAR_36 id "PK"
+        VARCHAR_64 username 
+        VARCHAR_320 email 
+        VARCHAR_20 phone_e164 
+        VARCHAR_255 password_hash 
+        VARCHAR_20 status 
+        BOOLEAN is_demo 
+        DATETIME created_at 
+        DATETIME updated_at 
+        DATETIME deleted_at 
+    }
+    user_roles {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_50 role 
+        BOOLEAN is_active 
+        CHAR_36 granted_by "FK"
+        DATETIME granted_at 
+    }
+    user_profiles {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_100 first_name 
+        VARCHAR_100 last_name 
+        VARCHAR_500 avatar_url 
+        TEXT bio 
+        TEXT address 
+        VARCHAR_20 preferred_contact_method 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    user_permissions {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_100 permission_code 
+        VARCHAR_100 scope 
+        DATETIME granted_at 
+        DATETIME expires_at 
+    }
+    user_sessions {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_255 session_token_hash 
+        VARCHAR_45 ip_address 
+        TEXT user_agent 
+        VARCHAR_100 device_id 
+        DATETIME expires_at 
+        DATETIME created_at 
+        DATETIME revoked_at 
+    }
+    user_preferences {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_10 preferred_language 
+        VARCHAR_50 timezone 
+        VARCHAR_20 theme 
+        VARCHAR_20 notification_frequency 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    farms {
+        CHAR_36 id "PK"
+        VARCHAR_200 name 
+        VARCHAR_100 registration_number 
+        FLOAT total_area_sqm 
+        CHAR_36 owner_id "FK"
+        VARCHAR_20 status 
+        BOOLEAN is_demo 
+        DATETIME created_at 
+        DATETIME updated_at 
+        DATETIME deleted_at 
+    }
+    farm_boundaries {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        TEXT boundary_polygon 
+        FLOAT perimeter_meters 
+        FLOAT area_sqm 
+        FLOAT elevation_meters 
+        BOOLEAN is_active 
+        DATETIME recorded_at 
+    }
+    farm_sections {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        VARCHAR_50 section_code 
+        VARCHAR_100 name 
+        TEXT description 
+        TEXT section_polygon 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    farm_plots {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        CHAR_36 section_id "FK"
+        VARCHAR_50 plot_code 
+        VARCHAR_50 soil_type 
+        VARCHAR_50 irrigation_source 
+        FLOAT area_sqm 
+        TEXT plot_polygon 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    farm_locations {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        VARCHAR_255 address_line 
+        VARCHAR_100 village_or_town 
+        VARCHAR_100 taluk_or_subdistrict 
+        VARCHAR_100 district 
+        VARCHAR_100 state 
+        VARCHAR_100 country 
+        VARCHAR_20 postal_code 
+        TEXT centroid 
+    }
+    farm_members {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        CHAR_36 user_id "FK"
+        VARCHAR_30 access_level 
+        BOOLEAN is_active 
+        DATETIME joined_at 
+    }
+    users ||--o{ user_roles : "user_id"
+    users ||--o{ user_roles : "granted_by"
+    users ||--o{ user_profiles : "user_id"
+    users ||--o{ user_permissions : "user_id"
+    users ||--o{ user_sessions : "user_id"
+    users ||--o{ user_preferences : "user_id"
+    users ||--o{ farms : "owner_id"
+    farms ||--o{ farm_boundaries : "farm_id"
+    farms ||--o{ farm_sections : "farm_id"
+    farms ||--o{ farm_plots : "farm_id"
+    farm_sections ||--o{ farm_plots : "section_id"
+    farms ||--o{ farm_locations : "farm_id"
+    users ||--o{ farm_members : "user_id"
+    farms ||--o{ farm_members : "farm_id"
+```
+
+---
+
+## 3. Crop and Plant ERD
+```mermaid
+erDiagram
+    crop_types {
+        CHAR_36 id "PK"
+        CHAR_36 group_id "FK"
+        VARCHAR_50 code 
+        VARCHAR_100 common_name 
+        VARCHAR_150 botanical_name 
+        TEXT description 
+        FLOAT optimal_temp_min_c 
+        FLOAT optimal_temp_max_c 
+        FLOAT optimal_rainfall_mm 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    crop_groups {
+        CHAR_36 id "PK"
+        VARCHAR_50 code 
+        VARCHAR_100 name 
+        TEXT description 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    crop_instances {
+        CHAR_36 id "PK"
+        CHAR_36 plot_id "FK"
+        CHAR_36 crop_type_id "FK"
+        VARCHAR_100 variety 
+        VARCHAR_30 season 
+        DATE planting_date 
+        DATE expected_harvest_date 
+        DATE actual_harvest_date 
+        VARCHAR_30 status 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    plants {
+        CHAR_36 id "PK"
+        CHAR_36 crop_instance_id "FK"
+        VARCHAR_50 tag_or_id 
+        INTEGER row_number 
+        INTEGER column_number 
+        TEXT plant_location 
+        VARCHAR_30 health_status 
+        DATE planted_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    plant_observations {
+        CHAR_36 id "PK"
+        CHAR_36 plant_id "FK"
+        CHAR_36 observer_id "FK"
+        DATETIME observation_date 
+        TEXT visual_symptoms 
+        INTEGER vigor_score 
+        FLOAT foliage_damage_pct 
+        TEXT observation_notes 
+        DATETIME created_at 
+    }
+    crop_growth_stages {
+        CHAR_36 id "PK"
+        CHAR_36 crop_type_id "FK"
+        VARCHAR_50 stage_name 
+        INTEGER stage_order 
+        INTEGER typical_duration_days 
+        VARCHAR_20 water_requirement_level 
+        DATETIME created_at 
+    }
+    planting_records {
+        CHAR_36 id "PK"
+        CHAR_36 crop_instance_id "FK"
+        VARCHAR_100 seed_lot_number 
+        VARCHAR_200 seed_source 
+        VARCHAR_50 sowing_method 
+        FLOAT planting_density_per_sqm 
+        TEXT fertilization_notes 
+        CHAR_36 recorded_by "FK"
+        DATETIME recorded_at 
+    }
+    crop_groups ||--o{ crop_types : "group_id"
+    crop_types ||--o{ crop_instances : "crop_type_id"
+    crop_instances ||--o{ plants : "crop_instance_id"
+    plants ||--o{ plant_observations : "plant_id"
+    crop_types ||--o{ crop_growth_stages : "crop_type_id"
+    crop_instances ||--o{ planting_records : "crop_instance_id"
+```
+
+---
+
+## 4. Media ERD
+```mermaid
+erDiagram
+    media_files {
+        CHAR_36 id "PK"
+        CHAR_36 uploader_id "FK"
+        VARCHAR_50 storage_provider 
+        VARCHAR_100 bucket_name 
+        VARCHAR_500 object_key 
+        VARCHAR_255 file_name 
+        INTEGER file_size_bytes 
+        VARCHAR_100 mime_type 
+        VARCHAR_64 file_hash_sha256 
+        VARCHAR_20 media_type 
+        FLOAT duration_seconds 
+        INTEGER width_px 
+        INTEGER height_px 
+        DATETIME capture_timestamp 
+        DATETIME upload_timestamp 
+        BOOLEAN is_quarantined 
+        VARCHAR_255 quarantine_reason 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    media_frames {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        INTEGER frame_number 
+        INTEGER timestamp_offset_ms 
+        VARCHAR_500 frame_object_key 
+        INTEGER width_px 
+        INTEGER height_px 
+        FLOAT quality_score 
+        DATETIME created_at 
+    }
+    media_observations {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        CHAR_36 observation_id "FK"
+        VARCHAR_50 media_role 
+        DATETIME attached_at 
+    }
+    media_locations {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        TEXT location 
+        FLOAT altitude_meters 
+        FLOAT gps_accuracy_meters 
+        FLOAT heading_degrees 
+        DATETIME captured_at 
+    }
+    media_analysis_links {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        CHAR_36 analysis_id "FK"
+        CHAR_36 frame_id "FK"
+        DATETIME linked_at 
+    }
+    media_files ||--o{ media_frames : "media_file_id"
+    media_files ||--o{ media_observations : "media_file_id"
+    media_files ||--o{ media_locations : "media_file_id"
+    media_frames ||--o{ media_analysis_links : "frame_id"
+    media_files ||--o{ media_analysis_links : "media_file_id"
+```
+
+---
+
+## 5. Pest and Disease ERD
+```mermaid
+erDiagram
+    pests {
+        CHAR_36 id "PK"
+        CHAR_36 pest_category_id "FK"
+        VARCHAR_150 common_name 
+        VARCHAR_200 scientific_name 
+        TEXT description 
+        TEXT identification_guide 
+        TEXT economic_threshold 
+        VARCHAR_30 quarantine_status 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pest_categories {
+        CHAR_36 id "PK"
+        VARCHAR_50 code 
+        VARCHAR_100 name 
+        TEXT description 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pest_life_cycles {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        VARCHAR_50 stage_name 
+        INTEGER stage_duration_days_min 
+        INTEGER stage_duration_days_max 
+        BOOLEAN damaging_stage 
+        FLOAT favorable_temperature_min 
+        FLOAT favorable_temperature_max 
+        FLOAT favorable_humidity_min 
+        DATETIME created_at 
+    }
+    pest_host_crops {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 crop_type_id "FK"
+        VARCHAR_30 susceptibility_level 
+        INTEGER damage_severity_rating 
+        TEXT notes 
+        DATETIME created_at 
+    }
+    diseases {
+        CHAR_36 id "PK"
+        VARCHAR_150 common_name 
+        VARCHAR_200 scientific_name 
+        VARCHAR_50 pathogen_type 
+        CHAR_36 vector_pest_id "FK"
+        TEXT description 
+        TEXT favorable_conditions 
+        TEXT economic_impact 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    disease_symptoms {
+        CHAR_36 id "PK"
+        CHAR_36 disease_id "FK"
+        VARCHAR_50 affected_plant_part 
+        TEXT symptom_description 
+        VARCHAR_20 severity_scale 
+        BOOLEAN is_primary_symptom 
+        DATETIME created_at 
+    }
+    crop_symptoms {
+        CHAR_36 id "PK"
+        CHAR_36 crop_type_id "FK"
+        CHAR_36 disease_id "FK"
+        CHAR_36 pest_id "FK"
+        VARCHAR_150 symptom_name 
+        TEXT characteristic_appearance 
+        VARCHAR_50 typical_growth_stage 
+        TEXT visual_diagnostic_rules 
+        DATETIME created_at 
+    }
+    pest_damage_records {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 plant_observation_id "FK"
+        VARCHAR_50 damage_type 
+        FLOAT affected_area_percentage 
+        INTEGER severity_index 
+        DATETIME recorded_at 
+    }
+    pest_categories ||--o{ pests : "pest_category_id"
+    pests ||--o{ pest_life_cycles : "pest_id"
+    pests ||--o{ pest_host_crops : "pest_id"
+    pests ||--o{ diseases : "vector_pest_id"
+    diseases ||--o{ disease_symptoms : "disease_id"
+    diseases ||--o{ crop_symptoms : "disease_id"
+    pests ||--o{ crop_symptoms : "pest_id"
+    pests ||--o{ pest_damage_records : "pest_id"
+```
+
+---
+
+## 6. AI Analysis ERD
+```mermaid
+erDiagram
+    ai_analysis {
+        CHAR_36 id "PK"
+        CHAR_36 media_file_id "FK"
+        CHAR_36 requested_by "FK"
+        VARCHAR_30 status 
+        VARCHAR_50 analysis_type 
+        INTEGER processing_time_ms 
+        JSON raw_response 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    ai_predictions {
+        CHAR_36 id "PK"
+        CHAR_36 analysis_id "FK"
+        CHAR_36 model_version_id "FK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        VARCHAR_150 primary_diagnosis 
+        NUMERIC_5__4 confidence_score 
+        VARCHAR_20 severity_level 
+        DATETIME inference_timestamp 
+        BOOLEAN is_superseded 
+        DATETIME created_at 
+    }
+    ai_detections {
+        CHAR_36 id "PK"
+        CHAR_36 prediction_id "FK"
+        VARCHAR_100 label 
+        NUMERIC_6__4 bbox_x_min 
+        NUMERIC_6__4 bbox_y_min 
+        NUMERIC_6__4 bbox_x_max 
+        NUMERIC_6__4 bbox_y_max 
+        NUMERIC_5__4 detection_confidence 
+        TEXT mask_rle 
+        DATETIME created_at 
+    }
+    ai_confidence {
+        CHAR_36 id "PK"
+        CHAR_36 prediction_id "FK"
+        VARCHAR_100 class_label 
+        NUMERIC_5__4 probability 
+        VARCHAR_50 calibration_method 
+        FLOAT entropy_score 
+        DATETIME created_at 
+    }
+    ai_model_versions {
+        CHAR_36 id "PK"
+        VARCHAR_100 model_name 
+        VARCHAR_50 version_tag 
+        VARCHAR_50 model_family 
+        VARCHAR_64 weights_digest_sha256 
+        VARCHAR_50 training_dataset_version 
+        FLOAT f1_score 
+        FLOAT accuracy 
+        VARCHAR_50 inference_runtime 
+        BOOLEAN is_active 
+        DATETIME deployed_at 
+        DATETIME retired_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    ai_feedback {
+        CHAR_36 id "PK"
+        CHAR_36 diagnosis_record_id "FK"
+        CHAR_36 prediction_id "FK"
+        CHAR_36 user_id "FK"
+        VARCHAR_50 feedback_type 
+        CHAR_36 corrected_pest_id "FK"
+        CHAR_36 corrected_disease_id "FK"
+        TEXT comments 
+        DATETIME submitted_at 
+    }
+    diagnosis_records {
+        CHAR_36 id "PK"
+        CHAR_36 analysis_id "FK"
+        CHAR_36 prediction_id "FK"
+        CHAR_36 verified_by "FK"
+        CHAR_36 confirmed_pest_id "FK"
+        CHAR_36 confirmed_disease_id "FK"
+        VARCHAR_50 confirmation_status 
+        TEXT expert_notes 
+        DATETIME diagnosed_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    ai_analysis ||--o{ ai_predictions : "analysis_id"
+    ai_model_versions ||--o{ ai_predictions : "model_version_id"
+    ai_predictions ||--o{ ai_detections : "prediction_id"
+    ai_predictions ||--o{ ai_confidence : "prediction_id"
+    diagnosis_records ||--o{ ai_feedback : "diagnosis_record_id"
+    ai_predictions ||--o{ ai_feedback : "prediction_id"
+    ai_predictions ||--o{ diagnosis_records : "prediction_id"
+    ai_analysis ||--o{ diagnosis_records : "analysis_id"
+```
+
+---
+
+## 7. Pest Management ERD
+```mermaid
+erDiagram
+    ipm_methods {
+        CHAR_36 id "PK"
+        VARCHAR_50 code 
+        VARCHAR_150 title 
+        VARCHAR_50 category 
+        TEXT description 
+        VARCHAR_20 environmental_impact_rating 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pest_control_options {
+        CHAR_36 id "PK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        CHAR_36 crop_type_id "FK"
+        CHAR_36 ipm_method_id "FK"
+        TEXT strategy_summary 
+        VARCHAR_100 applicability_window 
+        VARCHAR_20 effectiveness_rating 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    biological_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_150 agent_name 
+        VARCHAR_50 agent_type 
+        CHAR_36 target_pest_id "FK"
+        VARCHAR_100 release_rate 
+        VARCHAR_100 optimal_timing 
+        TEXT conservation_practices 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    mechanical_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_150 method_name 
+        VARCHAR_200 equipment_needed 
+        VARCHAR_20 labor_intensity 
+        TEXT execution_steps 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    cultural_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_50 practice_type 
+        TEXT implementation_protocol 
+        VARCHAR_100 recommended_timing 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    physical_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_50 control_mechanism 
+        TEXT technical_parameters 
+        TEXT installation_guide 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    behavioral_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_50 attractant_type 
+        INTEGER trap_density_per_hectare 
+        INTEGER replacement_interval_days 
+        VARCHAR_100 monitoring_threshold 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    chemical_controls {
+        CHAR_36 id "PK"
+        CHAR_36 ipm_method_id "FK"
+        VARCHAR_150 active_ingredient 
+        VARCHAR_100 chemical_class 
+        VARCHAR_200 mode_of_action 
+        VARCHAR_50 resistance_risk_group 
+        VARCHAR_20 toxicity_class 
+        INTEGER phi_days 
+        INTEGER rei_hours 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pesticide_registrations {
+        CHAR_36 id "PK"
+        CHAR_36 chemical_control_id "FK"
+        VARCHAR_100 registration_number 
+        VARCHAR_100 registering_authority 
+        VARCHAR_150 registered_trade_name 
+        CHAR_36 approved_crop_id "FK"
+        CHAR_36 approved_pest_id "FK"
+        VARCHAR_100 approved_dosage_per_ha 
+        DATE approval_date 
+        DATE expiry_date 
+        VARCHAR_30 status 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    treatment_records {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 crop_instance_id "FK"
+        CHAR_36 applied_by "FK"
+        CHAR_36 ipm_method_id "FK"
+        CHAR_36 chemical_control_id "FK"
+        CHAR_36 registration_id "FK"
+        DATETIME application_date 
+        VARCHAR_100 dosage_applied 
+        VARCHAR_150 weather_conditions_at_spray 
+        VARCHAR_200 safety_equipment_used 
+        TEXT notes 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    treatment_effectiveness {
+        CHAR_36 id "PK"
+        CHAR_36 treatment_record_id "FK"
+        DATETIME evaluation_date 
+        INTEGER days_post_treatment 
+        FLOAT pest_mortality_percentage 
+        INTEGER crop_recovery_score 
+        BOOLEAN phytotoxicity_observed 
+        CHAR_36 evaluator_id "FK"
+        TEXT evaluation_notes 
+        DATETIME created_at 
+    }
+    ipm_methods ||--o{ pest_control_options : "ipm_method_id"
+    ipm_methods ||--o{ biological_controls : "ipm_method_id"
+    ipm_methods ||--o{ mechanical_controls : "ipm_method_id"
+    ipm_methods ||--o{ cultural_controls : "ipm_method_id"
+    ipm_methods ||--o{ physical_controls : "ipm_method_id"
+    ipm_methods ||--o{ behavioral_controls : "ipm_method_id"
+    ipm_methods ||--o{ chemical_controls : "ipm_method_id"
+    chemical_controls ||--o{ pesticide_registrations : "chemical_control_id"
+    ipm_methods ||--o{ treatment_records : "ipm_method_id"
+    pesticide_registrations ||--o{ treatment_records : "registration_id"
+    chemical_controls ||--o{ treatment_records : "chemical_control_id"
+    treatment_records ||--o{ treatment_effectiveness : "treatment_record_id"
+```
+
+---
+
+## 8. Hotspot and Outbreak ERD
+```mermaid
+erDiagram
+    pest_reports {
+        CHAR_36 id "PK"
+        CHAR_36 reporter_id "FK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 reported_pest_id "FK"
+        CHAR_36 reported_disease_id "FK"
+        TEXT report_location 
+        VARCHAR_20 severity 
+        DATETIME observation_date 
+        VARCHAR_30 status 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    verified_cases {
+        CHAR_36 id "PK"
+        CHAR_36 pest_report_id "FK"
+        CHAR_36 verifier_id "FK"
+        TEXT confirmed_location 
+        CHAR_36 confirmed_pest_id "FK"
+        CHAR_36 confirmed_disease_id "FK"
+        VARCHAR_20 confidence_level 
+        DATETIME verified_at 
+        TEXT notes 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    hotspot_regions {
+        CHAR_36 id "PK"
+        VARCHAR_150 region_name 
+        TEXT boundary_geom 
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        VARCHAR_20 risk_level 
+        INTEGER active_case_count 
+        DATE start_date 
+        DATE end_date 
+        BOOLEAN is_active 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    regional_pest_statistics {
+        CHAR_36 id "PK"
+        VARCHAR_50 region_code 
+        DATE date_bucket 
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        INTEGER total_reports 
+        INTEGER verified_count 
+        FLOAT incidence_rate 
+        FLOAT average_severity 
+        DATETIME calculated_at 
+    }
+    outbreak_predictions {
+        CHAR_36 id "PK"
+        TEXT region_geom 
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        NUMERIC_5__4 predicted_risk_score 
+        INTEGER forecast_horizon_days 
+        CHAR_36 prediction_model_version "FK"
+        DATETIME prediction_timestamp 
+        DATETIME valid_from 
+        DATETIME valid_until 
+        DATETIME created_at 
+    }
+    spread_observations {
+        CHAR_36 id "PK"
+        CHAR_36 hotspot_id "FK"
+        TEXT observation_location 
+        FLOAT spread_direction_degrees 
+        FLOAT spread_rate_km_per_day 
+        DATETIME observed_at 
+        CHAR_36 recorder_id "FK"
+        DATETIME created_at 
+    }
+    risk_history {
+        CHAR_36 id "PK"
+        VARCHAR_50 region_code 
+        DATETIME timestamp 
+        CHAR_36 pest_id "FK"
+        NUMERIC_5__4 historical_risk_score 
+        TEXT weather_conditions 
+        VARCHAR_100 source_run_id 
+        DATETIME recorded_at 
+    }
+    monitoring_coverage {
+        CHAR_36 id "PK"
+        VARCHAR_150 area_name 
+        TEXT boundary 
+        INTEGER assigned_scouts_count 
+        INTEGER scouting_frequency_days 
+        DATE last_monitored_date 
+        FLOAT coverage_percentage 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    pest_reports ||--o{ verified_cases : "pest_report_id"
+    hotspot_regions ||--o{ spread_observations : "hotspot_id"
+```
+
+---
+
+## 9. Recovery and Inspection ERD
+```mermaid
+erDiagram
+    inspections {
+        CHAR_36 id "PK"
+        CHAR_36 farm_id "FK"
+        CHAR_36 plot_id "FK"
+        CHAR_36 inspector_id "FK"
+        DATE scheduled_date 
+        DATETIME conducted_at 
+        VARCHAR_30 status 
+        INTEGER overall_health_rating 
+        TEXT findings_summary 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    inspection_assignments {
+        CHAR_36 id "PK"
+        CHAR_36 inspection_id "FK"
+        CHAR_36 agent_id "FK"
+        CHAR_36 assigned_by "FK"
+        DATETIME assigned_at 
+        VARCHAR_50 role_in_inspection 
+        VARCHAR_30 status 
+    }
+    scouting_records {
+        CHAR_36 id "PK"
+        CHAR_36 inspection_id "FK"
+        TEXT waypoint_location 
+        INTEGER plant_count_inspected 
+        INTEGER infested_plant_count 
+        CHAR_36 pest_id "FK"
+        TEXT notes 
+        DATETIME recorded_at 
+    }
+    recovery_records {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 crop_instance_id "FK"
+        CHAR_36 treatment_record_id "FK"
+        CHAR_36 inspection_id "FK"
+        VARCHAR_30 recovery_status 
+        FLOAT recovery_percentage 
+        DATETIME assessed_at 
+        CHAR_36 assessor_id "FK"
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    recovery_comparisons {
+        CHAR_36 id "PK"
+        CHAR_36 recovery_record_id "FK"
+        CHAR_36 baseline_media_id "FK"
+        CHAR_36 current_media_id "FK"
+        FLOAT symptom_reduction_percentage 
+        INTEGER foliage_regrowth_score 
+        TEXT comparison_notes 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    seasonal_history {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        INTEGER season_year 
+        VARCHAR_30 season_name 
+        CHAR_36 crop_type_id "FK"
+        FLOAT total_yield_kg 
+        VARCHAR_20 pest_pressure_rating 
+        TEXT weather_summary 
+        DATETIME recorded_at 
+    }
+    infestation_history {
+        CHAR_36 id "PK"
+        CHAR_36 farm_plot_id "FK"
+        CHAR_36 crop_instance_id "FK"
+        CHAR_36 pest_id "FK"
+        CHAR_36 disease_id "FK"
+        DATE outbreak_start_date 
+        VARCHAR_20 peak_severity 
+        DATE containment_date 
+        FLOAT crop_loss_percentage 
+        DATETIME recorded_at 
+    }
+    inspections ||--o{ inspection_assignments : "inspection_id"
+    inspections ||--o{ scouting_records : "inspection_id"
+    inspections ||--o{ recovery_records : "inspection_id"
+    recovery_records ||--o{ recovery_comparisons : "recovery_record_id"
+```
+
+---
+
+## 10. Chatbot and Knowledge ERD
+```mermaid
+erDiagram
+    chat_sessions {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_150 title 
+        VARCHAR_10 language 
+        VARCHAR_20 channel 
+        BOOLEAN is_active 
+        DATETIME started_at 
+        DATETIME ended_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    chat_messages {
+        CHAR_36 id "PK"
+        CHAR_36 session_id "FK"
+        VARCHAR_20 sender_type 
+        TEXT message_text 
+        INTEGER sequence_number 
+        JSON cited_sources 
+        DATETIME sent_at 
+    }
+    knowledge_articles {
+        CHAR_36 id "PK"
+        VARCHAR_255 title 
+        VARCHAR_255 slug 
+        INTEGER version 
+        CHAR_36 author_id "FK"
+        VARCHAR_100 category 
+        TEXT summary 
+        TEXT content 
+        VARCHAR_20 status 
+        BOOLEAN is_current 
+        DATETIME published_at 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    knowledge_chunks {
+        CHAR_36 id "PK"
+        CHAR_36 article_id "FK"
+        INTEGER chunk_index 
+        TEXT content_chunk 
+        INTEGER token_count 
+        DATETIME created_at 
+    }
+    knowledge_embeddings {
+        CHAR_36 id "PK"
+        CHAR_36 chunk_id "FK"
+        VARCHAR_100 embedding_model 
+        TEXT embedding_vector 
+        INTEGER dimension 
+        DATETIME created_at 
+    }
+    chatbot_feedback {
+        CHAR_36 id "PK"
+        CHAR_36 message_id "FK"
+        CHAR_36 user_id "FK"
+        INTEGER rating 
+        BOOLEAN is_helpful 
+        TEXT feedback_text 
+        DATETIME submitted_at 
+    }
+    chat_sessions ||--o{ chat_messages : "session_id"
+    knowledge_articles ||--o{ knowledge_chunks : "article_id"
+    knowledge_chunks ||--o{ knowledge_embeddings : "chunk_id"
+    chat_messages ||--o{ chatbot_feedback : "message_id"
+```
+
+---
+
+## 11. Notification ERD
+```mermaid
+erDiagram
+    notifications {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_200 title 
+        TEXT body 
+        VARCHAR_50 notification_type 
+        VARCHAR_20 priority 
+        VARCHAR_20 status 
+        VARCHAR_20 channel 
+        INTEGER retry_count 
+        DATETIME sent_at 
+        DATETIME read_at 
+        DATETIME created_at 
+    }
+    alert_rules {
+        CHAR_36 id "PK"
+        VARCHAR_100 rule_name 
+        VARCHAR_50 event_type 
+        TEXT condition_expression 
+        NUMERIC_8__4 threshold_value 
+        VARCHAR_50 target_role 
+        BOOLEAN is_active 
+        CHAR_36 created_by "FK"
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    user_alert_preferences {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        BOOLEAN push_enabled 
+        BOOLEAN sms_enabled 
+        BOOLEAN email_enabled 
+        VARCHAR_5 quiet_hours_start 
+        VARCHAR_5 quiet_hours_end 
+        VARCHAR_20 min_priority_threshold 
+        DATETIME created_at 
+        DATETIME updated_at 
+    }
+    scheduled_tasks {
+        CHAR_36 id "PK"
+        VARCHAR_100 task_name 
+        VARCHAR_50 task_type 
+        CHAR_36 target_user_id "FK"
+        DATETIME scheduled_time 
+        VARCHAR_50 recurrence_pattern 
+        VARCHAR_20 status 
+        DATETIME last_run_at 
+        DATETIME next_run_at 
+        INTEGER retry_count 
+        DATETIME created_at 
+    }
+    sync_logs {
+        CHAR_36 id "PK"
+        CHAR_36 user_id "FK"
+        VARCHAR_100 device_id 
+        VARCHAR_50 sync_entity_type 
+        DATETIME client_timestamp 
+        DATETIME server_timestamp 
+        INTEGER records_synced 
+        VARCHAR_30 sync_status 
+        VARCHAR_50 conflict_resolution_strategy 
+        TEXT error_details 
+        DATETIME created_at 
+    }
+```
+
+---

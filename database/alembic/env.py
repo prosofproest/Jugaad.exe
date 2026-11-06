@@ -13,8 +13,12 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# target_metadata = None
-target_metadata = None
+# Target metadata for Alembic migrations
+try:
+    from database.models import Base
+    target_metadata = Base.metadata
+except ImportError:
+    target_metadata = None
 
 # Allow DATABASE_URL or POSTGRES_URL environment variables to override
 db_url = os.getenv("DATABASE_URL") or os.getenv("POSTGRES_URL")
