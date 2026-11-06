@@ -8,7 +8,7 @@ opt-in checks. Demo forecasts are never promoted to operational alerts.
 from __future__ import annotations
 
 import hashlib
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -39,17 +39,15 @@ DEFAULT_CHANNEL_ENABLED = {"in_app": True, "email": False, "sms": False}
 SUPPORTED_CHANNELS = {"in_app"}
 FEEDBACK_RATINGS = {"useful", "not_useful", "inaccurate"}
 MESSAGE_VERSION = "alert-template-2026-11-v1"
-NOT_CONFIRMATION = (
-    "This is an early warning, not confirmation of disease in your field."
-)
+NOT_CONFIRMATION = "This is an early warning, not confirmation of disease in your field."
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _normalise(value: datetime) -> datetime:
-    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 def _policy_for(db: Session, *, geo_code: str, target_code: str) -> AlertPolicy | None:
@@ -63,9 +61,7 @@ def _policy_for(db: Session, *, geo_code: str, target_code: str) -> AlertPolicy 
     )
 
 
-def evaluate(
-    db: Session, *, forecast: Forecast, policy: AlertPolicy | None = None
-) -> dict:
+def evaluate(db: Session, *, forecast: Forecast, policy: AlertPolicy | None = None) -> dict:
     """Evaluate every alert trigger gate without mutating state."""
 
     checks: list[dict] = []
@@ -87,12 +83,8 @@ def evaluate(
     stale = forecast.valid_to < now
     checks.append({"gate": "freshness", "passed": not stale})
 
-    policy = policy or _policy_for(
-        db, geo_code=forecast.geo_code, target_code=forecast.target_code
-    )
-    checks.append(
-        {"gate": "policy_active", "passed": bool(policy and policy.active)}
-    )
+    policy = policy or _policy_for(db, geo_code=forecast.geo_code, target_code=forecast.target_code)
+    checks.append({"gate": "policy_active", "passed": bool(policy and policy.active)})
 
     if policy is None:
         return {
@@ -101,9 +93,7 @@ def evaluate(
             "checks": checks,
         }
 
-    band_ok = BAND_RANK.get(forecast.risk_band, -1) >= BAND_RANK.get(
-        policy.min_band, 99
-    )
+    band_ok = BAND_RANK.get(forecast.risk_band, -1) >= BAND_RANK.get(policy.min_band, 99)
     checks.append(
         {
             "gate": "risk_band",
@@ -248,9 +238,7 @@ def generate(
     )
     is_update = False
     if same_window is not None:
-        if BAND_RANK.get(forecast.risk_band, 0) <= BAND_RANK.get(
-            same_window.band, 0
-        ):
+        if BAND_RANK.get(forecast.risk_band, 0) <= BAND_RANK.get(same_window.band, 0):
             return None, {
                 **evaluation,
                 "eligible": False,
@@ -349,9 +337,7 @@ def _preference(
     )
 
 
-def _channel_enabled(
-    db: Session, *, user_id: str, channel: str, target_code: str
-) -> bool:
+def _channel_enabled(db: Session, *, user_id: str, channel: str, target_code: str) -> bool:
     pref = _preference(db, user_id=user_id, channel=channel, target_code=target_code)
     if pref is None:
         return DEFAULT_CHANNEL_ENABLED.get(channel, False)
@@ -409,9 +395,7 @@ def dispatch(
 
     for user_id in _recipient_ids(db, alert):
         for channel in channels:
-            pref = _preference(
-                db, user_id=user_id, channel=channel, target_code=alert.target_code
-            )
+            pref = _preference(db, user_id=user_id, channel=channel, target_code=alert.target_code)
             enabled = _channel_enabled(
                 db, user_id=user_id, channel=channel, target_code=alert.target_code
             )
@@ -424,9 +408,7 @@ def dispatch(
             elif channel in {"sms", "email"} and _in_quiet_hours(pref, now):
                 status, reason = "suppressed", "quiet_hours"
             else:
-                recent = _recent_delivery(
-                    db, user_id=user_id, alert=alert, channel=channel
-                )
+                recent = _recent_delivery(db, user_id=user_id, alert=alert, channel=channel)
                 if recent is not None:
                     previous_delivery, previous_alert = recent
                     within_cooldown = previous_delivery.created_at > now - timedelta(
@@ -455,9 +437,7 @@ def dispatch(
     return deliveries
 
 
-def list_for_user(
-    db: Session, *, user: User, channel: str, limit: int = 50
-) -> dict:
+def list_for_user(db: Session, *, user: User, channel: str, limit: int = 50) -> dict:
     query = (
         select(AlertDelivery, Alert)
         .join(Alert, Alert.id == AlertDelivery.alert_id)
@@ -485,9 +465,7 @@ def list_for_user(
                 "coverage": alert.coverage,
                 "reason_summary": alert.reason_summary,
                 "message_version": alert.message_version,
-                "issue_time": _normalise(forecast.issue_time).isoformat()
-                if forecast
-                else None,
+                "issue_time": _normalise(forecast.issue_time).isoformat() if forecast else None,
                 "notice": NOT_CONFIRMATION,
                 "is_demo": alert.is_demo,
             }
@@ -710,9 +688,7 @@ def pause_policy(db: Session, *, actor: User, policy_id: str, reason: str) -> Al
     return row
 
 
-def feedback_report(
-    db: Session, *, geo_code: str | None, target_code: str | None
-) -> dict:
+def feedback_report(db: Session, *, geo_code: str | None, target_code: str | None) -> dict:
     query = (
         select(
             AlertFeedback.rating,

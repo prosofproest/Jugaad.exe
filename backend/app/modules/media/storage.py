@@ -13,7 +13,7 @@ from pathlib import Path
 
 from app.core.config import get_settings
 from app.core.errors import ApiError
-from app.core.security import sign_payload, verify_signed_payload, TokenError
+from app.core.security import TokenError, sign_payload, verify_signed_payload
 
 
 def _root() -> Path:

@@ -15,9 +15,7 @@ from app.modules.video.tracker import BYTETRACK_LITE_VERSION, ByteTrackLiteTrack
 
 
 def _clip(path: Path, frames: int = 30, size: int = 320) -> Path:
-    writer = cv2.VideoWriter(
-        str(path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (size, size)
-    )
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (size, size))
     assert writer.isOpened()
     for index in range(frames):
         frame = np.full((size, size, 3), (34, 139, 34), dtype=np.uint8)

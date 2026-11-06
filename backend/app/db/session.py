@@ -61,10 +61,23 @@ def get_session_factory() -> sessionmaker[Session]:
 
 
 def get_session() -> Iterator[Session]:
-    """FastAPI dependency: one transaction-scoped session per request."""
+    """FastAPI dependency: one transaction-scoped session per request.
+
+    Commits on success and rolls back on exception so that flush-only
+    service code (conversations, uploads, videos) persists across requests.
+    Routes that already call ``db.commit()`` explicitly are unaffected: the
+    second commit is a no-op. This mirrors the test fixture in
+    ``tests/test_chat_api.py``, which overrides this dependency with a
+    committing version — without it, a live server silently rolls back every
+    request when the session closes.
+    """
     session = get_session_factory()()
     try:
         yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
 
@@ -84,8 +97,8 @@ def reset_engine() -> None:
 
 def init_db(*, seed: bool = True) -> None:
     """Create all tables for local dev/test and seed reference data."""
-    from app.db.base import Base
     from app.db import models  # noqa: F401  (registers mappers)
+    from app.db.base import Base
 
     Base.metadata.create_all(bind=get_engine())
     if seed:

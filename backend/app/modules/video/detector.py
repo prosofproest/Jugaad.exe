@@ -69,9 +69,7 @@ class MotionRegionDetector:
             gray = cv2.resize(gray, size, interpolation=cv2.INTER_AREA)
         return cv2.GaussianBlur(gray, (5, 5), 0)
 
-    def detect(
-        self, frame_bgr: np.ndarray, previous_gray: np.ndarray | None
-    ) -> list[Detection]:
+    def detect(self, frame_bgr: np.ndarray, previous_gray: np.ndarray | None) -> list[Detection]:
         gray = self.prepare(frame_bgr)
         if previous_gray is None or previous_gray.shape != gray.shape:
             return []

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import hashlib
 import re
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -140,7 +140,7 @@ _REQUIRED_DISCLAIMER = re.compile(
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def find_violations(text: str) -> list[dict[str, str]]:
@@ -192,14 +192,10 @@ def _validate_target(db: Session, crop_code: str, target_code: str) -> None:
     if crop is None or not crop.supported:
         raise ApiError(422, "unsupported_crop", "Crop is not on the validated allowlist")
     target = db.scalar(
-        select(Target).where(
-            Target.crop_code == crop_code, Target.code == target_code
-        )
+        select(Target).where(Target.crop_code == crop_code, Target.code == target_code)
     )
     if target is None or not target.supported:
-        raise ApiError(
-            422, "unsupported_target", "Target is not on the validated allowlist"
-        )
+        raise ApiError(422, "unsupported_target", "Target is not on the validated allowlist")
 
 
 def _validate_scope(db: Session, geo_scope: list[str]) -> list[str]:
@@ -223,9 +219,7 @@ def _validate_common(
     body: str,
 ) -> None:
     if language not in ALLOWED_LANGUAGES:
-        raise ApiError(
-            422, "unsupported_language", "Advisory language must be en or kn"
-        )
+        raise ApiError(422, "unsupported_language", "Advisory language must be en or kn")
     unknown = sorted(set(action_types) - ALLOWED_ACTION_TYPES)
     if unknown:
         raise ApiError(
@@ -512,9 +506,7 @@ def approve_version(
     return version
 
 
-def withdraw(
-    db: Session, *, user: User, advisory_id: str, reason: str
-) -> Advisory:
+def withdraw(db: Session, *, user: User, advisory_id: str, reason: str) -> Advisory:
     if "can_approve_advisory" not in identity_service.active_permissions(db, user.id):
         raise ApiError(
             403,
@@ -617,9 +609,7 @@ def list_serving(
 ) -> dict:
     if language not in ALLOWED_LANGUAGES:
         raise ApiError(422, "unsupported_language", "Supported languages are en and kn")
-    rows = _serving_rows(
-        db, crop=crop, target=target, geo=geo, language=language
-    )
+    rows = _serving_rows(db, crop=crop, target=target, geo=geo, language=language)
     language_fallback = False
     if not rows and language != "en":
         rows = _serving_rows(db, crop=crop, target=target, geo=geo, language="en")
@@ -638,9 +628,7 @@ def list_serving(
     return payload
 
 
-def list_drafts(
-    db: Session, *, crop: str | None = None, target: str | None = None
-) -> dict:
+def list_drafts(db: Session, *, crop: str | None = None, target: str | None = None) -> dict:
     query = select(Advisory).where(Advisory.status != "withdrawn")
     if crop:
         query = query.where(Advisory.crop_code == crop)
@@ -711,9 +699,7 @@ def get_detail(db: Session, advisory_id: str) -> dict:
                 "valid_from": row.valid_from.isoformat(),
                 "valid_to": row.valid_to.isoformat(),
                 "approved": db.scalar(
-                    select(AdvisoryApproval).where(
-                        AdvisoryApproval.version_id == row.id
-                    )
+                    select(AdvisoryApproval).where(AdvisoryApproval.version_id == row.id)
                 )
                 is not None,
                 "created_at": row.created_at.isoformat(),

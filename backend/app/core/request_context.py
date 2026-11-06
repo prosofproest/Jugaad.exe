@@ -11,7 +11,7 @@ import logging
 import sys
 import time
 from contextvars import ContextVar
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -28,7 +28,7 @@ def get_request_id() -> str:
 
 def log_event(event: str, level: int = logging.INFO, **fields: object) -> None:
     record = {
-        "ts": datetime.now(timezone.utc).isoformat(),
+        "ts": datetime.now(UTC).isoformat(),
         "level": logging.getLevelName(level).lower(),
         "event": event,
         "request_id": get_request_id(),

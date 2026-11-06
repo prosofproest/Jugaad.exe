@@ -7,7 +7,7 @@ interface Section {
   href: string;
   label: string;
   detail: string;
-  icon: "overview" | "camera" | "map" | "review";
+  icon: "overview" | "camera" | "map" | "review" | "admin";
 }
 
 const SECTIONS: Section[] = [
@@ -34,6 +34,12 @@ const SECTIONS: Section[] = [
     label: "Review queue",
     detail: "Expert verification",
     icon: "review",
+  },
+  {
+    href: "/admin",
+    label: "Admin",
+    detail: "Identity management",
+    icon: "admin",
   },
 ];
 
@@ -88,6 +94,13 @@ function Icon({ name }: { name: Section["icon"] }) {
         <svg {...common}>
           <path d="M9 4h6l1 2h3a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3l1-2Z" />
           <path d="m8.5 13 2.2 2.2L16 10" />
+        </svg>
+      );
+    case "admin":
+      return (
+        <svg {...common}>
+          <path d="M12 3 5 6v5c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3Z" />
+          <path d="m9.5 12 1.8 1.8L15 10" />
         </svg>
       );
   }

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query
@@ -10,7 +10,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.dependencies import get_current_user, require_roles
+from app.core.dependencies import require_roles
 from app.db.models import ReviewAssignment, User
 from app.db.session import get_db
 from app.modules.review import service
@@ -90,7 +90,7 @@ def claim_case(
             .order_by(ReviewAssignment.assigned_at.desc())
         )
         if assignment is not None:
-            assignment.expires_at = datetime.now(timezone.utc)
+            assignment.expires_at = datetime.now(UTC)
         db.commit()
         return {"observation_id": observation.id, "claimed_by": None}
     result = service.claim(db, user=user, observation_id=observation_id)

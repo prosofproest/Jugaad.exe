@@ -49,9 +49,7 @@ class GenerateRequest(BaseModel):
 
 
 @router.get("/notification-preferences")
-def list_preferences(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
-) -> dict:
+def list_preferences(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     return service.list_preferences(db, user=user)
 
 

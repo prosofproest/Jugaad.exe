@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-
-from sqlalchemy import or_, select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime
 
 from app.core.config import get_settings
 from app.core.dependencies import assigned_area_codes, can_read_observation
 from app.core.errors import ApiError
 from app.core.idempotency import find_existing, remember
-from app.db.base import new_id
 from app.db.models import (
     Crop,
     Geography,
@@ -27,10 +23,12 @@ from app.modules.assessment import service as assessment_service
 from app.modules.audit.service import record_audit
 from app.modules.identity import service as identity_service
 from app.modules.media import storage
+from sqlalchemy import or_, select
+from sqlalchemy.orm import Session
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def get_observation(db: Session, observation_id: str) -> Observation:
@@ -40,9 +38,7 @@ def get_observation(db: Session, observation_id: str) -> Observation:
     return observation
 
 
-def readable_observation(
-    db: Session, user: User, observation_id: str
-) -> Observation:
+def readable_observation(db: Session, user: User, observation_id: str) -> Observation:
     observation = get_observation(db, observation_id)
     if not can_read_observation(db, user, observation):
         # Cross-user access is deliberately indistinguishable from absence.
@@ -56,9 +52,7 @@ def writable_observation(db: Session, user: User, observation_id: str) -> Observ
     owns = observation.user_id == user.id or observation.subject_user_id == user.id
     if owns:
         return observation
-    if "extension_worker" in roles and observation.area_code in assigned_area_codes(
-        db, user.id
-    ):
+    if "extension_worker" in roles and observation.area_code in assigned_area_codes(db, user.id):
         return observation
     raise ApiError(404, "not_found", "Observation not found")
 
@@ -74,9 +68,7 @@ def serialize_observation(db: Session, observation: Observation) -> dict:
         "variety": observation.variety,
         "growth_stage": observation.growth_stage,
         "notes": observation.notes,
-        "captured_at": observation.captured_at.isoformat()
-        if observation.captured_at
-        else None,
+        "captured_at": observation.captured_at.isoformat() if observation.captured_at else None,
         "submitted_at": observation.submitted_at.isoformat(),
         "is_demo": observation.is_demo,
         "verification": {
@@ -135,9 +127,7 @@ def create_observation(
     if existing is not None:
         return existing, False
 
-    record = find_existing(
-        db, user_id=user.id, scope="observation.create", key=idempotency_key
-    )
+    record = find_existing(db, user_id=user.id, scope="observation.create", key=idempotency_key)
     if record is not None:
         if record.entity_id:
             existing = db.get(Observation, record.entity_id)
@@ -221,7 +211,7 @@ def _parse_cursor(cursor: str) -> datetime:
         value = datetime.fromisoformat(cursor.replace("Z", "+00:00"))
     except ValueError as error:
         raise ApiError(422, "invalid_cursor", "Cursor is not a valid timestamp") from error
-    return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 def create_upload_url(
@@ -273,9 +263,7 @@ def create_upload_url(
     return {"image_id": image.id, **descriptor}
 
 
-def complete_upload(
-    db: Session, *, user: User, observation: Observation, image_id: str
-) -> dict:
+def complete_upload(db: Session, *, user: User, observation: Observation, image_id: str) -> dict:
     image = db.get(ImageAsset, image_id)
     if image is None or image.observation_id != observation.id:
         raise ApiError(404, "not_found", "Image not found for this observation")
