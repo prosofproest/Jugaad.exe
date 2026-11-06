@@ -9,8 +9,8 @@ a safe generic sentence and the block is recorded.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from app.modules.assessments.decision import Decision
 from app.modules.assessments.policy import TriagePolicy
@@ -33,15 +33,15 @@ _FORBIDDEN_PATTERNS: tuple[re.Pattern[str], ...] = tuple(
     )
 )
 
-_SAFE_FALLBACK = (
-    "A safe assessment could not be shown for this image. " + NOT_A_DIAGNOSIS
-)
+_SAFE_FALLBACK = "A safe assessment could not be shown for this image. " + NOT_A_DIAGNOSIS
 
 _QUALITY_TEXT: dict[str, str] = {
     "blurry": "The image is too blurry to assess. Hold the camera steady and retake it.",
     "dark": "The image is too dark to assess. Move into even light and retake it.",
     "overexposed": "The image is too bright to assess. Avoid direct glare and retake it.",
-    "low_resolution": "The image is too small to assess. Move closer and retake it at a higher resolution.",
+    "low_resolution": (
+        "The image is too small to assess. Move closer and retake it at a higher resolution."
+    ),
     "no_plant": "No plant is clearly visible. Frame the affected leaf or stem and retake it.",
 }
 
@@ -52,15 +52,11 @@ _REASON_TEXT: dict[str, str] = {
     "low_margin": (
         "More than one condition looks similarly likely, so no single match is reliable."
     ),
-    "high_entropy": (
-        "The visual evidence is too mixed to choose a reliable match."
-    ),
+    "high_entropy": ("The visual evidence is too mixed to choose a reliable match."),
     "out_of_distribution": (
         "The image is outside the range of field images this model was validated on."
     ),
-    "unsupported_crop": (
-        "This crop is not supported in this release, so no assessment is made."
-    ),
+    "unsupported_crop": ("This crop is not supported in this release, so no assessment is made."),
 }
 
 

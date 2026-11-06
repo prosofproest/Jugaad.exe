@@ -45,9 +45,7 @@ def make_body(**overrides: str) -> AdvisoryBody:
         "what_this_is_about": (
             "Leaf spotting on the supported crop in the defined area and time window."
         ),
-        "what_you_may_see": (
-            "Small dark spots on leaves; leaves may yellow around the spots."
-        ),
+        "what_you_may_see": ("Small dark spots on leaves; leaves may yellow around the spots."),
         "what_to_do_now": (
             "Inspect plants across the field and keep a photo record for comparison."
         ),
@@ -133,8 +131,7 @@ def make_policy(
             "target_code": target_code,
             "min_band": min_band,
             "min_coverage": min_coverage,
-            "cooldowns": cooldowns
-            or {"low": 24.0, "moderate": 24.0, "high": 24.0, "urgent": 24.0},
+            "cooldowns": cooldowns or {"low": 24.0, "moderate": 24.0, "high": 24.0, "urgent": 24.0},
             "channels": channels,
             "template_version": template_version,
             "approved_by": "agronomist-1",
@@ -283,7 +280,5 @@ class InspectingProvider:
         history = service.history()
         self.history_lengths.append(len(history))
         if history:
-            self.delivery_statuses.extend(
-                delivery.status for delivery in history[0].deliveries
-            )
+            self.delivery_statuses.extend(delivery.status for delivery in history[0].deliveries)
         return ProviderReceipt(status="delivered", provider_ref="ref-inspected")

@@ -28,11 +28,10 @@ def test_two_outputs_are_not_merged_in_the_contract() -> None:
     paths = client.get("/openapi.json").json()["paths"]
     schema = client.get("/openapi.json").json()
 
-    # Photo assessment is served as its own resource. Area outlook arrives in
-    # Phase 4 as a separate resource and must never be folded into assessment
-    # or chat.
+    # Photo assessment is served as its own resource. Area outlook is a separate
+    # resource and must never be folded into assessment or chat.
     assert "/v1/assessments" in paths
-    assert "/v1/forecasts" not in paths
+    assert "/v1/forecasts" in paths
     assert all("forecast" not in path for path in paths if "assessment" in path)
 
     assessment_schema = schema["components"]["schemas"]["AssessmentResponse"]

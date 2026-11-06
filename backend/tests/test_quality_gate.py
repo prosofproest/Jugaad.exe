@@ -1,9 +1,8 @@
 from __future__ import annotations
 
 import pytest
-from pydantic import ValidationError
-
 from app.modules.assessments.quality import ImageMetrics, evaluate_quality
+from pydantic import ValidationError
 
 from tests.support import make_policy
 

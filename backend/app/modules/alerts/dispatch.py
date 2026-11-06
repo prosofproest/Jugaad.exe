@@ -322,9 +322,7 @@ class AlertService:
         received = any(item.status in RECEIVED_STATUSES for item in final_deliveries)
         failed = any(item.status == "failed" for item in final_deliveries)
         reason = (
-            "triggered"
-            if received
-            else ("suppressed" if all_suppressed else "delivery_failed")
+            "triggered" if received else ("suppressed" if all_suppressed else "delivery_failed")
         )
         if failed and not received and not all_suppressed:
             reason = "delivery_failed"

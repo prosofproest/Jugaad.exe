@@ -115,9 +115,7 @@ def test_all_supported_areas_scope_matches_any_area() -> None:
     registry = AdvisoryRegistry(clock=MutableClock())
     populate_advisory(registry, draft=make_draft(geo_scope=["all_supported_areas"]))
 
-    result = registry.retrieve(
-        crop="crop-1", target="target-1", geo="area-99", language="en"
-    )
+    result = registry.retrieve(crop="crop-1", target="target-1", geo="area-99", language="en")
 
     assert len(result.items) == 1
 
@@ -168,8 +166,7 @@ def test_an_edit_creates_a_new_version_and_clears_approval() -> None:
     assert updated.approval_for(updated.current_version) is None
     assert updated.approval_for(1) is not None
     assert (
-        registry.retrieve(crop="crop-1", target="target-1", geo="area-1", language="en").items
-        == ()
+        registry.retrieve(crop="crop-1", target="target-1", geo="area-1", language="en").items == ()
     )
 
 
@@ -184,8 +181,7 @@ def test_withdrawal_removes_every_version_from_retrieval_and_is_audited() -> Non
     assert withdrawn.status == "withdrawn"
     assert withdrawn.withdrawn_reason == "Synthetic safety withdrawal"
     assert (
-        registry.retrieve(crop="crop-1", target="target-1", geo="area-1", language="en").items
-        == ()
+        registry.retrieve(crop="crop-1", target="target-1", geo="area-1", language="en").items == ()
     )
     event_types = [event.event_type for event in registry.audit_events()]
     assert "advisory.approved" in event_types

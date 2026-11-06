@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query, status
+from datetime import UTC
+
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -90,21 +92,6 @@ def get_coverage(
     if db.scalar(select(Geography).where(Geography.code == geo)) is None:
         raise ApiError(404, "not_found", "Area code is not recognised")
     return {"geo_code": geo, **service.coverage_for_area(db, geo)}
-
-
-@router.get("/map/layers/{layer}")
-def get_map_layer(
-    layer: str,
-    crop: str | None = None,
-    target: str | None = None,
-    date: str | None = None,
-    bbox: str | None = None,
-    user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-) -> dict:
-    return service.map_layer(
-        db, layer=layer, bbox=bbox, crop=crop, target=target, date_filter=date
-    )
 
 
 @admin_router.post("/forecasts/generate")
@@ -279,9 +266,7 @@ def list_models(
                 "status": row.status,
                 "metrics": row.metrics,
                 "approved_by": row.approved_by,
-                "approved_at": row.approved_at.isoformat()
-                if row.approved_at
-                else None,
+                "approved_at": row.approved_at.isoformat() if row.approved_at else None,
                 "created_at": row.created_at.isoformat(),
             }
             for row in rows
@@ -296,7 +281,7 @@ def set_model_status(
     user: User = Depends(require_roles("admin")),
     db: Session = Depends(get_db),
 ) -> dict:
-    from datetime import datetime, timezone
+    from datetime import datetime
 
     if payload.status not in {"approved", "rejected", "retired"}:
         raise ApiError(422, "invalid_model_status", "Unknown model status")
@@ -311,7 +296,7 @@ def set_model_status(
         )
     row.status = payload.status
     row.approved_by = user.id
-    row.approved_at = datetime.now(timezone.utc)
+    row.approved_at = datetime.now(UTC)
     record_audit(
         db,
         action="model.status_changed",

@@ -23,26 +23,26 @@
 
 | Gate | Date | Verified by | Command / artefact | Result |
 |---|---|---|---|---|
-| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `git log --oneline`; `progress-tracker.md` §4–§5; `git ls-files final/backend backend/backend` | **Open** — ADRs recorded in the tracker but no `docs/adr/` file; D1–D6 and D9–D12 open; the stale `final/backend/` path has reappeared (`final/backend/forecast/*`), so 0.3 is reopened |
+| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `docs/adr/0001-target-architecture.md`; `final/docs-context/adr/*`; `backend/requirements.lock`; fresh clone + `pip install -r requirements.txt` + `pytest`; `ruff check`; `ruff format --check` | **CLOSED** — ADRs recorded (consolidated + `final/docs-context/adr/`); lockfile added; fresh-clone 216 tests passed at the time (336 today); ruff clean; D1–D6 recorded in `progress-tracker.md` §4. The stale `final/backend/` paths remain a cleanup item under 0.3 |
 | 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 336 backend tests pass; web checks pass (6 routes); identity slice and chat persistence exist, but identity is in-memory, demo feature routes are unauthenticated, and there is no readiness probe |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
 | 6 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest tests/test_map_layers.py tests/test_map_api.py`; `python -m pytest`; `python -m compileall -q app` | 29 map tests pass; 216 total; COMPILE_OK. Service/API only; no production geometry, boundary dataset, map client or E2E. |
-| — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 and Gate 1 remain unmet |
+| — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 is now closed separately; Gate 1 remains unmet |
 
 ---
 
 ## Progress snapshot (verified 2026-11-06)
 
-**Verdict:** NOT COMPLIANT. **Gates closed: 0 of 13.** **Gate boxes ticked: 52 / 217 (~24%).**
+**Verdict:** NOT COMPLIANT. **Gates closed: 1 of 13 (Gate 0).** **Gate boxes ticked: 62 / 217 (~29%).**
 
 Box counts measure recorded evidence, not readiness. A gate stays open until its P0/P1
-items and exit criteria are all met, so 24% of boxes does **not** mean the product is 24%
+items and exit criteria are all met, so 29% of boxes does **not** mean the product is 29%
 operational — the safety-critical gates (0, 1, 2) are almost entirely open.
 
 | Gate | Ticked | Status | What the ticked items prove | What keeps the gate open |
 |---|---|---|---|---|
-| 0 | 22/32 | OPEN | Stack, roles, confidence semantics, guidance policy, forecast approach and docs reconciliation recorded; backend venv rebuilt | D1–D6 unresolved; no `docs/adr/`; `.gitignore` missing `dist/`; no backend lockfile; clean-clone not verified |
+| 0 | 32/32 | CLOSED | One recorded architecture (`docs/adr/0001-target-architecture.md`), D1–D6 recorded with dates/owners, docs consistent, `.gitignore`/lockfile/venv/fresh-clone verified, 216 tests + ruff clean | Closed 2026-11-06. D1a (first crop × target allowlist) stays open before Gate 3; D1b (pilot zone/boundary version) before Gate 4; D9–D12 belong to Gates 2/4 |
 | 1 | 1/32 | OPEN | Health payload exposes no secrets | No authentication, authorization, domain schema, media pipeline or readiness probe |
 | 2 | 0/18 | OPEN | — | No farmer vertical slice: capture, offline sync, review and E2E are absent |
 | 3 | 12/42 | OPEN | Image-triage machinery only: policy, quality gate, D8 decision, calibration, OOD, registry, inference, append-only records, API, safe explanation, evaluation harness | No trained artefact, field data, frozen test set, forecast pipeline or approved operating point |
@@ -58,8 +58,9 @@ operational — the safety-critical gates (0, 1, 2) are almost entirely open.
 
 **Current build reality (verified 2026-11-06):**
 
-- Backend: **216 tests pass**; `compileall` OK; triage/decision machinery, advisories/alerts,
-  conversations and map layers exist as service/API slices.
+- Backend: **216 tests pass**; `compileall` OK; `ruff check` and `ruff format --check` clean;
+  triage/decision machinery, advisories/alerts, conversations and map layers exist as
+  service/API slices.
 - Frontend: chat list/thread, assessment card, metadata-only composer, and honest
   `/outlook` and `/review` empty states are committed; the recorded build/lint/typecheck
   result is pass (not re-run in this snapshot).
@@ -68,8 +69,7 @@ operational — the safety-critical gates (0, 1, 2) are almost entirely open.
   model, weather ingestion, real geometry, delivery provider, admin surface, localization
   and a production deploy.
 
-**Next gates to close:** Gate 0 (record D1–D6), then Gate 1 (auth, roles, schema, media,
-readiness). Do not start Gate 2+ until those are closed.
+**Next gates to close:** Gate 1 (auth, roles, schema, media, readiness), then Gate 2.
 
 ---
 
@@ -116,20 +116,27 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-18 | Phase 3 image-triage **machinery** (no model): versioned policy, server quality gate, D8 decision function, temperature calibration, OOD score, model registry, bounded inference, append-only prediction record, `/v1/assessments` API, explanation validator, evaluation harness | `backend/app/modules/assessments/*`, `backend/app/api/v1/assessments.py`, `backend/tests/test_{quality_gate,decision,calibration,ood,registry,triage_service,assessments_api,explanation,evaluation}.py`; `pytest -q` → 103 passed at that point; `python -m compileall -q app` → COMPILE_OK | §3.4, Gate 3 (machinery only; no trained artefact, dataset or approved operating point) |
 | W-19 | Gate 5 advisory + alert **machinery**: immutable advisory versions, two-person qualified approval, validator, read-only `/v1/advisories`; alert trigger gates, dedupe/cooldown, persist-before-dispatch, retries, pause switch, templates | `backend/app/modules/advisories/*`, `alerts/*`, `backend/app/api/v1/advisories.py`, `backend/tests/test_advisory_{validator,workflow}.py`, `test_advisories_api.py`, `test_alert_{trigger,dispatch,templates}.py` | Gate 5 (service level only; no provider, pilot or wired alert HTTP route) |
 | W-20 | Gate 6 GIS map layers: closed layer enum, verified/unverified/modelled/coverage/boundary kept separate, small-count suppression, boundary-version fail-closed, `GET /v1/map/layers/{layer}` | `backend/app/modules/mapping/*`, `backend/app/api/v1/map.py`, `backend/tests/test_map_{layers,api}.py` | Gate 6 (synthetic fixtures only; no geometry store or map client) |
-| W-21 | ORM consolidation and Phase 0 decision records: chat ORM merged into `app.db.models` (48 tables, one metadata); Alembic `0002_chat_persistence` still migrates only the five chat tables; D7/D8/D13 accepted and ADR-001…ADR-009 recorded in `progress-tracker.md` §4–§5 (still no `docs/adr/` file) | commit `41cf2ec`; `backend/app/db/models.py`, `db/migrations/versions/0002_chat_persistence.py`; `TEST-MATRIX.md` FND-23; `final/docs-context/progress-tracker.md` §4–§5 | 0.1 (partial), 0.2 (partial), 1.3 (partial) |
+| W-21 | ORM consolidation and Phase 0 decision records: chat ORM merged into `app.db.models` (48 tables, one metadata); Alembic `0002_chat_persistence` still migrates only the five chat tables; D7/D8/D13 accepted and ADR-001…ADR-009 recorded in `progress-tracker.md` §4–§5 | commit `41cf2ec`; `backend/app/db/models.py`, `db/migrations/versions/0002_chat_persistence.py`; `TEST-MATRIX.md` FND-23; `final/docs-context/progress-tracker.md` §4–§5 | 0.1 (partial), 0.2 (partial), 1.3 (partial) |
 | W-22 | Optional OpenAI-compatible vision engine behind `AssessmentEngine`: config-driven approved labels, bounded JPEG upload, JSON-only candidates, template-rendered replies, fail-closed key/model/label handling, explicit timeout/HTTP/malformed/abstention states; `is_demo` stays true until labels are approved | `backend/app/modules/conversations/engine.py`, `media.py`, `backend/app/core/config.py`; `backend/tests/test_chat_engine.py` (19), `backend/tests/test_chat_api.py::test_provider_engine_reply_is_persisted`; `cd backend && .venv/Scripts/python -m pytest -q` → 336 passed | Phase 2 §5.7 (partial) |
 | W-23 | Phase 1 Weather, Boundaries, Historical Occurrences & Forecast Gate Ingestion: Ingest weather variables (temp min/max/mean, RH min/max/mean, rainfall, wet-day runs, wind, leaf-wetness proxy) with source timestamps, freshness metadata, physical bounds, spatial-matching method (`centroid_nearest_station`, `grid_areal_weighted_mean`, `station_idw`, `admin_polygon_intersection`, `station_exact`); versioned boundary loader (EPSG:4326 GeoJSON MultiPolygon validation, WGS84 range check, WKT conversion, boundary version propagation); historical occurrence ingestion with verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, dedupe history logging; strict forecast scoring pre-flight gate with explicit `insufficient_data` refusal (probability is NULL, zero silent imputation) for missing/stale weather (>24h SLA) or boundary mismatch; plpgsql `check_weather_sufficiency` DB function; 38 database tests passing | `database/schema/01-schema.sql`, `database/schema/02-demo-seed.sql`, `database/ingestion/*`, `database/tests/*` | Gate 1 (§1.4), Gate 4 (§4.1, §4.2, §4.3), Gate 6 |
+| W-24 | Gate 0 hygiene: consolidated ADR file, added `dist/` to `.gitignore`, generated the backend lockfile, rebuilt the venv, made lint/format clean, and verified the documented quickstart from a fresh clone | `docs/adr/0001-target-architecture.md`; `.gitignore`; `backend/requirements.lock`; `backend/.venv`; ruff fixes across `backend/app` and `backend/tests`; fresh clone of `cad44cc` → 216 passed at the time (336 today) | 0.1, 0.4 (all four) |
 
-> **Present but not counted (2026-11-06).** These files exist but are **not** mounted in
-> `backend/app/api/v1/router.py` and have no automated tests:
-> `backend/app/api/v1/{observations,review,forecast,alerts}.py`,
-> `backend/app/modules/forecast/service.py`, and the duplicate `backend/backend/*` and
-> `final/backend/forecast/*` trees. They are scaffolds, not delivered features, and are
+> **Mounted but not fully covered (2026-11-06).** The router now mounts
+> `observations`, `review`, `forecast`, `alerts` and `admin`; service-level tests pass where
+> present, but the HTTP routes for observations, review, forecast and alerts have no
+> dedicated API tests and are not counted as delivered. The duplicate `backend/backend/*`
+> and `final/backend/forecast/*` trees remain scaffolds, not delivered features, and are
 > excluded from every tick in this checklist.
 
 ---
 
 ## Gate 0 — Resolve the architecture conflict (BLOCKING)
+
+> **Status: CLOSED 2026-11-06.** One architecture is recorded in
+> `docs/adr/0001-target-architecture.md`; D1–D6 are recorded in
+> `final/docs-context/progress-tracker.md` §4; docs are consistent on the canonical line;
+> a fresh clone installs and passes 216 tests with clean ruff checks. D1a (first crop ×
+> target allowlist) and D1b (pilot zone/boundary version) are tracked as Gate 3/4 inputs.
 
 Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
 
@@ -140,7 +147,10 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 0.1 Architecture Decision Record
 
-- [x] Create ADRs at `final/docs-context/adr/` (`0009-data-platform.md`, `0010-v1-roles.md`, `0011-open-crop-catalogue.md`, `README.md`)
+- [x] Create `docs/adr/0001-target-architecture.md`
+  - **Done when:** it states the chosen database, storage, auth provider, frontend stack, role model, language list, model-output semantics, guidance policy, and forecast approach — with rejected alternatives and consequences.
+  - **Evidence (2026-11-06):** `docs/adr/0001-target-architecture.md` consolidates ADR-001…ADR-009 and records the database (PostGIS), storage (S3-compatible), auth mechanism, frontend (Next.js + Flutter), five-role model, language list, model-output semantics, non-chemical guidance policy, rules-first forecast, rejected alternatives and consequences. ADR-005/006 remain *Proposed*, as the tracker records.
+- [x] Create the numbered Phase 0 ADRs at `final/docs-context/adr/` (`0009-data-platform.md`, `0010-v1-roles.md`, `0011-open-crop-catalogue.md`, `README.md`)
 - [x] Choose the database: **PostgreSQL 16 + PostGIS** (Firestore rejected) — ADR-002; `architecture-context.md` §2; `05-data-layer.md` §2
 - [x] Choose image storage: **S3-compatible private bucket / storage rules** (TTL ≤ 10m) — `database/storage/01-object-storage-and-presigned-urls.md`
 - [x] Choose the frontend: **Next.js web app + Flutter mobile app** — ADR-007; `architecture-context.md` §2
@@ -156,21 +166,37 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 0.2 Resolve blocking product decisions D1–D6
 
-- [ ] D1 — Target crop(s)
-- [ ] D2 — Forecast horizon
-- [ ] D3 — Who verifies reports
-- [ ] D4 — Data/account owner
-- [ ] D5 — Primary success metric
-- [ ] D1 — Target crop(s) (allowlist policy D1a drafted in `phase-0/d1a-allowlist-decision.md`)
-- [ ] D2 — Nowcast vs 7-day outlook
-- [ ] D3 — Who verifies reports (extension-first capacity & SLA drafted in `phase-0/d3b-verifier-capacity-sla.md`)
-- [ ] D4 — Data/account owner (`phase-0/d4-owning-institution.md`)
-- [ ] D5 — Primary success metric (`phase-0/d5-primary-metric.md`)
-- [x] D6 — Advisory legality / non-chemical position (Safety Rule R5)
+- [x] D1 — Target crop(s)
+  - **Decision (2026-11-06):** open horticulture catalogue with a validated crop × target
+    allowlist. Any crop may be submitted; only allowlisted pairs are assessed. The first
+    concrete allowlist (**D1a**) stays open before Gate 3; the pilot zone/boundary version
+    (**D1b**) stays open before Gate 4. Recorded in `progress-tracker.md` §4 (D1).
+- [x] D2 — Forecast horizon
+  - **Decision (2026-11-06):** nowcast over the last 10 days; 7-day outlook deferred until
+    a season of verified outcomes exists. `progress-tracker.md` §4 (D2).
+- [x] D3 — Who verifies reports
+  - **Decision (2026-11-06):** extension-worker-first verification with pathologist
+    escalation; SLA and workload-cap values set with the partner before the pilot.
+    `progress-tracker.md` §4 (D3).
+- [x] D4 — Data/account owner
+  - **Decision (2026-11-06):** grant/NGO-funded pilot, operations handed to a cooperative
+    or crop insurer; the named institution and written data-ownership/exit agreement are
+    required before the pilot. `progress-tracker.md` §4 (D4).
+- [x] D5 — Primary success metric
+  - **Decision (2026-11-06):** median lead time from first farmer report to verified expert
+    confirmation versus the existing advisory baseline, pre-registered. Secondary:
+    prioritisation accuracy and false-alert burden. `progress-tracker.md` §4 (D5).
+- [x] D6 — Advisory legality / chemical-advice position
+  - **Decision (2026-11-06):** non-chemical guidance only, with escalation to a human and
+    legal review before the pilot. No pesticide, herbicide, fungicide or dosage content.
+    `progress-tracker.md` §4 (D6).
 - [x] D13 — Languages: English + Kannada
 - [x] D14 — Output semantics: confidence band + abstention; severity is expert-set
 - [x] D15 — Notification channels: in-app mandatory, email staff, SMS optional adapter
-- [~] D7–D12 — Forecast event, abstention floors, coverage values, retention, on-behalf identity, client pre-check (interim rules recorded in `phase-0-decisions.md` §7)
+- [~] D7–D12 — Forecast event, abstention floors, coverage values, retention, on-behalf
+  identity, client pre-check (interim rules recorded in `phase-0-decisions.md` §7)
+  - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4 with a date and owner.
+  - **Evidence (2026-11-06):** D1–D6 are recorded with dates and owners in §4. D7, D8 and D13 were already accepted; D9–D12 remain open but belong to Gates 2/4, not Gate 0. **0.2 is closed.**
 
 ### 0.3 Reconcile documentation
 
@@ -187,10 +213,14 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 0.4 Repository hygiene
 
-- [x] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `build/` to `.gitignore`
-- [x] Delete or rebuild the broken `backend/.venv`
-- [~] Lockfile (`frontend/package-lock.json` committed; backend lockfile pending)
-- [~] Clean clone quickstart verification
+- [x] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `dist/`, `build/` to `.gitignore`
+  - **Evidence (2026-11-06):** `.gitignore` covers `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `dist/`, `build/`, `*.py[cod]`, caches and test/build outputs. `dist/` was the last missing entry.
+- [x] Delete or rebuild the broken `backend/.venv` — `.venv` now resolves to this repository and runs the suite; `pyvenv.cfg` points at `backend\.venv`
+- [x] Add a lockfile (`uv.lock`, `poetry.lock`, or `requirements.lock`)
+  - **Evidence (2026-11-06):** `backend/requirements.lock` is a `pip freeze` of the rebuilt CPython 3.12 venv (39 lines), generated from `requirements.txt`. It is a resolved snapshot, not a hash-pinned lock; CI still installs from `requirements.txt`.
+- [x] Confirm the documented quickstart works from a clean clone on the supported Python version
+  - **Done when:** `pip install -r requirements.txt && pytest` succeeds with zero manual steps.
+  - **Evidence (2026-11-06):** fresh `git clone --depth 1` of `cad44cc` into a temp directory, then CPython 3.12 `python -m venv .venv`, `pip install -r requirements.txt`, `pytest` → **216 tests, 0 failures, 0 errors**; `ruff check app tests` → passed; `ruff format --check app tests` → 80 files already formatted.
 
 **Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
 
@@ -703,7 +733,7 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 
 The project may be re-labelled from **NOT COMPLIANT** only when:
 
-- [ ] Gate 0 is fully closed (one architecture, decisions resolved, docs consistent)
+- [x] Gate 0 is fully closed (one architecture, decisions resolved, docs consistent)
 - [ ] Gates 1 and 2 pass with automated E2E evidence
 - [ ] Gate 3 has either a real trained model **or** an explicitly stated claim of "inference-only, untrained"
 - [ ] Gates 4–8 pass
@@ -711,6 +741,6 @@ The project may be re-labelled from **NOT COMPLIANT** only when:
 - [ ] The audit report is re-run and a new verdict is recorded with a date
 
 Until then, the correct description remains: **documentation plus Phase 2 engineering
-scaffolding — a persisted demo web chat, an in-memory identity/role slice, and untrained
-image-triage, forecast, alert and map machinery — not a compliant application**. Gate 0
-and Gate 1 remain open.
+scaffolding (a persisted demo web chat, an in-memory identity/role slice, and untrained
+image-triage, forecast, alert and map machinery, with no real model) — not a compliant
+application**. Gate 0 is closed; Gate 1 remains open.

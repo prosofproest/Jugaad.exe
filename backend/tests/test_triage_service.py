@@ -4,10 +4,9 @@ import math
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.modules.assessments.calibration import TemperatureCalibration
 from app.modules.assessments.inference import InferenceFailure
+from pydantic import ValidationError
 
 from tests.support import (
     FIXED_TIME,
@@ -201,7 +200,11 @@ def test_label_map_mismatch_fails_safe(tmp_path: Path) -> None:
 
 
 def test_low_margin_abstention_has_no_candidates(tmp_path: Path) -> None:
-    adapter = FakeAdapter(logits=dict(zip(["lesion_like", "healthy_like", "other_like"], LOW_MARGIN_LOGITS, strict=True)))
+    adapter = FakeAdapter(
+        logits=dict(
+            zip(["lesion_like", "healthy_like", "other_like"], LOW_MARGIN_LOGITS, strict=True)
+        )
+    )
     service, store = make_service(tmp_path, adapter=adapter)
 
     response = service.assess(make_request())

@@ -4,14 +4,13 @@ import hashlib
 from pathlib import Path
 
 import pytest
-from pydantic import ValidationError
-
 from app.modules.assessments.registry import (
     ModelNotApproved,
     ModelRegistry,
     RegistryEntry,
     load_registry_file,
 )
+from pydantic import ValidationError
 
 from tests.support import write_registry_file
 
@@ -43,9 +42,7 @@ def test_approved_entry_with_matching_checksum_is_servable(tmp_path: Path) -> No
         {"schema_version": "1.0", "models": [make_entry(tmp_path)]}
     )
 
-    served = registry.require_servable(
-        "synthetic-model-1", taxonomy_version="synthetic-taxonomy-1"
-    )
+    served = registry.require_servable("synthetic-model-1", taxonomy_version="synthetic-taxonomy-1")
 
     assert served.model_version == "synthetic-model-1"
     assert served.preprocessing_version == "prep-synthetic-1"
@@ -68,9 +65,7 @@ def test_unservable_entries_are_refused(tmp_path: Path, overrides, expected_code
     )
 
     with pytest.raises(ModelNotApproved) as caught:
-        registry.require_servable(
-            "synthetic-model-1", taxonomy_version="synthetic-taxonomy-1"
-        )
+        registry.require_servable("synthetic-model-1", taxonomy_version="synthetic-taxonomy-1")
 
     assert caught.value.code == expected_code
 
@@ -112,9 +107,7 @@ def test_approved_calibration_requires_a_matching_version(tmp_path: Path) -> Non
     )
 
     with pytest.raises(ModelNotApproved) as caught:
-        registry.require_servable(
-            "synthetic-model-1", taxonomy_version="synthetic-taxonomy-1"
-        )
+        registry.require_servable("synthetic-model-1", taxonomy_version="synthetic-taxonomy-1")
     assert caught.value.code == "calibration_version_required"
 
     with pytest.raises(ModelNotApproved) as caught:

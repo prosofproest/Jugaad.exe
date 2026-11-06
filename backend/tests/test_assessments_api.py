@@ -3,10 +3,9 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
-from fastapi.testclient import TestClient
-
 from app.api.v1 import assessments as assessment_routes
 from app.main import app
+from fastapi.testclient import TestClient
 
 from tests.support import FakeAdapter, make_registry, make_request, make_service
 
@@ -38,9 +37,7 @@ def test_assessment_route_is_published_in_openapi() -> None:
 def test_unconfigured_deployment_returns_a_safe_failure() -> None:
     request = make_request()
 
-    response = client.post(
-        "/v1/assessments", json=_payload(request), headers=_headers(request)
-    )
+    response = client.post("/v1/assessments", json=_payload(request), headers=_headers(request))
 
     assert response.status_code == 200
     body = response.json()
@@ -56,9 +53,7 @@ def test_assessed_response_and_history_round_trip(tmp_path: Path) -> None:
     assessment_routes.set_assessment_service(service)
     request = make_request(client_assessment_id="api-client-1", crop_id="test_crop")
 
-    response = client.post(
-        "/v1/assessments", json=_payload(request), headers=_headers(request)
-    )
+    response = client.post("/v1/assessments", json=_payload(request), headers=_headers(request))
 
     assert response.status_code == 200
     body = response.json()
@@ -96,9 +91,7 @@ def test_quality_failure_is_returned_as_an_abstention(tmp_path: Path) -> None:
     assessment_routes.set_assessment_service(service)
     request = make_request(client_assessment_id="api-client-3", mean_luma=5.0)
 
-    response = client.post(
-        "/v1/assessments", json=_payload(request), headers=_headers(request)
-    )
+    response = client.post("/v1/assessments", json=_payload(request), headers=_headers(request))
 
     body = response.json()
     assert response.status_code == 200
@@ -113,9 +106,7 @@ def test_unsupported_crop_is_returned_with_the_supported_list(tmp_path: Path) ->
     assessment_routes.set_assessment_service(service)
     request = make_request(client_assessment_id="api-client-4", crop_id="unsupported")
 
-    response = client.post(
-        "/v1/assessments", json=_payload(request), headers=_headers(request)
-    )
+    response = client.post("/v1/assessments", json=_payload(request), headers=_headers(request))
 
     body = response.json()
     assert body["state"] == "unsupported_crop"
@@ -133,15 +124,11 @@ def test_unknown_assessment_returns_404(tmp_path: Path) -> None:
 
 def test_an_unapproved_model_is_a_safe_failure_over_http(tmp_path: Path) -> None:
     registry, _ = make_registry(tmp_path, status="trained")
-    service, _ = make_service(
-        tmp_path, registry=registry, adapter=FakeAdapter()
-    )
+    service, _ = make_service(tmp_path, registry=registry, adapter=FakeAdapter())
     assessment_routes.set_assessment_service(service)
     request = make_request(client_assessment_id="api-client-5")
 
-    response = client.post(
-        "/v1/assessments", json=_payload(request), headers=_headers(request)
-    )
+    response = client.post("/v1/assessments", json=_payload(request), headers=_headers(request))
 
     body = response.json()
     assert response.status_code == 200

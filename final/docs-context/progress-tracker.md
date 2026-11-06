@@ -38,9 +38,9 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [x] **D1** Crop + targets policy decided: open catalogue + validated-target allowlist
       (ADR-011). The first concrete allowlist is split out as **D1a** (recorded in `phase-0/d1a-allowlist-decision.md`).
 - [x] **D2** Nowcast (last 10 days) decided; 7-day outlook deferred.
-- [~] **D3** Verifier role decided (extension-first, `can_confirm` permission; capacity
-      and SLA documented in `phase-0/d3b-verifier-capacity-sla.md`; partner sign-off pending).
-- [~] **D4** Owning/paying institution policy decided (`phase-0/d4-owning-institution.md`; partner counterparty pending).
+- [x] **D3** Verifier role decided (extension-first, `can_confirm` permission; capacity
+      and SLA documented in `phase-0/d3b-verifier-capacity-sla.md`; partner sign-off pending as a pilot prerequisite).
+- [x] **D4** Owning/paying institution policy decided (`phase-0/d4-owning-institution.md`; partner counterparty pending as a pilot prerequisite).
 - [x] **D5** Primary outcome metric pre-registered (`phase-0/d5-primary-metric.md`).
 - [x] **D6** Advisory policy decided: non-chemical only (R5 unchanged).
 - [~] **D7–D12** Scientific-integrity interim rules recorded in `phase-0-decisions.md` §7.
@@ -51,10 +51,12 @@ every phase are in `./phase-plan.md`; this section is the live status view.
       WhatsApp/push/IVR deferred.
 - [x] Crop calendar and epidemic window documented for the pilot area (`phase-0/crop-calendar.md`, `phase-0/target-reference-sheet.md`, `phase-0/pilot-sites.csv`).
 
-**Gate 0:** D1–D15 answered or policy-drafted. Gate 0 carries a calendar target
-(proposed: **2026-11-20**, confirmed at the decision workshop) so that it cannot close by
-definition until partner signatures land. No code that depends on them.
-Working record: `phase-0-decisions.md` and `phase-0/`. **Gate 0 is decision-drafted; partner signatures pending.**
+**Gate 0:** D1–D6, D7, D8 and D13 are answered and recorded in §4, each with a recorded
+date and owner; D14 and D15 are also decided. D9–D12 are deliberate pre-Gate-2/pre-Gate-4
+decisions and are not part of the checklist's Gate 0 scope. Gate 0 closes when the
+checklist's Gate 0 items are met (architecture, docs consistency, clean clone) — they are,
+so **Gate 0 is closed**. Partner signatures (D3 SLA, D4 counterparty) and D1a/D1b remain
+pilot prerequisites. Working record: the decision log below, `phase-0-decisions.md` and `phase-0/`.
 
 ### Phase 1 — Data foundation `[~]`
 
@@ -176,7 +178,7 @@ epidemic season.
 |---|---|---|
 | Documentation | `[x]` | Keep in sync with decisions |
 | Blueprint coverage | `[x]` | Chapter map maintained in `../README.md` |
-| Decisions | `[?]` | Resolve D1–D6 with local experts |
+| Decisions | `[~]` | D1–D6 resolved; close D9–D12 before Gates 2/4 |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1a |
 | Data platform | `[x]` | Reference schema (40 tables), Alembic migrations, storage rules, backup design, demo seed, weather/boundary/historical ingestion, and zero-imputation forecast gate verified in `database/` (38 unit tests pass); `backend/` remains schema authority |
@@ -202,56 +204,68 @@ close while any remain open. Where a decision needs a number that the repository
 entitled to invent (R6), the decision must still define *who sets the number, from what
 measurement, before which gate* — the rule for setting the value is itself the decision.
 
-### D1 — Crop + targets + zone `[?]`
+### D1 — Crop + targets + zone `[x]`
 
-| Option | Consequence |
+**Decision (2026-11-06): open, crop-agnostic horticulture catalogue with a validated
+crop × target allowlist.** Any horticulture crop may be submitted; a photo assessment or
+area outlook is returned only for a `crop × target` pair on the release allowlist.
+Everything else returns an explicit abstention (`unsupported_crop`, `unsupported_target`)
+rather than mapping to the nearest supported class (R2). This carries the user's direction
+to cover horticulture crops without making validation claims the project cannot support.
+
+**Still open as D1a:** the first concrete allowlist (crop × target entries plus
+healthy/abiotic/unknown classes) must be fixed before Gate 3.
+
+**Still open as D1b:** the single pilot agro-climatic zone (state/district/block) and its
+boundary version must be named before Gate 4.
+
+**Scope note:** "pesticides" is read as pest and disease *targets*, not pesticide product
+advice. D6 and R5 keep all chemical prescriptions out of the product.
+
+**Owner:** Product lead + agronomist. **Recorded:** 2026-11-06.
+
+| Option considered | Consequence |
 |---|---|
-| Potato late blight | Validated weather model exists (BLITECAST/SimCast); forecast credible on day one; narrow advisory |
-| Tomato late blight / early blight / leaf curl | More targets, more public data, weaker forecast baseline for non-blight targets |
+| Open catalogue + validated allowlist (chosen) | Crop-agnostic schema; claims limited to validated entries; abstains elsewhere |
+| Potato late blight only | Validated weather model exists (BLITECAST/SimCast); credible day one, but narrow |
+| Tomato blight complex | More targets and public data; weaker forecast baseline for non-blight targets |
 | Rice blast / BLB / brown spot | Large farmer base, harder image data, blast weather models exist |
 
-Recommended default: **potato late blight**, one zone, plus healthy + abiotic look-alike +
-unknown. Final choice requires local economic and partner input.
-**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (target 2026-11-20).
+### D2 — Nowcast or 7-day outlook `[x]`
 
-### D2 — Nowcast or 7-day outlook `[?]`
+**Accepted 2026-11-06: nowcast over the last 10 days.** A 7-day outlook is deferred until
+at least one season of verified outcomes exists. **Owner:** Agronomist + ML lead.
+**Recorded:** 2026-11-06.
 
-| Option | Consequence |
-|---|---|
-| Nowcast (last 10 days) | No historical outcome data needed; more accurate; still actionable |
-| 7-day outlook | Needs validation against outcomes; risk of overclaiming in year one |
+### D3 — Verifier, capacity, SLA `[x]`
 
-Recommended default: **nowcast for v1**, add outlook when a season of verified outcomes
-exists. **Owner:** Agronomist + ML lead. **Needs by:** Gate 0.
+**Accepted 2026-11-06: extension-worker-first verification with pathologist escalation.**
+A published SLA and workload cap are required; their numeric values and the partner
+commitment are set before the pilot (Gate 5), not invented here. Extension workers triage
+and escalate; only pathologists verify escalated cases. **Owner:** Programme lead + partner.
+**Recorded:** 2026-11-06.
 
-### D3 — Verifier, capacity, SLA `[?]`
+### D4 — Owning/paying institution `[x]`
 
-| Option | Consequence |
-|---|---|
-| Extension-worker-first | Scales; needs training and triage rules; pathologist for escalation |
-| Pathologist-first | Higher label quality; immediate backlog; not viable at volume |
-
-Recommended default: **extension-first**, pathologist escalation, published SLA and
-workload cap (`phase-0/d3b-verifier-capacity-sla.md`). **Owner:** Programme lead + partner. **Needs by:** Gate 0.
-
-### D4 — Owning/paying institution `[~]`
-
-Policy decided (2026-11-06): Public extension/plant-health authority as institutional owner; grant/NGO-funded pilot transitioning to institutional or cooperative operations. Input-company funding for the advisory layer is rejected on trust grounds. See [`phase-0/d4-owning-institution.md`](phase-0/d4-owning-institution.md). Named counterparty (D4a) pending partner signature.
-**Owner:** Product lead. **Needs by:** Gate 0.
+**Accepted 2026-11-06: grant/NGO-funded pilot, with operations handed to a cooperative
+or crop insurer.** Input-company funding of the advisory layer stays rejected on trust
+grounds. The named institution and written data-ownership/exit agreement are still required
+before the pilot; the ownership model itself is settled. **Owner:** Product lead.
+**Recorded:** 2026-11-06.
 
 ### D5 — Primary outcome metric `[x]`
 
-**Pre-registered (2026-11-06):** **Median lead time from first farmer report to verified expert
-confirmation**, versus the existing advisory baseline. Secondary:
-prioritisation accuracy, false-alert burden. Pre-registered in [`phase-0/d5-primary-metric.md`](phase-0/d5-primary-metric.md).
-**Owner:** Product lead + evaluator. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
+**Accepted 2026-11-06: median lead time from the first farmer report to verified expert
+confirmation**, compared with the existing advisory baseline and pre-registered before the
+pilot. Secondary metrics: prioritisation accuracy and false-alert burden.
+**Owner:** Product lead + evaluator. **Recorded:** 2026-11-06.
 
-### D6 — Legal position on advisory content `[?]`
+### D6 — Legal position on advisory content `[x]`
 
-Options: non-chemical only (recommended), approved chemical content with legal sign-off
-(not recommended for v1), no advisory in v1 (weakens product).
-Recommended default: **non-chemical + escalation**, legal review before pilot.
-**Owner:** Programme lead + legal. **Needs by:** Gate 0 (legal sign-off before Gate 5).
+**Accepted 2026-11-06: non-chemical guidance only, with escalation to a human.** Legal
+review is required before the pilot. This confirms R5: no pesticide, herbicide, fungicide
+or dosage content, and no chemical-use instructions in any advisory or chat response.
+**Owner:** Programme lead + legal. **Recorded:** 2026-11-06; legal sign-off gates Gate 5.
 
 ### D7 — Forecast event, negative class and label eligibility `[x]`
 
@@ -542,6 +556,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Web chat surface (Phase 2 §5.7, demo backend): `/chat` conversation list and `/chat/[conversationId]` thread; structured assessment card with assessed/abstained/unsupported/failed states; metadata-only image picker and drag-and-drop; idempotent retry and conversation delete; honest not-available routes for `/outlook` and `/review`. Added `design/tokens.json` and an application shell with mirrored CSS variables. Typecheck, lint, production build and live smoke pass. Upload/media, real inference, auth scoping and the mobile surface remain open; no gate is claimed. |
 | 2026-11-06 | Desktop web shell: persistent section sidebar (Overview, Photo assessment, Area outlook, Review queue) with active-state marker and skip link; desktop dashboard with platform status and separate-output cards; collapses to a horizontal nav below 1024px and single-column grids below 640px; locked `/review` boundary page with no fabricated cases; `/outlook` now reads the five independent `/v1/map/layers/*` endpoints and shows each layer's own state (`map_not_configured` is explicit, never a merged risk value). Typecheck, lint, production build and live route smoke pass. |
 | 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
+| 2026-11-06 | **D1–D6 decided.** D1: open horticulture catalogue with a validated crop × target allowlist; the first allowlist (D1a) stays open before Gate 3 and the pilot zone/boundary version (D1b) before Gate 4. D2: nowcast (last 10 days). D3: extension-first verification with pathologist escalation. D4: grant/NGO pilot → cooperative/insurer operations. D5: median lead time from first report to verified confirmation. D6: non-chemical guidance only, with legal review before Gate 5. "Pesticides" is read as pest/disease targets; R5 still forbids chemical prescriptions. |
 | 2026-11-06 | Verified the Flutter client locally after installing Flutter 3.47.9 (stable, Dart 3.13.7): `flutter pub get` resolved 30 packages, `flutter analyze` reported no issues, `flutter test` passed the single widget test. Updated `TEST-MATRIX.md` FND-11 to Verified (analyze + test), the mobile README, `AGENTS.md` §5, PRD/TRD status lines and `IMPLEMENTATION-CHECKLIST.md` W-11. Still open: `android/`/`ios/` runners, an APK build, a device/emulator smoke and a recorded CI run. No gate is claimed. |
 | 2026-11-06 | Phase 2 §5.2 identity backend slice: phone OTP for farmers, provisioned staff accounts, five-role deny-by-default dependencies, password+TOTP login, rotating refresh tokens with family revocation, versioned consent capture, privacy requests/self-export/soft deletion, credential-only retention job, and audited role changes, admin record views and exports. 64 new tests; full backend suite 294 passed. Deliberately **not** done: durable SQLAlchemy/Alembic persistence, authentication of the existing demo chat/assessment/advisory/map routes, real SMS/email providers, password reset, Argon2id (stdlib `scrypt` used instead), and D10/D11-dependent retention/on-behalf/offline behaviour. Gate 1 remains unmet and no gate is claimed. |
 | 2026-11-06 | Reconciled the chat ORM with the merged domain ORM: `app/db/base.py` now provides the shared `UTCDateTime`/`utc_now`/`new_id` helpers; `app/db/models.py` re-exports the chat models (`Conversation`, `Message`, `MessageEvent`, `ImageUpload`, `ChatReviewRequest`) and keeps the observation-review `ReviewRequest` on `review_requests`; the chat review table is `chat_review_requests` (Alembic `0002_chat_persistence`); `alembic/env.py` loads `app.db.models`. Verified: both ORM modules import together, `Base.metadata.create_all` creates 48 tables on SQLite, `alembic history`/offline SQL are unchanged in chain, full suite 294 passed, and the live upload → assessment → review smoke passed on a fresh database. |
@@ -550,16 +565,17 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added the chat content-safety gate (CHAT-10, R5/R18): the deterministic, fail-closed `chat-safety-0.1` validator checks the reply text, assessment reason and candidate display names before storage. A blocked reply is stored as `failed` with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and `request_review`; a `validator_rejected` message event records the validator version and rule categories without the unsafe text. 19 validator unit tests and 3 API safety-gate tests; full backend suite 316 passed. A live API smoke on a fresh SQLite database re-ran upload → assessed `demo-chat-0.1` reply → persisted review → idempotent replay → preview byte-match → `415` rejection with the validator in the path. |
 | 2026-11-06 | Added the optional OpenAI-compatible vision engine behind the `AssessmentEngine` seam (`APP_CHAT_ENGINE=openai_compatible`): the adapter posts a downscaled JPEG plus `APP_CHAT_LABELS` to `{APP_CHAT_BASE_URL}/chat/completions`, accepts JSON-only candidates, drops unknown labels and renders reply text from fixed templates. Missing key/model/labels, timeouts, HTTP failures and malformed output are explicit `failed` states; a model abstention is `abstained`/`model_abstained`. `is_demo` stays true until `APP_CHAT_LABELS_APPROVED=true`, so no D1/D2 taxonomy is invented in code. `httpx` moved to runtime dependencies; compose passes the chat variables and mounts a media volume. 19 engine tests and 1 API wiring test; full suite 336 passed. Verified with a mock transport and a live uvicorn run against a local OpenAI-compatible HTTP stub: upload → `assessed`, `is_demo=false`, `model_version=stub-vision-1`, one approved candidate, template text, persisted review and 2 messages. No real vendor call was made. |
 | 2026-11-06 | **Phase 1 Weather, Boundaries, Historical Occurrences & Forecast Gate Ingestion:** Implemented `database/ingestion/weather_ingest.py` (variables, physical bounds, freshness, spatial matching method, leaf-wetness proxy), `boundary_loader.py` (EPSG:4326 GeoJSON MultiPolygon validation, coordinate range check, WKT conversion, boundary version propagation), `historical_ingest.py` (verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, dedupe history logging), and `forecast_gate.py` (strict pre-flight gating with explicit `insufficient_data` refusal, `probability = NULL`, zero silent imputation). Updated `01-schema.sql` (added table `historical_occurrences` [#40], `ck_weather_spatial_method`, `ck_hist_dates`, `ck_hist_tier`, `ck_forecasts_no_imputation`, and `check_weather_sufficiency` plpgsql function) and `02-demo-seed.sql`. All 38 unit tests pass in `database/tests/`. |
+| 2026-11-06 | Merged `origin/main` (`c5ba4f7`) into the local Gate 0 line, resolving docs and lockfile conflicts. Upstream already contained the integrated assessments, mapping, alerts, auth, identity and observations work; local D1–D6 decisions, the consolidated ADR, and the Gate 0 closure were retained. Backend suite and lockfile to be regenerated and re-verified as part of the merge commit. |
 
 ---
 
 ## 8. Next five actions
 
-1. Run a decision workshop for D1–D6; record outcomes in §4.
-2. Complete data acquisition partner MoUs and archive access agreements.
-3. Draft the labelling handbook for the chosen crop and target list.
-4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Finish mobile verification (generate `android/`/`ios/` runners, build a debug APK, device smoke) and build both container images.
+1. Finish Gate 1 on the tested line: durable SQLAlchemy/Alembic identity and consent, authenticated demo feature routes, domain schema/media/readiness; keep the suite green.
+2. Fix the **D1a** initial crop × target allowlist before Gate 3 and the **D1b** pilot zone/boundary version before Gate 4.
+3. Secure the D3 SLA and D4 partner-counterparty signatures, then draft the data acquisition plan, labelling handbook and pilot protocol against the decided scope.
+4. Retention/privacy follow-through: D10/D11 values for retention and on-behalf identity before Gate 7.
+5. Verify the mobile scaffold (generate `android/`/`ios/` runners, build a debug APK, device smoke) and build both container images before claiming them.
 
 ---
 

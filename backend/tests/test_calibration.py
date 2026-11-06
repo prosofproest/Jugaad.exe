@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.modules.assessments.calibration import (
     CalibrationError,
     CalibrationNotApproved,
