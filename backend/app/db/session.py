@@ -61,10 +61,21 @@ def get_session_factory() -> sessionmaker[Session]:
 
 
 def get_session() -> Iterator[Session]:
-    """FastAPI dependency: one transaction-scoped session per request."""
+    """FastAPI dependency: one transaction-scoped session per request.
+
+    The request is the unit of work. Committing here means a route that only
+    calls ``session.flush()`` (the chat, upload and video repositories do) still
+    persists its writes; an exception rolls the whole request back. Routes that
+    already call ``commit()`` explicitly keep working — the final commit is then
+    a no-op.
+    """
     session = get_session_factory()()
     try:
         yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     finally:
         session.close()
 
@@ -84,8 +95,8 @@ def reset_engine() -> None:
 
 def init_db(*, seed: bool = True) -> None:
     """Create all tables for local dev/test and seed reference data."""
-    from app.db.base import Base
     from app.db import models  # noqa: F401  (registers mappers)
+    from app.db.base import Base
 
     Base.metadata.create_all(bind=get_engine())
     if seed:
