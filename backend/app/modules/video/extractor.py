@@ -122,9 +122,7 @@ def _downscale(frame: np.ndarray, max_side: int) -> np.ndarray:
 
 
 def _encode_jpeg(frame: np.ndarray) -> bytes:
-    ok, buffer = cv2.imencode(
-        ".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), _JPEG_QUALITY]
-    )
+    ok, buffer = cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), _JPEG_QUALITY])
     if not ok:
         raise VideoValidationError(
             "video_decode_failed",
@@ -179,9 +177,7 @@ def iter_sampled_frames(
                 if not ok or frame is None:
                     break
                 resized = _downscale(frame, settings.video_frame_max_side)
-                timestamp_ms = (
-                    round(index / probe.fps * 1000) if probe.fps > 0 else index * 1000
-                )
+                timestamp_ms = round(index / probe.fps * 1000) if probe.fps > 0 else index * 1000
                 yield SampledFrame(
                     index=index,
                     timestamp_ms=timestamp_ms,

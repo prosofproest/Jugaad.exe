@@ -30,9 +30,7 @@ from sqlalchemy.pool import StaticPool
 client = TestClient(app)
 
 
-def _write_clip(
-    path: Path, *, kind: str = "growing", frames: int = 60, size: int = 320
-) -> bytes:
+def _write_clip(path: Path, *, kind: str = "growing", frames: int = 60, size: int = 320) -> bytes:
     """Write a synthetic clip and return its bytes.
 
     ``growing`` animates one bright region so the demo motion detector and
@@ -40,9 +38,7 @@ def _write_clip(
     and ``dark`` fails the demo quality gate.
     """
 
-    writer = cv2.VideoWriter(
-        str(path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (size, size)
-    )
+    writer = cv2.VideoWriter(str(path), cv2.VideoWriter_fourcc(*"mp4v"), 10.0, (size, size))
     assert writer.isOpened()
     for index in range(frames):
         if kind == "dark":
@@ -106,9 +102,7 @@ def _upload(data: bytes, *, content_type: str = "video/mp4") -> dict:
     return response.json()
 
 
-def test_upload_and_read_tracks_a_region(
-    video_env: sessionmaker[Session], tmp_path: Path
-) -> None:
+def test_upload_and_read_tracks_a_region(video_env: sessionmaker[Session], tmp_path: Path) -> None:
     data = _write_clip(tmp_path / "growing.mp4")
     descriptor = _upload(data)
     assert descriptor["is_demo"] is True
@@ -163,9 +157,7 @@ def test_preview_is_the_first_sampled_frame(
     assert response.content == expected
 
 
-def test_readings_are_append_only(
-    video_env: sessionmaker[Session], tmp_path: Path
-) -> None:
+def test_readings_are_append_only(video_env: sessionmaker[Session], tmp_path: Path) -> None:
     data = _write_clip(tmp_path / "append.mp4")
     descriptor = _upload(data)
     first = client.post(f"/v1/videos/{descriptor['video_id']}/read")

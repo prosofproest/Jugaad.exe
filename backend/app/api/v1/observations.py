@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Literal
 
 from fastapi import APIRouter, Depends, Query, Request, Response, status
@@ -10,12 +10,12 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.core.config import get_settings
 from app.core.dependencies import (
     get_current_user,
     require_idempotency_key,
     require_roles,
 )
-from app.core.config import get_settings
 from app.core.errors import ApiError
 from app.db.models import Crop, Geography, GrowingArea, ImageAsset, User, UserAreaAssignment
 from app.db.session import get_db
@@ -79,9 +79,7 @@ def _require_admin_reason(
 
 
 @router.get("/config/crops")
-def list_crops(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
-) -> dict:
+def list_crops(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     crops = db.scalars(select(Crop).order_by(Crop.code)).all()
     return {
         "items": [observation_service.catalogue_entry(db, crop) for crop in crops],
@@ -90,13 +88,9 @@ def list_crops(
 
 
 @router.get("/areas")
-def list_areas(
-    user: User = Depends(get_current_user), db: Session = Depends(get_db)
-) -> dict:
+def list_areas(user: User = Depends(get_current_user), db: Session = Depends(get_db)) -> dict:
     geographies = db.scalars(select(Geography).order_by(Geography.code)).all()
-    saved = db.scalars(
-        select(GrowingArea).where(GrowingArea.owner_user_id == user.id)
-    ).all()
+    saved = db.scalars(select(GrowingArea).where(GrowingArea.owner_user_id == user.id)).all()
     assignment_rows = db.scalars(
         select(UserAreaAssignment).where(UserAreaAssignment.user_id == user.id)
     ).all()

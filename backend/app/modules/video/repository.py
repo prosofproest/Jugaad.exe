@@ -55,9 +55,7 @@ def create_video(
     return row
 
 
-def get_video(
-    session: Session, *, video_id: str, owner_id: str
-) -> VideoUploadRow | None:
+def get_video(session: Session, *, video_id: str, owner_id: str) -> VideoUploadRow | None:
     return session.scalar(
         select(VideoUploadRow).where(
             VideoUploadRow.id == video_id,
@@ -107,9 +105,7 @@ def create_reading(
     return row
 
 
-def latest_reading(
-    session: Session, *, video_id: str, owner_id: str
-) -> VideoReadingRow | None:
+def latest_reading(session: Session, *, video_id: str, owner_id: str) -> VideoReadingRow | None:
     return session.scalar(
         select(VideoReadingRow)
         .where(

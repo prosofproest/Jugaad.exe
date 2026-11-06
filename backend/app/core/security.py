@@ -10,7 +10,7 @@ import base64
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -56,7 +56,7 @@ def password_needs_rehash(password_hash: str) -> bool:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def create_token(
@@ -82,9 +82,7 @@ def create_token(
 def decode_token(token: str, *, expected_type: str) -> dict[str, Any]:
     settings = get_settings()
     try:
-        payload = jwt.decode(
-            token, settings.jwt_secret, algorithms=[settings.jwt_algorithm]
-        )
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except jwt.ExpiredSignatureError as error:
         raise TokenError("token_expired", "Token has expired") from error
     except jwt.PyJWTError as error:
@@ -139,7 +137,7 @@ def hash_otp(phone_e164: str, code: str) -> str:
     """OTP hashes are salted by the phone number so a dump is not sprayable."""
     return hmac.new(
         get_settings().jwt_secret.encode("utf-8"),
-        f"{phone_e164}:{code}".encode("utf-8"),
+        f"{phone_e164}:{code}".encode(),
         hashlib.sha256,
     ).hexdigest()
 
@@ -171,9 +169,7 @@ def sign_payload(purpose: str, payload: dict[str, Any], ttl_seconds: int) -> str
         "exp": int((_now() + timedelta(seconds=ttl_seconds)).timestamp()),
     }
     raw = json.dumps(body, separators=(",", ":"), sort_keys=True).encode("utf-8")
-    signature = hmac.new(
-        get_settings().jwt_secret.encode("utf-8"), raw, hashlib.sha256
-    ).digest()
+    signature = hmac.new(get_settings().jwt_secret.encode("utf-8"), raw, hashlib.sha256).digest()
     return f"{_b64url(raw)}.{_b64url(signature)}"
 
 
@@ -183,9 +179,7 @@ def verify_signed_payload(purpose: str, token: str) -> dict[str, Any]:
     try:
         raw_part, signature_part = token.split(".", 1)
         raw = _b64url_decode(raw_part)
-        expected = hmac.new(
-            get_settings().jwt_secret.encode("utf-8"), raw, hashlib.sha256
-        ).digest()
+        expected = hmac.new(get_settings().jwt_secret.encode("utf-8"), raw, hashlib.sha256).digest()
         if not hmac.compare_digest(expected, _b64url_decode(signature_part)):
             raise TokenError("invalid_signature", "Signature does not match")
         body = json.loads(raw.decode("utf-8"))

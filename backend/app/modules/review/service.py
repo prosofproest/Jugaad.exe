@@ -2,16 +2,11 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-
-from sqlalchemy import select
-from sqlalchemy.orm import Session
+from datetime import UTC, datetime, timedelta
 
 from app.core.dependencies import assigned_area_codes
 from app.core.errors import ApiError
-from app.db.base import new_id
 from app.db.models import (
-    ImageAsset,
     Observation,
     ObservationVerification,
     Review,
@@ -27,6 +22,8 @@ from app.modules.assessment import service as assessment_service
 from app.modules.identity import service as identity_service
 from app.modules.media import storage
 from app.modules.observations import service as observation_service
+from sqlalchemy import select
+from sqlalchemy.orm import Session
 
 DECISIONS = ("confirmed", "probable", "rejected", "duplicate", "needs_visit", "unresolved")
 QUEUE_STATUSES = ("uploaded", "assessed", "abstained", "pending_review")
@@ -45,7 +42,7 @@ UNRESOLVED_REASONS = {"poor_image", "conflicting_signs", "no_field_access", "oth
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _require_reviewer(db: Session, user: User) -> list[str]:
@@ -256,9 +253,7 @@ def case_detail(db: Session, *, user: User, observation_id: str) -> dict:
             "growth_stage": observation.growth_stage,
             "variety": observation.variety,
             "notes": observation.notes,
-            "captured_at": observation.captured_at.isoformat()
-            if observation.captured_at
-            else None,
+            "captured_at": observation.captured_at.isoformat() if observation.captured_at else None,
             "area_level_only": True,
         },
         "history": [
@@ -302,11 +297,7 @@ def _check_lock(db: Session, user: User, observation_id: str) -> None:
         .where(ReviewAssignment.observation_id == observation_id)
         .order_by(ReviewAssignment.assigned_at.desc())
     )
-    if (
-        assignment is not None
-        and assignment.expires_at > _now()
-        and assignment.user_id != user.id
-    ):
+    if assignment is not None and assignment.expires_at > _now() and assignment.user_id != user.id:
         raise ApiError(409, "case_locked", "Another reviewer has this case")
 
 
@@ -354,14 +345,10 @@ def _validate_evidence(
         rows.append(ReviewEvidence(type="image_note", value=image_note, source="reviewer"))
     if field_observation:
         rows.append(
-            ReviewEvidence(
-                type="field_observation", value=field_observation, source="reviewer"
-            )
+            ReviewEvidence(type="field_observation", value=field_observation, source="reviewer")
         )
     if lab_confirmation:
-        rows.append(
-            ReviewEvidence(type="lab_result", value=lab_confirmation, source="reviewer")
-        )
+        rows.append(ReviewEvidence(type="lab_result", value=lab_confirmation, source="reviewer"))
     return rows
 
 
@@ -517,9 +504,7 @@ def decide(
     }
 
 
-def escalate(
-    db: Session, *, user: User, observation_id: str, note: str
-) -> dict:
+def escalate(db: Session, *, user: User, observation_id: str, note: str) -> dict:
     observation = _scope_observation(db, user, observation_id)
     event = ReviewEvent(
         observation_id=observation.id,
@@ -541,9 +526,7 @@ def escalate(
     return {"observation_id": observation.id, "event_id": event.id, "status": observation.status}
 
 
-def request_info(
-    db: Session, *, user: User, observation_id: str, message: str
-) -> dict:
+def request_info(db: Session, *, user: User, observation_id: str, message: str) -> dict:
     observation = _scope_observation(db, user, observation_id)
     event = ReviewEvent(
         observation_id=observation.id,

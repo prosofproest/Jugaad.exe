@@ -8,7 +8,7 @@ explicit ``seed_demo_data`` call. Every weather row seeded here carries
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -82,7 +82,7 @@ DEMO_WEATHER = {
 
 
 def _utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def seed_reference_data(session: Session) -> None:
@@ -116,9 +116,7 @@ def seed_reference_data(session: Session) -> None:
             session.add(crop)
         for code, name, kind, supported, forecast_eligible in crop_def["targets"]:
             existing = session.scalar(
-                select(Target).where(
-                    Target.crop_code == crop_def["code"], Target.code == code
-                )
+                select(Target).where(Target.crop_code == crop_def["code"], Target.code == code)
             )
             if existing is None:
                 session.add(
@@ -132,13 +130,16 @@ def seed_reference_data(session: Session) -> None:
                     )
                 )
 
-    if session.scalar(
-        select(CropCalendar).where(
-            CropCalendar.crop_code == "tomato",
-            CropCalendar.geo_code == "DEMO_BLOCK_01",
-            CropCalendar.season == "kharif",
+    if (
+        session.scalar(
+            select(CropCalendar).where(
+                CropCalendar.crop_code == "tomato",
+                CropCalendar.geo_code == "DEMO_BLOCK_01",
+                CropCalendar.season == "kharif",
+            )
         )
-    ) is None:
+        is None
+    ):
         session.add(
             CropCalendar(
                 crop_code="tomato",
@@ -215,12 +216,15 @@ def seed_reference_data(session: Session) -> None:
         if session.get(SystemConfig, key) is None:
             session.add(SystemConfig(key=key, value=value, updated_by="seed"))
 
-    if session.scalar(
-        select(AlertPolicy).where(
-            AlertPolicy.geo_code == "DEMO_BLOCK_01",
-            AlertPolicy.target_code == "tomato_late_blight",
+    if (
+        session.scalar(
+            select(AlertPolicy).where(
+                AlertPolicy.geo_code == "DEMO_BLOCK_01",
+                AlertPolicy.target_code == "tomato_late_blight",
+            )
         )
-    ) is None:
+        is None
+    ):
         session.add(
             AlertPolicy(
                 geo_code="DEMO_BLOCK_01",
@@ -316,12 +320,16 @@ def _seed_demo_users(session: Session) -> None:
         mfa_secret=new_totp_secret(),
     )
     for user in (farmer, worker, admin):
-        if user.active_role == "extension_worker" and session.scalar(
-            select(UserAreaAssignment).where(
-                UserAreaAssignment.user_id == user.id,
-                UserAreaAssignment.geo_code == "DEMO_BLOCK_01",
+        if (
+            user.active_role == "extension_worker"
+            and session.scalar(
+                select(UserAreaAssignment).where(
+                    UserAreaAssignment.user_id == user.id,
+                    UserAreaAssignment.geo_code == "DEMO_BLOCK_01",
+                )
             )
-        ) is None:
+            is None
+        ):
             session.add(
                 UserAreaAssignment(
                     user_id=user.id,

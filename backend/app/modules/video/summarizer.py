@@ -39,8 +39,7 @@ SUMMARY_UNSAFE_TEXT = (
     "Request expert review."
 )
 SUMMARY_FAILED_TEXT = (
-    "Video summary unavailable: {reason} No assessment is shown. Retry or request "
-    "expert review."
+    "Video summary unavailable: {reason} No assessment is shown. Retry or request expert review."
 )
 
 FAILED_REASON_TEXT: dict[str, str] = {
@@ -80,9 +79,7 @@ def _stable_tracks(tracks: list[Track], interval_ms: int) -> list[dict]:
             continue
         span = track.last_frame - track.first_frame + 1
         boxes = list(track.boxes.values())
-        areas = [
-            (width * height) for _, _, width, height in boxes if width > 0 and height > 0
-        ]
+        areas = [(width * height) for _, _, width, height in boxes if width > 0 and height > 0]
         stable.append(
             {
                 "track_id": track.track_id,

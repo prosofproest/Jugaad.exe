@@ -133,25 +133,15 @@ class ByteTrackLiteTracker:
             used_detections.add(detection_index)
             matches.append((tracks[track_index], detections[detection_index]))
 
-        unmatched_tracks = [
-            track for index, track in enumerate(tracks) if index not in used_tracks
-        ]
+        unmatched_tracks = [track for index, track in enumerate(tracks) if index not in used_tracks]
         unmatched_detections = [
-            detection
-            for index, detection in enumerate(detections)
-            if index not in used_detections
+            detection for index, detection in enumerate(detections) if index not in used_detections
         ]
         return matches, unmatched_tracks, unmatched_detections
 
-    def update(
-        self, detections: list[Detection], frame_index: int
-    ) -> list[tuple[int, Detection]]:
+    def update(self, detections: list[Detection], frame_index: int) -> list[tuple[int, Detection]]:
         high = [item for item in detections if item.score >= self._high_score]
-        low = [
-            item
-            for item in detections
-            if self._low_score <= item.score < self._high_score
-        ]
+        low = [item for item in detections if self._low_score <= item.score < self._high_score]
 
         active = list(self._tracks.values())
         matches, unmatched_tracks, _ = self._match(active, high, frame_index)
@@ -173,16 +163,12 @@ class ByteTrackLiteTracker:
             track.box = (x, y, width, height)
 
         for track_id in [
-            track_id
-            for track_id, track in self._tracks.items()
-            if track.age > self._max_age
+            track_id for track_id, track in self._tracks.items() if track.age > self._max_age
         ]:
             del self._tracks[track_id]
 
         matched_high = {
-            id(detection)
-            for _, detection in matches
-            if detection.score >= self._high_score
+            id(detection) for _, detection in matches if detection.score >= self._high_score
         }
         for detection in high:
             if id(detection) in matched_high:
