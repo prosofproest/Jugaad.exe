@@ -17,11 +17,16 @@ from app.core.config import get_settings
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.modules.conversations import orm  # noqa: F401  (registers the tables)
-from app.modules.conversations.engine import get_assessment_engine
+from app.modules.conversations import (
+    orm,  # noqa: F401  (registers the tables)
+    service,
+)
+from app.modules.conversations.engine import EngineResult, get_assessment_engine
+from app.modules.conversations.orm import MessageEventRow
+from app.modules.conversations.validator import VALIDATOR_VERSION
 from fastapi.testclient import TestClient
 from PIL import Image, ImageDraw
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -110,6 +115,37 @@ def _send(client: TestClient, conversation_id: str, **body) -> dict:
     )
     assert response.status_code == 200, response.text
     return response.json()
+
+
+class _StubEngine:
+    """Engine used to prove the safety gate runs before storage."""
+
+    def __init__(
+        self,
+        *,
+        reason_text: str = "Possible symptom match. This is an assistive result.",
+        candidates: list[dict] | None = None,
+    ) -> None:
+        self.model_version = "stub-chat-0.1"
+        self.is_demo = False
+        self._reason_text = reason_text
+        self._candidates = candidates or []
+
+    def assess(
+        self,
+        *,
+        upload,
+        crop_id: str | None = None,
+        context: str | None = None,
+    ) -> EngineResult:
+        del upload, crop_id, context
+        return EngineResult(
+            state="assessed",
+            reason_text=self._reason_text,
+            candidates=self._candidates,
+            model_version=self.model_version,
+            is_demo=False,
+        )
 
 
 def test_upload_is_validated_stored_and_previewable(session_factory) -> None:
@@ -325,3 +361,78 @@ def test_jpeg_upload_is_accepted(session_factory) -> None:
 
     assert descriptor["content_type"] == "image/jpeg"
     assert descriptor["filename"] == "leaf.png"
+
+
+def test_unsafe_reply_is_withheld_before_storage(session_factory, monkeypatch) -> None:
+    unsafe = "Spray chlorothalonil at 2 g/L every 7 days."
+    monkeypatch.setattr(
+        service,
+        "get_assessment_engine",
+        lambda: _StubEngine(reason_text=unsafe),
+    )
+    conversation = _conversation(client)
+
+    result = _send(client, conversation["conversation_id"])
+
+    assistant = result["assistant_message"]
+    assessment = assistant["assessment"]
+    assert assessment["state"] == "failed"
+    assert assessment["reason_code"] == "unsafe_content_blocked"
+    assert assessment["error_code"] == "unsafe_content_blocked"
+    assert assessment["candidates"] == []
+    assert assistant["kind"] == "failed"
+    assert assistant["next_steps"] == ["request_review"]
+    assert "chlorothalonil" not in assistant["text"].lower()
+    assert "g/l" not in assistant["text"].lower()
+
+    stored = client.get(f"/v1/conversations/{conversation['conversation_id']}/messages").json()
+    assistant_row = next(item for item in stored if item["role"] == "assistant")
+    assert "chlorothalonil" not in assistant_row["text"].lower()
+
+    with session_factory() as session:
+        events = session.scalars(
+            select(MessageEventRow).where(MessageEventRow.message_id == assistant["message_id"])
+        ).all()
+    rejection = next(event for event in events if event.event_type == "validator_rejected")
+    assert rejection.detail["validator_version"] == VALIDATOR_VERSION
+    assert rejection.detail["categories"] == [
+        "application_instruction",
+        "chemical_product",
+        "dosage",
+    ]
+    assert "chlorothalonil" not in str(rejection.detail).lower()
+
+
+def test_unsafe_candidate_name_is_withheld(session_factory, monkeypatch) -> None:
+    monkeypatch.setattr(
+        service,
+        "get_assessment_engine",
+        lambda: _StubEngine(
+            candidates=[
+                {
+                    "label": "demo_pattern_a",
+                    "display_name": "Apply fungicide",
+                    "score": 0.9,
+                }
+            ]
+        ),
+    )
+    conversation = _conversation(client)
+
+    result = _send(client, conversation["conversation_id"])
+
+    assessment = result["assistant_message"]["assessment"]
+    assert assessment["state"] == "failed"
+    assert assessment["candidates"] == []
+
+
+def test_safe_engine_reply_is_stored(session_factory, monkeypatch) -> None:
+    monkeypatch.setattr(service, "get_assessment_engine", lambda: _StubEngine())
+    conversation = _conversation(client)
+
+    result = _send(client, conversation["conversation_id"])
+
+    assessment = result["assistant_message"]["assessment"]
+    assert assessment["state"] == "assessed"
+    assert assessment["reason_code"] is None
+    assert result["assistant_message"]["kind"] == "assessment"

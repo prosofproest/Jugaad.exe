@@ -237,6 +237,12 @@ Rules:
 - No endpoint returns raw scores to farmer clients beyond the documented candidates.
 - An assistant message is append-only. `POST …/review` creates at most one
   `chat_review_requests` row per assistant message and returns the same row on replay.
+- Every assistant reply is validated before it is stored. If the reply text, the
+  assessment reason or a candidate display name contains a chemical product, dose,
+  mixture, application interval or spray instruction, the turn is stored as `failed`
+  with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and
+  `next_steps` set to `["request_review"]`. A `validator_rejected` `message_events` row
+  records the validator version and rule categories; the unsafe text is never stored.
 
 ---
 
@@ -274,8 +280,10 @@ the following are hard requirements:
    monitoring, sanitation, crop management and escalation.
 4. Severe, uncertain or unsupported cases surface "request expert review" as the primary
    action.
-5. The server-side content validator rejects chemical vocabulary before a message is
-   stored; a template test asserts this.
+5. The server-side content validator (`chat-safety-0.1`) rejects chemical vocabulary
+   before a message is stored. It is fail-closed: a blocked reply becomes a `failed`
+   assessment with no candidates, and the rejection is audited without copying the
+   unsafe text. Unit and API tests assert this.
 6. No free-form generative text is served in v1. Template rendering is deterministic and
    versioned.
 7. The chat cannot be used to bypass verification: requesting review creates the same

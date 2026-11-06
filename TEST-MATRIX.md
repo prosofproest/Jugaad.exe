@@ -26,7 +26,7 @@ Flutter 3.47.9 / Dart 3.13.7.
 | FND-06 | TRD §15.1; CHAT-NF-05 | Log inside a request context / with an exception | `request_id` attached; only `error_type` kept, payload text absent | `backend/tests/test_logging.py` (two tests) | Verified |
 | FND-07 | TRD-O-08 observability | Call liveness; supply `X-Request-ID` | `200`; supplied id preserved, otherwise minted and unique per request | `backend/tests/test_request_context.py`, `test_health.py`, `test_errors.py::test_health_is_still_reachable_without_auth` | Verified |
 | FND-08 | §5.1 migrations | Generate migration SQL without a live database | `alembic history` shows `0001_baseline` and `0002_chat_persistence`; `alembic upgrade head --sql` emits transactional SQL | `cd backend && alembic history && alembic upgrade head --sql`; CI backend job | Verified |
-| FND-09 | §5.1 lint/test runners (backend) | Run the backend suite and linters | 294 tests pass; targeted `ruff check` clean on the identity and chat slices; `ruff format --check` clean on the same slices | `cd backend && pytest && ruff check app/modules/identity app/api/v1/auth.py app/api/v1/me.py app/api/v1/admin.py tests/test_identity_*.py tests/support_identity.py app/modules/conversations app/api/v1/uploads.py app/api/v1/conversations.py tests/test_chat_api.py` | Verified |
+| FND-09 | §5.1 lint/test runners (backend) | Run the backend suite and linters | 316 tests pass; targeted `ruff check` clean on the identity and chat slices; `ruff format --check` clean on the same slices | `cd backend && pytest && ruff check app/modules/identity app/api/v1/auth.py app/api/v1/me.py app/api/v1/admin.py tests/test_identity_*.py tests/support_identity.py app/modules/conversations app/api/v1/uploads.py app/api/v1/conversations.py tests/test_chat_api.py tests/test_chat_validator.py` | Verified |
 | FND-10 | §5.1 web app scaffold | Typecheck, lint and production-build the Next.js client | No type errors, no lint errors, build emits `/`, `/_not-found`, `/chat`, `/chat/[conversationId]`, `/outlook`, `/review` | `cd frontend && npm run typecheck && npm run lint && npm run build`; CI frontend job | Verified |
 | FND-11 | §5.1 mobile app scaffold | Analyze and test the Flutter client | `flutter analyze` clean; widget test passes | Local run on 2026-11-06 with Flutter 3.47.9 / Dart 3.13.7: `flutter pub get` (30 packages), `flutter analyze` → “No issues found!”, `flutter test` → 1 test passed; `.github/workflows/ci.yml` mobile job mirrors the same commands | Verified (analyze + test; no APK or device run) |
 | FND-12 | §5.1 local compose | Parse and interpolate the stack with the example env file | Exit `0`, no unresolved variables | `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml config --quiet` | Verified |
@@ -41,6 +41,7 @@ Flutter 3.47.9 / Dart 3.13.7.
 | FND-21 | CHAT-07 | Upload a dark or too-small image and send it | Reply is `abstained` with `quality_gate_failed`, the quality flag and a retake step; no candidates | `backend/tests/test_chat_api.py::test_dark_image_fails_the_demo_quality_gate`, `test_quality_failure_abstains_with_a_retake`, `test_small_image_is_low_resolution` | Verified (demo gate) |
 | FND-22 | CHAT-09; CHAT-18 | Request expert review twice on one assistant message | One persisted review request; replay returns the same id; the assessment is unchanged; a user message is rejected with `400` | `backend/tests/test_chat_api.py::test_review_request_is_persisted_and_idempotent`, `test_review_on_a_user_message_is_rejected` | Verified |
 | FND-23 | §5.1 schema authority; ADR-002 | Import the domain ORM and the chat ORM into one metadata, then create the schema on SQLite | Both modules import together; no duplicate-table error; `Base.metadata.create_all` creates 48 tables including `chat_review_requests`; the observation `review_requests` table is separate | `python -c "import app.db.models"`; `python -c "from app.db.base import Base; import app.db.models; ...create_all..."` on 2026-11-06 | Verified |
+| FND-24 | CHAT-10; AGENTS R5 | Make the assessment engine return chemical advice, then send the turn | The unsafe reply is withheld before storage; the stored assistant message is `failed` with `unsafe_content_blocked`, no candidates, no chemical text; one `validator_rejected` event records the validator version and rule categories only | `backend/tests/test_chat_validator.py` (19 tests); `backend/tests/test_chat_api.py::test_unsafe_reply_is_withheld_before_storage`, `test_unsafe_candidate_name_is_withheld`, `test_safe_engine_reply_is_stored` | Verified |
 
 ---
 
@@ -59,14 +60,14 @@ unless an automated test is explicitly named, and they do not close Phase 2.
 | CHAT-07 | Send an unusable image | Reply is `abstained` with a machine reason, plain-language text and retake action | `backend/tests/test_chat_api.py` quality-gate tests (FND-21); demo gate only | Verified (demo gate) |
 | CHAT-09 | Request expert review from a reply | One persisted review request; status visible in the thread; the assessment is unchanged | `backend/tests/test_chat_api.py` review tests (FND-22); `frontend/components/assessment-card.tsx` | Verified (API + manual SSR) |
 | CHAT-08 | Send an unsupported crop | Supported list + escalation; no forced class | API test with unsupported crop fixture | Planned |
-| CHAT-10 | Ask for a chemical treatment | Validator blocks the reply; no chemical name, dose, interval or legal-use text | Validator unit test (validator not built) | Planned |
+| CHAT-10 | Ask for a chemical treatment | Validator blocks the reply; no chemical name, dose, interval or legal-use text | `backend/tests/test_chat_validator.py`; `backend/tests/test_chat_api.py` safety-gate tests (FND-24) | Verified |
 | CHAT-11 / R1 | View a chat reply that has an area outlook available | Two separate cards; the outlook is linked, never merged into the assessment | UI test plus contract assertion (contract half covered by FND-01) | Planned |
 | CHAT-14 | Upload or assessment fails | Retry action shown; never a fabricated result | `test_upload_rejects_a_non_image`, `test_upload_rejects_corrupt_bytes`, `test_quality_failure_abstains_with_a_retake`; web retry reuses the same `client_message_id` | Verified (API + manual UI) |
 | CHAT-15 | Conversation list context | Title, last-activity time and an open link | FND-18 live smoke; `frontend/components/chat-index.tsx` | Verified (manual) |
 | CHAT-16 | Delete a conversation | Confirm step, `DELETE`, item removed and empty state shown | FND-18 live smoke; `frontend/components/chat-index.tsx` | Verified (manual) |
 | FR-02-23 / FR-02-24 | Open a result screen | `AssessmentCard` and `OutlookCard` are distinct; outcome states drive the card | Component test | Planned |
 | FR-04-14 | Reviewer records a decision | Immutable review event + audit event written in the same transaction | API + database test (feature not built) | Planned |
-| 03 §3 permission matrix | Farmer reads another owner’s conversation | `404`, never the record; staff access is role-scoped and audited | Conversation ownership is still unimplemented: the demo chat store has no owner field and its routes are unauthenticated (IDN-03 covers only the new `/v1/me` and `/v1/admin` routes) | Planned |
+| 03 §3 permission matrix | Farmer reads another owner’s conversation | `404`, never the record; staff access is role-scoped and audited | Conversation rows carry `owner_id` and the service scopes every lookup to the fixed `demo_user`; the chat routes are still unauthenticated, so a second user cannot be represented yet. Staff access is not built (IDN-03 covers only the new `/v1/me` and `/v1/admin` routes) | Planned |
 | TRD-O-08 rollback | Apply migrations from zero, then downgrade/restore | Baseline creates no tables beyond `alembic_version`; every later revision has a rollback note | Migration test against a scratch PostGIS container | Planned |
 
 ---
@@ -152,7 +153,8 @@ curl -F "file=@leaf.png;type=image/png" http://localhost:8000/v1/uploads
 - `mobile/` analyze and test now pass locally, but there are no platform runners;
   neither CI nor this machine can build an APK/IPA until `flutter create .` is run
   and committed. No device or emulator run has been performed.
-- Auth, the reviewer queue and the chat validator are still feature work. Upload
+- Auth, the reviewer queue and the remaining CHAT requirements are still feature work.
+  The chat content-safety validator (CHAT-10) now runs before storage. Upload
   and a demo quality gate now exist; the §5.2 identity slice is implemented in
   memory (IDN-01…IDN-09) but the demo chat/assessment/advisory/map routes are still
   unauthenticated, so no object-level isolation claim can be made for them.

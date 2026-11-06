@@ -167,7 +167,7 @@ paths are in each agent's `README.md`.
 
 | Task | Command | Last result |
 |---|---|---|
-| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 294 passed |
+| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 316 passed |
 | Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean for the identity slice; pre-existing failures remain elsewhere |
 | Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean for the identity slice; pre-existing differences remain elsewhere |
 | Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence` |
