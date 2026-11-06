@@ -16,6 +16,7 @@ from app.api.v1 import (
     map,
     me,
     uploads,
+    videos,
 )
 
 api_router = APIRouter()
@@ -28,3 +29,4 @@ api_router.include_router(uploads.router)
 api_router.include_router(assessments.router)
 api_router.include_router(advisories.router)
 api_router.include_router(map.router)
+api_router.include_router(videos.router)

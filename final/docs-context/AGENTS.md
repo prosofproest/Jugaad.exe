@@ -8,10 +8,13 @@ planned, built, tested and documented.
 **Status:** documentation plus engineering scaffolds (Phase 2 §5.1), the persisted
 demo chat slice (§5.7: image upload, demo quality gate, deterministic demo engine,
 optional OpenAI-compatible vision adapter, review requests; Alembic
-`0002_chat_persistence`), and the §5.2 identity backend slice (in memory: OTP,
+`0002_chat_persistence`), the demo-labelled video-reading machinery (spec 09:
+bounded decode, frame sampling, `demo-motion-0.1` detector, `bytetrack-lite-0.1`
+tracker, per-frame assessments, non-diagnostic summary; Alembic
+`0003_video_persistence`), and the §5.2 identity backend slice (in memory: OTP,
 staff MFA, five roles, consent, privacy, audit). No real model is connected by
 default; demo paths are labelled, the provider adapter is mock- and local-stub
-tested (no vendor call), and
+tested (no vendor call), the shipped video detector is a demo heuristic, and
 identity state is lost on restart. The mobile client passes `flutter analyze` and
 `flutter test`; no APK or device run yet.
 **Last updated:** 2026-11-06
@@ -155,9 +158,10 @@ of its own — SQLAlchemy models and Alembic migrations in `backend/` are the
 single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
 Nothing beyond the Phase 2 §5.1 foundation, the persisted demo chat slice
-(§5.7) and the in-memory §5.2 identity backend slice exists in these folders. Do
-not create scaffolding that implies a decision has been made unless the decision
-is recorded in `progress-tracker.md`.
+(§5.7), the demo-labelled video-reading machinery (spec 09) and the in-memory
+§5.2 identity backend slice exists in these folders. Do not create scaffolding
+that implies a decision has been made unless the decision is recorded in
+`progress-tracker.md`.
 
 ---
 
@@ -169,10 +173,10 @@ paths are in each agent's `README.md`.
 
 | Task | Command | Last result |
 |---|---|---|
-| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 336 passed |
+| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 353 passed |
 | Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean for the identity slice; pre-existing failures remain elsewhere |
 | Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean for the identity slice; pre-existing differences remain elsewhere |
-| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence` |
+| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence`, `0003_video_persistence` |
 | Review migration SQL offline | `cd backend && .venv\Scripts\python -m alembic upgrade head --sql` | SQL emitted |
 | Backend dev server | `cd backend && .venv\Scripts\python -m uvicorn app.main:app --reload --port 8000` | `/health` returned 200 |
 | Web install | `cd frontend && npm ci` | 346 packages |
@@ -271,7 +275,7 @@ Refuse and escalate (do not implement) if asked to:
 | `operations-and-pilot.md` | How the system is tested, piloted, deployed, monitored and staffed |
 | `roadmap-and-resources.md` | Phase roadmap, budget/resource logic and the risk register rationale |
 | `appendices.md` | Approved templates, checklists, glossary and launch gates |
-| `../feature-specs/01..07` | What each feature must do, with acceptance criteria |
+| `../feature-specs/01..09` | What each feature must do, with acceptance criteria |
 | `../README.md` | Which file covers which blueprint chapter |
 
 ---
@@ -281,6 +285,7 @@ Refuse and escalate (do not implement) if asked to:
 | Term | Meaning |
 |---|---|
 | **Photo assessment** | Image-based triage of visible symptoms. Never "diagnosis". |
+| **Video reading** | Per-frame photo assessments plus a non-diagnostic summary of a short clip. Never a video-level diagnosis, severity, yield loss or area outlook. |
 | **Area outlook** | Forecast risk for crop × target × geography × horizon. Never "outbreak alert". |
 | **Abstention / no assessment** | Model declined to answer because evidence is insufficient. |
 | **Coverage** | Completeness, freshness and representativeness of inputs for an area. |

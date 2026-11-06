@@ -308,7 +308,9 @@ Never log image bytes, notes, phone numbers or coordinates. Include `request_id`
 ## 11. Out of scope
 
 - Multi-image diagnosis per case (v1 assesses one image at a time).
-- Video capture.
+- ~~Video capture.~~ **Superseded by `09-video-reading.md` (explicit user instruction,
+  2026-11-06).** Video is a capture format over the same photo-assessment pipeline; it
+  never produces a video-level diagnosis, severity, yield loss or area outlook.
 - On-device model inference. (The FR-02-07 pre-check is client-side and advisory only; its
   mechanism is decided in `progress-tracker.md` D12. The server quality gate is
   authoritative.)

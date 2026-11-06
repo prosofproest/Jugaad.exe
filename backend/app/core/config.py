@@ -78,6 +78,23 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 10 * 1024 * 1024
     max_image_dimension: int = 8000
 
+    # Video reading (spec 09). Short clips only. Every ceiling is enforced before
+    # or during decode so a hostile file cannot exhaust the worker. Sampling is
+    # deterministic for the same file and settings.
+    video_max_bytes: int = 50 * 1024 * 1024
+    video_max_duration_s: float = 30.0
+    video_max_dimension: int = 1920
+    video_sample_fps: float = 2.0
+    video_max_frames: int = 24
+    video_frame_max_side: int = 1024
+    video_min_usable_frames: int = 3
+    video_min_duration_ms: int = 500
+    video_assess_frames: int = 3
+    video_track_iou: float = 0.3
+    video_track_max_age: int = 5
+    video_motion_threshold: int = 25
+    video_motion_min_area_fraction: float = 0.005
+
     # Logging: one JSON event per line, no payloads and no PII.
     log_level: str = "INFO"
 

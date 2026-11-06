@@ -72,7 +72,10 @@ role- and area-scoped and audited.
 
 - Free-form generative diagnosis or treatment conversation.
 - A general-purpose chatbot for non crop-health topics.
-- Voice messages, video, live streaming.
+- Voice messages and live streaming. ~~Video.~~ **Video is superseded by
+  `09-video-reading.md` (explicit user instruction, 2026-11-06):** a clip is read as
+  sampled frames with per-frame photo assessments and a non-diagnostic summary, never a
+  video-level diagnosis.
 - Multi-user group chats.
 - Automatic translation of user text.
 - Merging area outlook into the chat reply.

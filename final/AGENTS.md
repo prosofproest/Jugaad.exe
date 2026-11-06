@@ -21,10 +21,14 @@ Repository status as of 2026-11-06: documentation plus Phase 2 engineering scaff
 (FastAPI, Next.js web client, Flutter shell, compose and CI), the **persisted demo
 chat slice** (image upload + quality gate + deterministic demo engine + optional
 mock- and local-stub-tested OpenAI-compatible vision adapter + review requests, Alembic
-`0002_chat_persistence`), and the **§5.2 identity backend slice** (phone OTP, staff
+`0002_chat_persistence`), the **demo-labelled video-reading machinery** (bounded clip
+decode, deterministic sampling, `demo-motion-0.1` detector, `bytetrack-lite-0.1`
+tracker, per-frame assessments, non-diagnostic summary, Alembic
+`0003_video_persistence`), and the **§5.2 identity backend slice** (phone OTP, staff
 MFA, five roles, consent, privacy, audit — in memory). No real model is connected by
-default and identity state is not durable; the web app builds and its chat flow
-passed a live upload → assessment → review smoke test, while the mobile shell passes
+default, the shipped video detector is a heuristic rather than a pest detector, and
+identity state is not durable; the web app builds and its chat flow passed a live
+upload → assessment → review smoke test, while the mobile shell passes
 `flutter analyze` and `flutter test` (no device or APK run yet). Gate 1 is not met.
 
 The full 55-chapter blueprint and Appendices A–H are mapped to repository files in

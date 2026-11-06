@@ -5,8 +5,10 @@ Update this file in the same change as any scope, schema, API or decision change
 
 **Last updated:** 2026-11-06
 **Current phase:** Phase 0 — Discovery (documentation complete, decisions open; Phase 2 §5.1
-engineering foundation, the persisted demo chat slice and the §5.2 identity backend slice present under a recorded Gate-1
-exception; no live model key configured and no durable identity store; mobile analyze/test verified locally)
+engineering foundation, the persisted demo chat slice, the demo-labelled video-reading
+machinery and the §5.2 identity backend slice present under a recorded Gate-1
+exception; no live model key configured and no durable identity store; mobile
+analyze/test verified locally)
 
 ---
 
@@ -90,7 +92,15 @@ handbook approved by a pathologist.
 - [~] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
       `review_requested`) and chemical-content validator. Implemented: `assessed`,
       `abstained` and `failed` states plus persisted `review_requested`; `queued` and
-      `unsupported_crop` remain open, and the validator is not built.
+      `unsupported_crop` remain open. The `chat-safety-0.1` validator is built and
+      applied to chat and video summaries.
+- [~] Video reading (`09-video-reading.md`, added to v1 by explicit user instruction).
+      **Backend machinery implemented and demo-labelled** (Alembic
+      `0003_video_persistence`): bounded MP4/MOV/WebM upload, deterministic frame
+      sampling, per-frame quality gate, `demo-motion-0.1` motion-region detector,
+      `bytetrack-lite-0.1` tracker, per-frame photo assessments and a template-only,
+      non-diagnostic summary. Chat-composer integration on web/mobile, a real detector
+      (D15), retention (D14) and calibration remain open.
 - [ ] Expert review queue and decision flow (`04-expert-review.md`).
 - [ ] Audit trail for reviews, roles, exports and chat events.
 - [ ] Admin config for crops, targets, geographies.
@@ -174,10 +184,11 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo engine, optional OpenAI-compatible adapter, review requests); §5.2 identity slice in memory. Next: configure and validate a live provider (needs the Gate 1 exception, D1/D8 and the key), durable identity persistence and route auth |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence` + `0003_video_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo engine, optional OpenAI-compatible adapter, review requests); demo-labelled video-reading pipeline; §5.2 identity slice in memory. Next: configure and validate a live provider (needs the Gate 1 exception, D1/D8 and the key), durable identity persistence and route auth |
 | Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
 | Web | `[~]` | Next.js desktop shell in `frontend/` with persistent section sidebar, dashboard and honest locked/not-available routes; typecheck, lint, build and live smoke pass (2026-11-06) |
 | Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo/OpenAI-compatible engine → review); mobile shell only. Real assessment waits on Phase 3, D8 and a live key |
+| Video | `[~]` | Spec 09 + backend machinery (bounded decode/sampling, per-frame quality gate, `demo-motion-0.1`, `bytetrack-lite-0.1`, per-frame assessments, non-diagnostic summary, append-only readings). No trained detector (D15), no chat-composer UI and no retention job (D14) |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
 | MLOps | `[ ]` | Registry table design in data layer |
@@ -468,6 +479,26 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 **Implemented in:** `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `04-expert-review.md`
 §2; `05-data-layer.md` §4.1; `07-advisory-and-alerts.md` §2–§3; `phase-plan.md` §5.2.
 
+### D14 — Video retention and deletion window `[?]`
+
+Short clips are stored under `APP_MEDIA_ROOT` so a reading can be reproduced.
+Decide the retention window, whether the source clip or only the assessed frames
+are kept, and the deletion path (soft delete plus object-storage lifecycle). Until
+decided, no retention job exists; `video_uploads.deleted_at` is present so a job
+can be added without a schema change. **Owner:** Product lead + privacy lead.
+**Needs by:** before any real user clip is stored. **Interim rule:** do not store
+real farmer footage; synthetic/demo clips only.
+
+### D15 — Detector/tracker model and validation protocol `[?]`
+
+`demo-motion-0.1` is a frame-difference heuristic and `bytetrack-lite-0.1` is a
+dependency-light reimplementation, not the official ByteTrack package. Replacing
+them needs an approved crop/target taxonomy (D1/D2), a labelled video dataset, a
+pre-registered evaluation protocol and the D8 decision function. **Owner:** ML lead.
+**Needs by:** Phase 3. **Interim rule:** every video reading stays `is_demo=true`,
+`calibrated=false` and `requires_review=true`; a tracker id is never a pest
+identity.
+
 ---
 
 ## 5. ADR log
@@ -483,6 +514,7 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 | ADR-007 | Full-stack delivery: one API, web app and mobile app are all in scope | Accepted | 2026-11-06 |
 | ADR-008 | Chat is a `conversations` wrapper over photo assessment, not a new model or generative diagnosis | Accepted | 2026-11-06 |
 | ADR-009 | The Next.js web app lives in `frontend/` (source documents say `web/`); the folder name follows the existing repository layout | Accepted | 2026-11-06 |
+| ADR-010 | Video reading is a capture format for the existing photo-assessment pipeline, not a new model or video-level diagnosis; the detector/tracker seam ships demo-labelled | Accepted | 2026-11-06 |
 
 ---
 
@@ -509,6 +541,7 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 | R-17 | Chat reply read as a diagnosis | H | H | Structured templates; "assistive, not diagnosis" copy; abstention; review escalation | Product | Open |
 | R-18 | Chat emits chemical advice or free-form medical text | L | H | Server-side validator before storage; template tests; no generative diagnosis path in v1 | Eng lead | Open |
 | R-19 | Chat scope creep into a general LLM assistant | M | M | Explicit out-of-scope; wrapper-only architecture; no free-form model | Product | Open |
+| R-20 | Video tracker output read as pest identification or a video-level diagnosis | M | H | Motion-region naming; demo-only versions; per-frame assessments only; template summary; `requires_review=true`; no video-level label | Product + ML lead | Open |
 
 L = likelihood, I = impact, both H/M/L.
 
@@ -539,6 +572,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Reconciled a force-pushed `main`: a collaborator's line (`697944d`, diverged at `611aa48`) added a parallel backend, Phase-0 docs and ADRs. Merged it while keeping this line's tested backend for overlapping paths (`app/api`, `app/core`, `app/db`, conversations, identity). The collaborator's new Phase-0 documents, ADRs, `backend/backend/*` vertical slice and non-conflicting files are retained; its superseded `app/*` implementations remain in history but are not wired. Removed the committed `backend/var/ps03.db` artifact. Backend suite re-run after the merge: 294 passed. |
 | 2026-11-06 | Added the chat content-safety gate (CHAT-10, R5/R18): the deterministic, fail-closed `chat-safety-0.1` validator checks the reply text, assessment reason and candidate display names before storage. A blocked reply is stored as `failed` with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and `request_review`; a `validator_rejected` message event records the validator version and rule categories without the unsafe text. 19 validator unit tests and 3 API safety-gate tests; full backend suite 316 passed. A live API smoke on a fresh SQLite database re-ran upload → assessed `demo-chat-0.1` reply → persisted review → idempotent replay → preview byte-match → `415` rejection with the validator in the path. |
 | 2026-11-06 | Added the optional OpenAI-compatible vision engine behind the `AssessmentEngine` seam (`APP_CHAT_ENGINE=openai_compatible`): the adapter posts a downscaled JPEG plus `APP_CHAT_LABELS` to `{APP_CHAT_BASE_URL}/chat/completions`, accepts JSON-only candidates, drops unknown labels and renders reply text from fixed templates. Missing key/model/labels, timeouts, HTTP failures and malformed output are explicit `failed` states; a model abstention is `abstained`/`model_abstained`. `is_demo` stays true until `APP_CHAT_LABELS_APPROVED=true`, so no D1/D2 taxonomy is invented in code. `httpx` moved to runtime dependencies; compose passes the chat variables and mounts a media volume. 19 engine tests and 1 API wiring test; full suite 336 passed. Verified with a mock transport and a live uvicorn run against a local OpenAI-compatible HTTP stub: upload → `assessed`, `is_demo=false`, `model_version=stub-vision-1`, one approved candidate, template text, persisted review and 2 messages. No real vendor call was made. |
+| 2026-11-06 | Added the demo-labelled video-reading machinery (`09-video-reading.md`, added to v1 by explicit user instruction; supersedes the video exclusions in specs 02 §11 and 08 §3.2). Bounded MP4/MOV/WebM upload with size/duration/dimension ceilings, deterministic frame sampling, per-frame quality gate, `demo-motion-0.1` frame-difference detector, `bytetrack-lite-0.1` tracker, at most three per-frame photo assessments through the existing `AssessmentEngine`, a template-only non-diagnostic summary and append-only `video_readings` (Alembic `0003_video_persistence`). Abstention (`no_stable_region`, `insufficient_usable_frames`) and explicit `failed` states; `chat-safety-0.1` runs on the summary; every reading is `is_demo=true`, `calibrated=false`, `requires_review=true`. 17 new tests; full backend suite 353 passed. Added ADR-010, R-20 and open decisions D14/D15. Deliberately **not** done: a trained detector, retention/deletion (D14), chat-composer video UI, calibration and a live PostgreSQL apply. |
 
 ---
 

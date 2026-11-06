@@ -26,15 +26,19 @@ from sqlalchemy.types import JSON
 
 from app.db.base import Base, TimestampMixin, UTCDateTime, new_id, utc_now
 from app.modules.conversations import orm as _chat_orm
+from app.modules.video import orm as _video_orm
 
-# Re-export the chat models so ``app.db.models`` remains the single import
-# surface for ORM models. The chat schema is owned by the conversations module
-# and migrated by Alembic ``0002_chat_persistence``.
+# Re-export the chat and video models so ``app.db.models`` remains the single
+# import surface for ORM models. The chat schema is owned by the conversations
+# module (Alembic ``0002_chat_persistence``); the video schema is owned by the
+# video module (Alembic ``0003_video_persistence``).
 Conversation = _chat_orm.ConversationRow
 Message = _chat_orm.MessageRow
 MessageEvent = _chat_orm.MessageEventRow
 ImageUpload = _chat_orm.ImageUploadRow
 ChatReviewRequest = _chat_orm.ReviewRequestRow
+VideoUpload = _video_orm.VideoUploadRow
+VideoReading = _video_orm.VideoReadingRow
 
 
 # ---------------------------------------------------------------------------

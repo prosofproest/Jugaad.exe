@@ -49,6 +49,15 @@ OPENAPI_TAGS = [
             "no real model is served in this phase."
         ),
     },
+    {
+        "name": "videos",
+        "description": (
+            "Video reading: upload a short clip, sample bounded frames, track motion "
+            "regions and return per-frame photo assessments plus a non-diagnostic "
+            "summary. The shipped detector is demo-only and every reading requires "
+            "human review."
+        ),
+    },
 ]
 
 

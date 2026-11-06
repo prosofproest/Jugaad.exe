@@ -23,7 +23,7 @@
 
 | Gate | Date | Verified by | Command / artefact | Result |
 |---|---|---|---|---|
-| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `git log --oneline`; `progress-tracker.md` §4–§5; `git ls-files final/backend backend/backend` | **Open** — ADRs recorded in the tracker but no `docs/adr/` file; D1–D6 and D9–D12 open; the stale `final/backend/` path has reappeared (`final/backend/forecast/*`), so 0.3 is reopened |
+| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `git log --oneline`; `progress-tracker.md` §4–§5; `git ls-files final/backend backend/backend` | **Open** — ADRs recorded in the tracker but no `docs/adr/` file; D1–D6 and D9–D12 open; the duplicate `final/backend/` and `backend/backend/` trees were removed on 2026-11-06, so 0.3 is closed |
 | 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 336 backend tests pass; web checks pass (6 routes); identity slice and chat persistence exist, but identity is in-memory, demo feature routes are unauthenticated, and there is no readiness probe |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
@@ -76,6 +76,7 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-20 | Gate 6 GIS map layers: closed layer enum, verified/unverified/modelled/coverage/boundary kept separate, small-count suppression, boundary-version fail-closed, `GET /v1/map/layers/{layer}` | `backend/app/modules/mapping/*`, `backend/app/api/v1/map.py`, `backend/tests/test_map_{layers,api}.py` | Gate 6 (synthetic fixtures only; no geometry store or map client) |
 | W-21 | ORM consolidation and Phase 0 decision records: chat ORM merged into `app.db.models` (48 tables, one metadata); Alembic `0002_chat_persistence` still migrates only the five chat tables; D7/D8/D13 accepted and ADR-001…ADR-009 recorded in `progress-tracker.md` §4–§5 (still no `docs/adr/` file) | commit `41cf2ec`; `backend/app/db/models.py`, `db/migrations/versions/0002_chat_persistence.py`; `TEST-MATRIX.md` FND-23; `final/docs-context/progress-tracker.md` §4–§5 | 0.1 (partial), 0.2 (partial), 1.3 (partial) |
 | W-22 | Optional OpenAI-compatible vision engine behind `AssessmentEngine`: config-driven approved labels, bounded JPEG upload, JSON-only candidates, template-rendered replies, fail-closed key/model/label handling, explicit timeout/HTTP/malformed/abstention states; `is_demo` stays true until labels are approved | `backend/app/modules/conversations/engine.py`, `media.py`, `backend/app/core/config.py`; `backend/tests/test_chat_engine.py` (19), `backend/tests/test_chat_api.py::test_provider_engine_reply_is_persisted`; `cd backend && .venv/Scripts/python -m pytest -q` → 336 passed | Phase 2 §5.7 (partial) |
+| W-23 | Video-reading machinery (spec 09, added to v1 by explicit user instruction): bounded MP4/MOV/WebM upload with duration/dimension/size ceilings, deterministic frame sampling, per-frame quality gate, `demo-motion-0.1` motion detector, `bytetrack-lite-0.1` tracker, per-frame photo assessments through the existing engine, template-only non-diagnostic summary, `chat-safety-0.1` on the summary, append-only readings, Alembic `0003_video_persistence`, and `POST/GET /v1/videos*` routes. Every reading is demo-labelled and requires human review | `backend/app/modules/video/*`, `backend/app/api/v1/videos.py`, `backend/app/db/migrations/versions/0003_video_persistence.py`; `backend/tests/test_video_api.py` (13), `backend/tests/test_video_pipeline.py` (4); `cd backend && .venv/Scripts/python -m pytest -o addopts="" -q` → 353 passed; `alembic history` → `0003_video_persistence` head; `TEST-MATRIX.md` FND-26…FND-29 | Video (machinery only; no trained detector, chat-composer UI, retention job or live PostgreSQL apply) |
 
 > **Present but not counted (2026-11-06).** These files exist but are **not** mounted in
 > `backend/app/api/v1/router.py` and have no automated tests:
@@ -133,8 +134,8 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 - [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — rules-based nowcast baseline recorded
 - [x] Update `final/feature-specs/07-advisory-and-alerts.md` — curated non-chemical guidance policy recorded
 - [x] Update `final/docs-context/progress-tracker.md` — reflects the real state, including the Gate-1 exception and the demo chat surface
-- [ ] Remove or correct every reference to `final/backend` (actual path is `backend/`) — a search across `final/` returns 0 matches; the only remaining hits are this checklist and the audit report describing the correction
-  - **Regression (2026-11-06):** the stale path is back. `git ls-files final/backend` returns `final/backend/forecast/gates.py` and `final/backend/forecast/repository.py`, and `backend/backend/*` is also still tracked. Reopen this item until both duplicate trees are removed and a fresh search is clean.
+- [x] Remove or correct every reference to `final/backend` (actual path is `backend/`) — a search across `final/` returns 0 matches; the only remaining hits are this checklist and the audit report describing the correction
+  - **Resolved (2026-11-06):** the duplicate `final/backend/*` and `backend/backend/*` trees (and the empty `chatbot/` placeholder) were removed. `git ls-files final/backend backend/backend` now returns 0 matches.
 - [x] **Done when:** a full-text search finds no contradictory stack, role, or language claims. Open values (D1, D2, D9, D12) are marked open, not contradictory.
 
 ### 0.4 Repository hygiene
@@ -418,7 +419,8 @@ only policy in the repository is explicitly labelled `synthetic_unit_test` and
 > coverage, no-score and map-layer logic, and `app.db.models` has weather/forecast tables,
 > but `backend/app/api/v1/forecast.py` is **not mounted** in `router.py`, there is no
 > weather ingestion, no forecast test, and no fixture proving that weather or verified
-> reports change a score. `backend/backend/forecast/*` is a stale duplicate. **Not done.**
+> reports change a score. The duplicate `backend/backend/forecast/*` tree was removed on
+> 2026-11-06. **Not done.**
 
 **Gate 4 exit criteria:** a forecast can be reproduced from fixtures, and its inputs provably affect the output.
 

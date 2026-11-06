@@ -2,10 +2,13 @@
 
 **Status:** engineering scaffold (Phase 2 §5.1), the persisted demo chat slice
 (§5.7: uploads, demo quality gate, pluggable assessment engine with an optional
-OpenAI-compatible vision adapter, content-safety validator, review requests) and
-the in-memory §5.2 identity slice. No product feature is served against real
-data; chat replies are demo-labelled unless an operator supplies an approved
-label set, and identity state is lost on restart.
+OpenAI-compatible vision adapter, content-safety validator, review requests), the
+demo-labelled video-reading machinery (`09-video-reading.md`: bounded decode,
+frame sampling, motion-region detector, `bytetrack-lite-0.1`, per-frame
+assessments, non-diagnostic summary) and the in-memory §5.2 identity slice. No
+product feature is served against real data; chat and video output are
+demo-labelled unless an operator supplies an approved label set, and identity
+state is lost on restart.
 **Stack:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, PostgreSQL
 (see `../final/docs-context/architecture-context.md`).
 
@@ -38,7 +41,7 @@ Run from `backend/` (Windows paths shown; POSIX uses `.venv/bin/python`):
 |---|---|
 | Create venv | `python -m venv .venv` |
 | Install | `.venv\Scripts\python -m pip install -r requirements.txt` |
-| Tests | `.venv\Scripts\python -m pytest` — **336 passed** |
+| Tests | `.venv\Scripts\python -m pytest` — **353 passed** |
 | Lint | `.venv\Scripts\python -m ruff check app tests` — clean for the identity slice; pre-existing failures remain in older modules |
 | Format check | `.venv\Scripts\python -m ruff format --check app tests` — clean for the identity slice; pre-existing differences remain in older modules |
 | Migration history | `.venv\Scripts\python -m alembic history` |
@@ -73,6 +76,17 @@ Environment variables use the `APP_` prefix (or an untracked `.env`); see
 | `APP_MEDIA_ROOT` | `var/media` | Local image storage root; a deployment replaces this with object storage |
 | `APP_MAX_UPLOAD_BYTES` | `10485760` | Upload ceiling (10 MB) |
 | `APP_MAX_IMAGE_DIMENSION` | `8000` | Decoded image dimension ceiling |
+| `APP_VIDEO_MAX_BYTES` | `52428800` | Video upload ceiling (50 MB) |
+| `APP_VIDEO_MAX_DURATION_S` | `30` | Clip duration ceiling, enforced during decode |
+| `APP_VIDEO_MAX_DIMENSION` | `1920` | Decoded video dimension ceiling |
+| `APP_VIDEO_SAMPLE_FPS` | `2` | Target frame-sampling rate |
+| `APP_VIDEO_MAX_FRAMES` | `24` | Hard cap on sampled frames; widens the stride for long clips |
+| `APP_VIDEO_FRAME_MAX_SIDE` | `1024` | Downscale bound for sampled frames and the preview |
+| `APP_VIDEO_MIN_USABLE_FRAMES` | `3` | Below this the reading abstains |
+| `APP_VIDEO_MIN_DURATION_MS` | `500` | Shorter clips abstain |
+| `APP_VIDEO_ASSESS_FRAMES` | `3` | Maximum frames sent to the assessment engine |
+| `APP_VIDEO_TRACK_IOU` / `APP_VIDEO_TRACK_MAX_AGE` | `0.3` / `5` | Tracker association threshold and coasting age |
+| `APP_VIDEO_MOTION_THRESHOLD` / `APP_VIDEO_MOTION_MIN_AREA_FRACTION` | `25` / `0.005` | Demo motion-detector sensitivity and minimum region area |
 | `APP_CORS_ORIGINS` | `["http://localhost:3000"]` | JSON list of allowed browser origins |
 | `APP_AUTH_SECRET` | dev-only value | HS256 secret for access/MFA tokens and OTP hashing; production requires ≥32 chars and refuses the dev default |
 | `APP_AUTH_*_TTL_*` / limits | see `core/config.py` | Access/refresh/MFA/OTP lifetimes, OTP and lockout limits |
@@ -142,15 +156,50 @@ keeps `is_demo=true` and says so in the reason text. The adapter is verified wit
 a mock transport and a live uvicorn run against a local OpenAI-compatible stub;
 no real vendor call has been made from this repository.
 
+## Video reading (spec 09)
+
+`app/modules/video/` serves a bounded, non-diagnostic reading of a short clip.
+Routes are `POST /v1/videos`, `GET /v1/videos/{id}`,
+`GET /v1/videos/{id}/preview` and `POST /v1/videos/{id}/read`. Uploading is
+separate from reading so the client controls when decode and model work runs.
+
+1. `POST /v1/videos` accepts MP4, MOV or WebM, enforces `APP_VIDEO_MAX_BYTES`,
+   probes the clip and rejects anything over the duration or dimension ceiling
+   before storing it under `APP_MEDIA_ROOT`. A clip that cannot be decoded is
+   deleted and no row is written.
+2. Reading samples frames deterministically (`APP_VIDEO_SAMPLE_FPS`, capped by
+   `APP_VIDEO_MAX_FRAMES`), runs each through the existing image-quality gate,
+   then the `demo-motion-0.1` frame-difference detector and the
+   `bytetrack-lite-0.1` tracker.
+3. At most `APP_VIDEO_ASSESS_FRAMES` usable frames go through the configured
+   `AssessmentEngine`. The response contains per-frame photo assessments and
+   track summaries, plus a template-only summary — never a video-level
+   diagnosis, severity, yield loss, area outlook or pest identity from a
+   tracker id.
+4. A clip with too few usable frames, no stable region or too short a duration
+   returns `abstained` with a machine reason. Decode, engine and content-safety
+   failures are explicit `failed` states with no candidates.
+5. Readings are append-only (`video_readings`); re-reading a clip creates a new
+   row. Every reading is `is_demo=true`, `calibrated=false`,
+   `requires_review=true` and `confidence_band=not_calibrated` while the shipped
+   detector is a demo heuristic (D15). `chat-safety-0.1` validates the summary
+   and candidate names before storage.
+
+`demo-motion-0.1` is a frame-difference heuristic, not a pest detector, and
+`bytetrack-lite-0.1` is a dependency-light reimplementation rather than the
+official ByteTrack package. No trained detector, retention job (D14) or
+chat-composer video UI exists yet.
+
 ## Migrations
 
 `0001_baseline` is intentionally empty: it exists so later feature tables are
 additive revisions with a parent. `0002_chat_persistence` adds the five chat
 tables (`conversations`, `messages`, `message_events`, `image_uploads`,
-`chat_review_requests`); it is the only revision with schema so far, and the
-collaborator domain tables in `app/db/models.py` are not yet migrated. Review
-every autogenerated revision; production is forward-only and each migration
-carries a rollback note.
+`chat_review_requests`). `0003_video_persistence` adds `video_uploads` and the
+append-only `video_readings`, with a downgrade that drops the readings before
+the uploads and leaves the chat tables untouched. The collaborator domain tables
+in `app/db/models.py` are still not migrated. Review every autogenerated
+revision; production is forward-only and each migration carries a rollback note.
 
 ```bash
 .venv\Scripts\python -m alembic revision --autogenerate -m "add observations"

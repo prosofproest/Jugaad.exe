@@ -14,6 +14,11 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
+# opencv-python-headless avoids libGL but still needs glib on slim images.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends libglib2.0-0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install the package (which contains app/ and app/db/migrations) from source.
 COPY pyproject.toml ./
 COPY app ./app
