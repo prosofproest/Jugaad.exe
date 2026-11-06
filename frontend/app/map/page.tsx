@@ -1,59 +1,303 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+/**
+ * H3 GIS Map Page - Interactive hexagonal agricultural intelligence map.
+ *
+ * Integrates Leaflet/OpenStreetMap with H3 hexagonal cell overlays,
+ * hotspot intelligence, weather risk, and task distribution.
+ */
 
-import { FarmMap, LAYERS, type FarmLayer } from "@/components/workspace/farm-map";
+import { useEffect, useState, useCallback, useMemo } from "react";
+import { MapContainer, TileLayer, Marker, Popup, useMap } from "react-leaflet";
+import "leaflet/dist/leaflet.css";
+import {
+  H3HexagonLayer,
+  type H3HexagonLayerProps,
+} from "@/components/workspace/gis/H3HexagonLayer";
+import {
+  classificationColor,
+  classificationLabel,
+  allClassifications,
+} from "@/lib/gis/h3-colors";
+import { haversineDistanceKm } from "@/lib/gis/h3-geojson";
 import {
   Badge,
-  HealthPill,
+  Button,
   Icon,
   PageHeader,
-  ProgressBar,
   StatCard,
   Tabs,
+  EmptyState,
 } from "@/components/workspace/ui";
-import { formatDate } from "@/lib/format";
-import { cropGroupHealth, healthLabel, useWorkspace } from "@/lib/workspace/store";
-import type { Health } from "@/lib/workspace/types";
 
-type View = "current" | "crops" | "plants" | "recovery" | "history";
+// Default center: Bangalore, India
+const DEFAULT_CENTER = [12.9716, 77.5946];
+const DEFAULT_ZOOM = 10;
 
-export default function FarmHealthMapPage() {
-  const { state } = useWorkspace();
-  const [farmId, setFarmId] = useState(state.farms[0]?.id ?? "");
-  const [layer, setLayer] = useState<FarmLayer>("health");
-  const [view, setView] = useState<View>("current");
-  const [plantFilter, setPlantFilter] = useState("all");
+// H3 resolutions available for the map
+const RESOLUTIONS = [
+  { value: 6, label: "Region (Res 6)" },
+  { value: 7, label: "District/Village (Res 7)" },
+  { value: 8, label: "Farm Cluster (Res 8)" },
+  { value: 9, label: "Field (Res 9)" },
+  { value: 10, label: "Fine (Res 10)" },
+];
+
+interface HexagonData {
+  cellId: string;
+  resolution: number;
+  centerLat: number;
+  centerLng: number;
+  boundary: number[][];
+  classification?: string;
+  score?: number;
+  diseaseHotspot?: {
+    targetCode: string;
+    classification: string;
+    score: number;
+    uniqueAffectedFarms: number;
+  };
+  pestHotspot?: {
+    targetCode: string;
+    classification: string;
+    score: number;
+    uniqueAffectedFarms: number;
+  };
+  riskScore?: number;
+  riskLabel?: string;
+  weatherRisk?: number;
+}
+
+interface SelectedCellInfo {
+  cellId: string;
+  centerLat: number;
+  centerLng: number;
+  classification: string;
+  score: number;
+  areaKm2: number;
+  diseaseReports: number;
+  pestReports: number;
+  uniqueFarms: number;
+  verifiedFarms: number;
+  weatherRisk: number;
+  riskScore: number;
+}
+
+export default function H3MapPage() {
+  const [zoom, setZoom] = useState(DEFAULT_ZOOM);
+  const [center, setCenter] = useState<[number, number]>([
+    DEFAULT_CENTER[0] as number,
+    DEFAULT_CENTER[1] as number,
+  ]);
+  const [resolution, setResolution] = useState(9);
+  const [hexagons, setHexagons] = useState<HexagonData[]>([]);
+  const [selectedCell, setSelectedCell] = useState<SelectedCellInfo | null>(null);
+  const [activeTab, setActiveTab] = useState("overview");
+  const [layerVisibility, setLayerVisibility] = useState({
+    hexagons: true,
+    hotspots: true,
+    weatherRisk: true,
+    tasks: true,
+    farmBoundaries: false,
+  });
+  const [filters, setFilters] = useState({
+    disease: "" as string,
+    pest: "" as string,
+    crop: "" as string,
+    severity: "" as string,
+    minClassification: "low" as string,
+  });
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // Mock data generation - in production this comes from API
+  const mockHexagons = useMemo((): HexagonData[] => {
+    const cells: HexagonData[] = [];
+    const classifications: ("low" | "moderate" | "high" | "critical")[] = [
+      "low",
+      "moderate",
+      "high",
+      "critical",
+    ];
+
+    // Generate a grid of hexagons around the center
+    for (let i = -3; i <= 3; i++) {
+      for (let j = -3; j <= 3; j++) {
+        const lat = DEFAULT_CENTER[0]! + i * 0.02;
+        const lng = DEFAULT_CENTER[1]! + j * 0.02;
+        const cellId = String(
+          Math.floor(Math.random() * 1e18)
+        );
+        const classification =
+          classifications[Math.floor(Math.random() * classifications.length)];
+        const score = Math.round(Math.random() * 100) / 100;
+
+        cells.push({
+          cellId,
+          resolution,
+          centerLat: lat,
+          centerLng: lng,
+          boundary: generateHexBoundary(lat, lng, 0.01),
+          classification,
+          score,
+          diseaseHotspot:
+            classification !== "low"
+              ? {
+                  targetCode: "rice_blast",
+                  classification: classification as string,
+                  score,
+                  uniqueAffectedFarms: Math.floor(Math.random() * 5) + 1,
+                }
+              : undefined,
+          pestHotspot:
+            classification === "high" || classification === "critical"
+              ? {
+                  targetCode: "fall_armyworm",
+                  classification,
+                  score,
+                  uniqueAffectedFarms: Math.floor(Math.random() * 3) + 1,
+                }
+              : undefined,
+          riskScore: score,
+          riskLabel: classification,
+          weatherRisk: Math.round(Math.random() * 100) / 100,
+        });
+      }
+    }
+    return cells;
+  }, [resolution]);
+
+  // Generate a hexagon boundary around a center point
+  function generateHexBoundary(
+    lat: number,
+    lng: number,
+    radius: number,
+  ): number[][] {
+    const boundary: number[][] = [];
+    for (let i = 0; i < 6; i++) {
+      const angle = (Math.PI / 3) * i;
+      const vLat = lat + radius * Math.cos(angle);
+      const vLng = lng + radius * Math.sin(angle);
+      boundary.push([vLat, vLng]);
+    }
+    return boundary;
+  }
+
+  // Filter hexagons based on current filters
+  const filteredHexagons = useMemo(() => {
+    return hexagons.filter((h) => {
+      if (filters.disease && h.diseaseHotspot?.targetCode !== filters.disease)
+        return false;
+      if (filters.pest && h.pestHotspot?.targetCode !== filters.pest)
+        return false;
+      if (filters.severity && h.classification !== filters.severity)
+        return false;
+
+      const classificationOrder: Record<string, number> = {
+        low: 0,
+        moderate: 1,
+        high: 2,
+        critical: 3,
+      };
+      const minOrder = classificationOrder[filters.minClassification] ?? 0;
+      const cellOrder =
+        classificationOrder[h.classification ?? "low"] ?? 0;
+      if (cellOrder < minOrder) return false;
+
+      return true;
+    });
+  }, [hexagons, filters]);
+
+  // Handle cell click
+  const handleCellClick = useCallback((cellId: string) => {
+    const cell = hexagons.find((h) => h.cellId === cellId);
+    if (!cell) return;
+
+    setSelectedCell({
+      cellId: cell.cellId,
+      centerLat: cell.centerLat,
+      centerLng: cell.centerLng,
+      classification: cell.classification ?? "low",
+      score: cell.score ?? 0,
+      areaKm2: 0.75, // Approximate for resolution 9
+      diseaseReports: cell.diseaseHotspot
+        ? cell.diseaseHotspot.uniqueAffectedFarms
+        : 0,
+      pestReports: cell.pestHotspot
+        ? cell.pestHotspot.uniqueAffectedFarms
+        : 0,
+      uniqueFarms: Math.max(
+        cell.diseaseHotspot?.uniqueAffectedFarms ?? 0,
+        cell.pestHotspot?.uniqueAffectedFarms ?? 0,
+      ),
+      verifiedFarms: Math.floor(
+        (Math.max(
+          cell.diseaseHotspot?.uniqueAffectedFarms ?? 0,
+          cell.pestHotspot?.uniqueAffectedFarms ?? 0,
+        ) * 0.7),
+      ),
+      weatherRisk: cell.weatherRisk ?? 0,
+      riskScore: cell.riskScore ?? 0,
+    });
+    setCenter([cell.centerLat, cell.centerLng]);
+    setZoom(13);
+  }, [hexagons]);
+
+  // Handle layer toggle
+  const handleToggleLayer = (layer: keyof typeof layerVisibility) => {
+    setLayerVisibility((prev) => ({ ...prev, [layer]: !prev[layer] }));
+  };
+
+  // Load data from API
+  const loadData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // In production, fetch from API endpoints:
+      // GET /api/v1/regional-overview/hexagons
+      // GET /api/v1/hotspots/nearby
+      // For now, mock data is used
+      setHexagons(mockHexagons);
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Failed to load map data",
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const farm = params.get("farm");
-    if (farm && state.farms.some((item) => item.id === farm)) setFarmId(farm);
-  }, [state.farms]);
+    loadData();
+  }, [loadData]);
 
-  const farm = state.farms.find((item) => item.id === farmId) ?? state.farms[0];
-  const plots = state.plots.filter((plot) => plot.farmId === farm?.id);
-  const groups = state.cropGroups.filter((group) => group.farmId === farm?.id);
-  const plants = state.plants.filter((plant) => plant.farmId === farm?.id);
-  const analyses = state.analyses.filter((analysis) => analysis.farmId === farm?.id);
-  const inspections = state.inspections.filter((inspection) => inspection.farmId === farm?.id);
-
-  const healthCounts = useMemo(() => {
-    const counts: Record<Health, number> = { healthy: 0, watch: 0, pest: 0, diseased: 0, recovering: 0 };
-    for (const plant of plants) counts[plant.health] += 1;
-    return counts;
-  }, [plants]);
-
-  const affectedPlots = plots.filter((plot) => plot.health === "pest" || plot.health === "diseased");
-  const recovering = inspections.filter((inspection) => (inspection.recovery ?? 0) > 0);
-  const filteredPlants = plantFilter === "all" ? plants : plants.filter((plant) => plant.cropGroupId === plantFilter);
-
-  if (!farm) {
+  if (isLoading && hexagons.length === 0) {
     return (
       <div className="ws-page">
-        <PageHeader eyebrow="Farm health map" title="No farm registered" lede="Add a farm to unlock the health map." />
-        <Link href="/farms" className="ws-button ws-button-primary">Add a farm</Link>
+        <PageHeader eyebrow="GIS Map" title="Loading..." />
+        <div className="ws-panel ws-stack">
+          <div style={{ textAlign: "center", padding: "40px" }}>
+            <Icon name="sync" size={32} />
+            <p style={{ marginTop: "12px", color: "#666" }}>
+              Loading hexagonal map...
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="ws-page">
+        <PageHeader eyebrow="GIS Map" title="Map Error" />
+        <div className="ws-panel ws-stack">
+          <div style={{ textAlign: "center", padding: "40px" }}>
+            <span style={{ color: "#b42318" }}><Icon name="alert" size={32} /></span>
+            <p style={{ marginTop: "12px" }}>{error}</p>
+            <Button onClick={loadData}>Retry</Button>
+          </div>
+        </div>
       </div>
     );
   }
@@ -61,216 +305,293 @@ export default function FarmHealthMapPage() {
   return (
     <div className="ws-page">
       <PageHeader
-        eyebrow="Farm health map"
-        title="Every plot, crop group and plant on one map"
-        lede="Switch between health, pest, disease, severity, recovery and historical layers. Colour is always paired with a label and pattern."
+        eyebrow="Hexagonal GIS Intelligence"
+        title="Agricultural Surveillance Map"
+        lede="H3 hexagonal grid with disease & pest hotspots, weather risk, and task distribution"
         actions={
-          <label className="ws-select-inline">
-            <span>Farm</span>
-            <select value={farm.id} onChange={(event) => setFarmId(event.target.value)}>
-              {state.farms.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
-            </select>
-          </label>
+          <div style={{ display: "flex", gap: "8px" }}>
+            <Button size="sm" onClick={loadData}>
+              <Icon name="refresh" /> Refresh
+            </Button>
+            <Button size="sm" variant="outline">
+              <Icon name="fullscreen" /> Fullscreen
+            </Button>
+          </div>
         }
       />
 
-      <div className="ws-stat-grid">
-        <StatCard label="Total plots" value={plots.length} detail={`${plots.reduce((sum, plot) => sum + plot.sections.length, 0)} sections`} icon="map" tone="brand" />
-        <StatCard label="Affected areas" value={affectedPlots.length} detail={affectedPlots.map((plot) => plot.name).join(", ") || "None"} icon="alert" tone={affectedPlots.length > 0 ? "bad" : "ok"} />
-        <StatCard label="Plants healthy" value={healthCounts.healthy} detail={`${plants.length} plants tracked`} icon="plant" tone="ok" />
-        <StatCard label="Recovering" value={healthCounts.recovering} detail="Follow-up in progress" icon="monitoring" tone="ok" />
+      <div className="ws-map-container">
+        <MapContainer
+          center={center}
+          zoom={zoom}
+          onZoomChange={(z: number) => setZoom(z)}
+          style={{ height: "100%", width: "100%" }}
+          zoomControl={true}
+          attributionControl={true}
+        >
+          <TileLayer
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          />
+
+          {layerVisibility.hexagons ? (
+            <H3HexagonLayer
+              hexagons={filteredHexagons.map((h) => ({
+                cellId: h.cellId,
+                resolution: h.resolution,
+                centerLat: h.centerLat,
+                centerLng: h.centerLng,
+                boundary: h.boundary,
+                classification: h.classification ?? "low",
+                score: h.score ?? 0,
+              }))}
+              selectedCellId={selectedCell?.cellId ?? undefined}
+              onCellClick={handleCellClick}
+            />
+          ) : null}
+
+          {/* Center marker for selected cell */}
+          {selectedCell ? (
+            <Marker position={[selectedCell.centerLat, selectedCell.centerLng] as [number, number]}>
+              <Popup>
+                <div style={{ minWidth: "220px" }}>
+                  <div style={{ fontWeight: "bold", fontSize: "14px", marginBottom: "8px" }}>
+                    H3 Cell: {selectedCell.cellId}
+                  </div>
+                  <div style={{ marginBottom: "6px" }}>
+                    <span style={{ color: "#666", fontSize: "12px" }}>
+                      Classification:
+                    </span>{" "}
+                    <span
+                      style={{
+                        color:
+                          classificationColor(
+                            selectedCell.classification,
+                            selectedCell.score,
+                          ),
+                          fontWeight: "bold",
+                        }}
+                      >
+                        {classificationLabel(selectedCell.classification)}
+                      </span>
+                    </div>
+                    <div style={{ marginBottom: "6px" }}>
+                      <span style={{ color: "#666", fontSize: "12px" }}>
+                        Risk Score:
+                      </span>{" "}
+                      {selectedCell.riskScore.toFixed(2)}
+                    </div>
+                    <div style={{ marginBottom: "6px" }}>
+                      <span style={{ color: "#666", fontSize: "12px" }}>
+                        Weather Risk:
+                      </span>{" "}
+                      {selectedCell.weatherRisk.toFixed(2)}
+                    </div>
+                    <div style={{ marginBottom: "6px" }}>
+                      <span style={{ color: "#666", fontSize: "12px" }}>
+                        Affected Farms:
+                      </span>{" "}
+                      {selectedCell.uniqueFarms}
+                    </div>
+                    <div style={{ marginTop: "10px" }}>
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setActiveTab("detail");
+                        }}
+                      >
+                        View Details
+                      </Button>
+                    </div>
+                  </div>
+                </Popup>
+              </Marker>
+            ) : null}
+        </MapContainer>
       </div>
 
-      <Tabs
-        label="Map views"
-        value={view}
-        onChange={setView}
-        tabs={[
-          { value: "current", label: "Farm map" },
-          { value: "crops", label: "Crop health" },
-          { value: "plants", label: "Plant indicators" },
-          { value: "recovery", label: "Recovery" },
-          { value: "history", label: "History" },
-        ]}
-      />
+      {/* Hexagon Intelligence Panel */}
+      {selectedCell && (
+        <div className="ws-panel ws-intelligence-panel">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px" }}>
+            <h3 style={{ margin: 0, fontSize: "16px" }}>Hexagon Intelligence</h3>
+            <Button size="sm" onClick={() => setSelectedCell(null)}>
+              Close
+            </Button>
+          </div>
 
-      {view === "current" ? (
-        <div className="ws-map-layout">
-          <section className="ws-panel">
-            <div className="ws-panel-head">
-              <div><p className="ws-eyebrow">{farm.village} · {farm.district}</p><h2>{farm.name}</h2></div>
-              <div className="ws-chip-row">
-                <Badge tone="info">GPS boundary</Badge>
-                <Badge tone="neutral">{farm.areaAcres} acres</Badge>
+          <Tabs
+            label="Hexagon Intelligence Tabs"
+            value={activeTab}
+            onChange={setActiveTab}
+            tabs={[
+              { value: "overview", label: "Overview", count: 0 },
+              { value: "disease", label: "Disease", count: selectedCell.diseaseReports },
+              { value: "pest", label: "Pest", count: selectedCell.pestReports },
+              { value: "weather", label: "Weather", count: 0 },
+              { value: "tasks", label: "Tasks", count: 0 },
+              { value: "recovery", label: "Recovery", count: 0 },
+            ]}
+          />
+
+          <div className="ws-panel-body" style={{ marginTop: "16px" }}>
+            {activeTab === "overview" && (
+              <div className="ws-stat-grid">
+                <StatCard
+                  label="Classification"
+                  value={classificationLabel(selectedCell.classification)}
+                  tone={selectedCell.classification as any}
+                />
+                <StatCard
+                  label="Risk Score"
+                  value={selectedCell.riskScore.toFixed(2)}
+                  detail="0.0 - 1.0 scale"
+                />
+                <StatCard
+                  label="Weather Risk"
+                  value={selectedCell.weatherRisk.toFixed(2)}
+                  detail="Weather suitability"
+                />
+                <StatCard
+                  label="Affected Farms"
+                  value={selectedCell.uniqueFarms}
+                  detail="Unique farms"
+                />
               </div>
-            </div>
-            <FarmMap farm={farm} layer={layer} onLayerChange={setLayer} showPlants />
-          </section>
-          <aside className="ws-stack">
-            <section className="ws-panel">
-              <div className="ws-panel-head"><h2>Layer</h2><Badge tone="neutral">{LAYERS.find((item) => item.value === layer)?.label}</Badge></div>
-              <div className="ws-layer-list">
-                {LAYERS.map((item) => (
-                  <button
-                    key={item.value}
-                    type="button"
-                    className={layer === item.value ? "ws-layer-option ws-layer-option-active" : "ws-layer-option"}
-                    onClick={() => setLayer(item.value)}
-                  >
-                    <strong>{item.label}</strong>
-                    <small>{item.hint}</small>
-                  </button>
-                ))}
-              </div>
-            </section>
-            <section className="ws-panel">
-              <div className="ws-panel-head"><h2>Plant distribution</h2></div>
-              <ul className="ws-distribution">
-                {(Object.keys(healthCounts) as Health[]).map((health) => (
-                  <li key={health}>
-                    <span className={`ws-legend-swatch ws-health-${health}`} />
-                    <span>{healthLabel(health)}</span>
-                    <strong>{healthCounts[health]}</strong>
-                  </li>
-                ))}
-              </ul>
-            </section>
-            <section className="ws-panel">
-              <div className="ws-panel-head"><h2>Plot summary</h2></div>
-              <ul className="ws-rank-list">
-                {plots.map((plot) => (
-                  <li key={plot.id}>
-                    <div><strong>{plot.name}</strong><span>{plot.areaAcres} acres · {plot.sections.length} sections</span></div>
-                    <HealthPill health={plot.health} />
-                  </li>
-                ))}
-              </ul>
-            </section>
-          </aside>
-        </div>
-      ) : null}
-
-      {view === "crops" ? (
-        <div className="ws-page">
-          <div className="ws-banner ws-banner-info">
-            <Icon name="leaf" size={18} />
-            <div><strong>Crop-wise health map</strong><p>Each crop group is assessed from its plants and its latest observations, not from a single photo.</p></div>
-          </div>
-          <div className="ws-crop-map-grid">
-            {groups.map((group) => {
-              const groupPlants = plants.filter((plant) => plant.cropGroupId === group.id);
-              const healthy = groupPlants.filter((plant) => plant.health === "healthy").length;
-              const health = cropGroupHealth(state, group.id);
-              return (
-                <article key={group.id} className="ws-crop-map-card">
-                  <div className="ws-crop-map-head">
-                    <div><p className="ws-eyebrow">{group.crop}</p><h3>{group.name}</h3></div>
-                    <HealthPill health={health} />
-                  </div>
-                  <div className={`ws-crop-map-canvas ws-health-${health}`}>
-                    {groupPlants.map((plant) => (
-                      <span key={plant.id} className={`ws-plant-dot ws-health-${plant.health}`} title={`${plant.code}: ${healthLabel(plant.health)}`} />
-                    ))}
-                    {groupPlants.length === 0 ? <span className="ws-small">No individual plants registered</span> : null}
-                  </div>
-                  <div className="ws-crop-map-meta">
-                    <span>{groupPlants.length} plants</span>
-                    <span>{group.variety} · {group.stage}</span>
-                  </div>
-                  <ProgressBar value={groupPlants.length > 0 ? Math.round((healthy / groupPlants.length) * 100) : 100} label="Healthy plants" tone={health === "healthy" ? "ok" : health === "watch" ? "warn" : "bad"} />
-                </article>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {view === "plants" ? (
-        <section className="ws-panel">
-          <div className="ws-panel-head">
-            <div><p className="ws-eyebrow">Plant-wise indicators</p><h2>Individual plant health</h2></div>
-            <select value={plantFilter} onChange={(event) => setPlantFilter(event.target.value)} aria-label="Filter by crop group">
-              <option value="all">All crop groups</option>
-              {groups.map((group) => <option key={group.id} value={group.id}>{group.name}</option>)}
-            </select>
-          </div>
-          <div className="ws-plant-grid">
-            {filteredPlants.map((plant) => (
-              <div key={plant.id} className="ws-plant-card">
-                <span className={`ws-plant-indicator ws-health-${plant.health}`} />
-                <div>
-                  <strong>{plant.code}</strong>
-                  <span className="ws-small ws-muted">{plant.label}</span>
-                  <span className="ws-small ws-muted">Last scouted {formatDate(plant.lastScouted)}</span>
-                </div>
-                <HealthPill health={plant.health} />
-              </div>
-            ))}
-          </div>
-        </section>
-      ) : null}
-
-      {view === "recovery" ? (
-        <div className="ws-two-col">
-          <section className="ws-panel">
-            <div className="ws-panel-head"><div><p className="ws-eyebrow">Recovery progress</p><h2>Treatment follow-ups</h2></div></div>
-            {recovering.length > 0 ? (
-              <ul className="ws-recovery-list">
-                {recovering.map((inspection) => (
-                  <li key={inspection.id}>
-                    <div className="ws-recovery-head">
-                      <div><strong>{inspection.title}</strong><span className="ws-small ws-muted">{inspection.target}</span></div>
-                      <Badge tone={inspection.failedTreatment ? "bad" : "ok"}>{inspection.failedTreatment ? "Treatment needs review" : "Recovering"}</Badge>
-                    </div>
-                    <ProgressBar value={inspection.recovery ?? 0} label="Plant recovery" tone={(inspection.recovery ?? 0) > 60 ? "ok" : "warn"} />
-                    <ProgressBar value={inspection.effectiveness ?? 0} label="Treatment effectiveness" tone="brand" />
-                    <div className="ws-compare-strip ws-compare-small">
-                      <div><span className="ws-photo ws-photo-sm ws-tone-5" /><span className="ws-small">Before</span></div>
-                      <Icon name="arrow" size={18} />
-                      <div><span className="ws-photo ws-photo-sm ws-tone-3" /><span className="ws-small">After</span></div>
-                      <p className="ws-small ws-muted">{inspection.notes}</p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="ws-empty-inline">No recovery follow-ups recorded yet.</p>
             )}
-          </section>
-          <section className="ws-panel">
-            <div className="ws-panel-head"><h2>Recovery map</h2><Badge tone="info">Layer</Badge></div>
-            <FarmMap farm={farm} layer="recovery" showPlants />
-            <p className="ws-small ws-muted ws-mt">
-              Dotted plots are recovering after treatment. Recovery is a field judgement, not a model prediction.
-            </p>
-          </section>
-        </div>
-      ) : null}
 
-      {view === "history" ? (
-        <div className="ws-two-col">
-          <section className="ws-panel">
-            <div className="ws-panel-head"><div><p className="ws-eyebrow">Historical infestation</p><h2>Observations over time</h2></div><Badge tone="neutral">{analyses.length} records</Badge></div>
-            <ul className="ws-timeline">
-              {analyses.slice().sort((a, b) => b.createdAt.localeCompare(a.createdAt)).map((analysis) => (
-                <li key={analysis.id}>
-                  <span className={`ws-timeline-dot ws-tone-${analysis.severity === "critical" || analysis.severity === "high" ? "bad" : "warn"}`} />
-                  <div className="ws-timeline-body">
-                    <div><strong>{analysis.subjectLabel}</strong><span className="ws-small ws-muted">{formatDate(analysis.createdAt)}</span></div>
-                    <span className="ws-small">Possible {analysis.pest ?? analysis.disease} · {analysis.severity} severity</span>
-                  </div>
-                  <Link href={`/analysis?focus=${analysis.id}`} className="ws-link">Open</Link>
-                </li>
-              ))}
-            </ul>
-          </section>
-          <section className="ws-panel">
-            <div className="ws-panel-head"><h2>Historical map</h2><Badge tone="neutral">All time</Badge></div>
-            <FarmMap farm={farm} layer="history" showPlants />
-            <p className="ws-small ws-muted ws-mt">Use the analysis list to open the original evidence and its expert review state.</p>
-          </section>
+            {activeTab === "disease" && selectedCell.diseaseReports > 0 && (
+              <div className="ws-stack">
+                <p>Disease reports in this hexagon.</p>
+                <EmptyState
+                  icon="alert-triangle"
+                  title="Disease Intelligence"
+                  body="Disease intelligence coming in next phase."
+                />
+              </div>
+            )}
+
+            {activeTab === "pest" && selectedCell.pestReports > 0 && (
+              <div className="ws-stack">
+                <p>Pest reports in this hexagon.</p>
+                <EmptyState
+                  icon="bug"
+                  title="Pest Intelligence"
+                  body="Pest intelligence coming in next phase."
+                />
+              </div>
+            )}
+
+            {activeTab === "weather" && (
+              <div className="ws-stack">
+                <p>Weather-supported risk indicators.</p>
+                <EmptyState
+                  icon="cloud"
+                  title="Weather Risk"
+                  body="Weather risk integration coming in next phase."
+                />
+              </div>
+            )}
+
+            {activeTab === "tasks" && (
+              <div className="ws-stack">
+                <p>Inspection tasks for this hexagon.</p>
+                <EmptyState
+                  icon="clipboard"
+                  title="Task Distribution"
+                  body="Task distribution coming in next phase."
+                />
+              </div>
+            )}
+
+            {activeTab === "recovery" && (
+              <div className="ws-stack">
+                <p>Recovery monitoring for this hexagon.</p>
+                <EmptyState
+                  icon="leaf"
+                  title="Recovery Monitoring"
+                  body="Recovery monitoring coming in next phase."
+                />
+              </div>
+            )}
+          </div>
         </div>
-      ) : null}
+      )}
+
+      {/* Map controls sidebar */}
+      <div className="ws-map-sidebar">
+        <div className="ws-panel">
+          <div style={{ fontWeight: "bold", marginBottom: "12px", fontSize: "14px" }}>
+            Map Layers
+          </div>
+          {Object.entries(layerVisibility).map(([key, visible]) => (
+            <div
+              key={key}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "8px",
+                fontSize: "13px",
+                cursor: "pointer",
+              }}
+              onClick={() => handleToggleLayer(key as keyof typeof layerVisibility)}
+            >
+              <input
+                type="checkbox"
+                checked={visible}
+                readOnly
+                onChange={(e) => handleToggleLayer(e.target.checked as any)}
+              />
+              {key.charAt(0).toUpperCase() + key.slice(1)}
+            </div>
+          ))}
+        </div>
+
+        <div className="ws-panel" style={{ marginTop: "12px" }}>
+          <div style={{ fontWeight: "bold", marginBottom: "12px", fontSize: "14px" }}>
+            H3 Resolution
+          </div>
+          {RESOLUTIONS.map((r) => (
+            <Button
+              size="sm"
+              variant={resolution === r.value ? ("solid" as const) : ("outline" as const)}
+              onClick={() => setResolution(r.value)}
+              style={{ width: "100%", textAlign: "left" }}
+            >
+              {r.label}
+            </Button>
+          ))}
+        </div>
+
+        <div className="ws-panel" style={{ marginTop: "12px" }}>
+          <div style={{ fontWeight: "bold", marginBottom: "12px", fontSize: "14px" }}>
+            Classifications
+          </div>
+          {allClassifications().map((c) => (
+            <div
+              key={c.value}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                marginBottom: "6px",
+                fontSize: "12px",
+              }}
+            >
+              <div
+                style={{
+                  width: "12px",
+                  height: "12px",
+                  backgroundColor: c.color,
+                  borderRadius: "2px",
+                }}
+              />
+              <span>{c.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
