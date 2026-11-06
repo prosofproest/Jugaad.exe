@@ -7,7 +7,7 @@ interface Section {
   href: string;
   label: string;
   detail: string;
-  icon: "overview" | "camera" | "map" | "review" | "admin";
+  icon: "overview" | "camera" | "map" | "weather" | "review";
 }
 
 const SECTIONS: Section[] = [
@@ -30,16 +30,16 @@ const SECTIONS: Section[] = [
     icon: "map",
   },
   {
+    href: "/weather",
+    label: "Weather",
+    detail: "Conditions and 7-day forecast",
+    icon: "weather",
+  },
+  {
     href: "/review",
     label: "Review queue",
     detail: "Expert verification",
     icon: "review",
-  },
-  {
-    href: "/admin",
-    label: "Admin",
-    detail: "Identity management",
-    icon: "admin",
   },
 ];
 
@@ -89,18 +89,19 @@ function Icon({ name }: { name: Section["icon"] }) {
           <path d="M15 6v14" />
         </svg>
       );
+    case "weather":
+      return (
+        <svg {...common}>
+          <circle cx="8" cy="9" r="2.6" />
+          <path d="M8 3.6v1M8 13.4v1M3.6 9h1M11.4 9h-1" />
+          <path d="M17.5 19a3 3 0 0 0-.5-5.96A4.2 4.2 0 0 0 9.2 14a3 3 0 0 0 .3 5Z" />
+        </svg>
+      );
     case "review":
       return (
         <svg {...common}>
           <path d="M9 4h6l1 2h3a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h3l1-2Z" />
           <path d="m8.5 13 2.2 2.2L16 10" />
-        </svg>
-      );
-    case "admin":
-      return (
-        <svg {...common}>
-          <path d="M12 3 5 6v5c0 4 3 7.5 7 9 4-1.5 7-5 7-9V6l-7-3Z" />
-          <path d="m9.5 12 1.8 1.8L15 10" />
         </svg>
       );
   }

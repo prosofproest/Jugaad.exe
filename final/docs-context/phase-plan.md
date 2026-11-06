@@ -335,9 +335,9 @@ Phase 3 supplies the real model.
 
 ### 5.1 Engineering foundation
 
-- Scaffold `backend/`, `frontend/web/`, `frontend/mobile/`, `database/` and `deploy/` with
+- Scaffold `backend/`, `frontend/`, `mobile/`, `database/` and `deploy/` with
   the approved stack.
-- Stand up three coordinated deliverables: FastAPI backend, Next.js web app and React Native
+- Stand up three coordinated deliverables: FastAPI backend, Next.js web app and Flutter
   mobile app, all consuming the same `/v1` API.
 - Set up CI, linting, test runners, migrations, local compose, `dev`/`staging` environments,
   secret management and structured logging.
@@ -402,7 +402,7 @@ Phase 3 supplies the real model.
 - Build a `conversations` module in the backend: threads, append-only messages, attachments,
   events and idempotent send.
 - Ship the chat surface on **both** frontends:
-  - React Native: `ChatList` and `ChatThread`, camera/gallery attach, offline queue.
+  - Flutter: `ChatList` and `ChatThread`, camera/gallery attach, offline queue.
   - Next.js: `/chat` and `/chat/[conversationId]`, file picker/drag-drop, optimistic send.
 - Composer: image plus optional crop, growth stage, approximate area and short note.
 - Reply is a structured `AssessmentMessage` (`assessment`, `abstained`, `unsupported_crop`,
@@ -442,7 +442,7 @@ Phase 3 supplies the real model.
 
 ### Deliverables
 
-- React Native mobile app (field-staff ready, with chat), FastAPI monolith (with
+- Flutter mobile app (field-staff ready, with chat), FastAPI monolith (with
   `conversations` module), Next.js web app (chat, review portal and admin console).
 - Migrated schema slices and seed data labelled `is_demo`.
 - Test matrix with executed evidence.

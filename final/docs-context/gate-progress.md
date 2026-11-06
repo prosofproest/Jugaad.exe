@@ -68,25 +68,34 @@ This document tracks the current state of each gate in the **CropSentinel AI** c
 - [ ] Loading/error/empty/offline/stale/abstained UI states – *pending component design*
 - [ ] End‑to‑end automated test covering happy & one failure path – *pending `tests/e2e/test_gate2.py`*
 
-## Gate 3 – AI model pipeline (P1)
-- [ ] Versioned model artefact committed to registry – *pending `backend/model_registry.py` integration and CI artefact storage*
-- [ ] Class taxonomy / label map – *pending definition file `label_map.json`*
-- [ ] Preprocessing parity – *pending script `preprocess.py` that mirrors training pipeline*
+## Gate 3 – AI model pipeline (P1) — 🟡 **machinery only**
+> **Evidence (2026-11-06):** serving machinery exists in
+> `backend/app/modules/assessments/` (quality gate, D8 abstention, calibration,
+> OOD, registry, inference, evaluation) and the training-side scaffold exists in
+> `ml/`. The scaffold is verified by 23 tests on a **clearly-labelled synthetic
+> fixture** only. No licensed dataset, image feature extractor, trained image
+> model, approved calibration artefact or numeric operating point exists, and a
+> synthetic fixture can never be promoted past `evaluated`. Gate 3 is **not met**.
+
+### 3.1 Inference integration
+- [ ] Versioned model artefact committed to registry – *registry entry shape and checksum are exercised by the `ml/` scaffold, but no trained image artefact is committed or served*
+- [~] Class taxonomy / label map – *synthetic-only label map (`ml/contract/label_map.synthetic.json`) for pipeline tests; production D1a allowlist / D2 taxonomy still open*
+- [ ] Preprocessing parity – *only a synthetic feature-vector contract exists (`ml/pest_ml/features.py`); no image extractor or training/serving parity test*
 - [ ] Timeout, retry, fallback – *pending wrapper around inference service*
-- [ ] Registry records (version, checksum, approval, retirement) – *pending DB table `model_registry` and admin UI*
+- [~] Registry records (version, checksum, approval, retirement) – *backend registry schema validates `ml/` entries; no DB table, committed model or admin UI*
 - [ ] Inference latency & abstention metrics – *pending Prometheus metrics collection*
 - [ ] Safe outcome on model failure – *pending error handling in inference client*
 - [ ] Prediction lineage stored – *pending audit entry linking model version & input snapshot*
 
-### 3.2 Training pipeline (pending)
-- [ ] Dataset acquisition docs & licence
-- [ ] Data dictionary & manifest
-- [ ] Splits (no leakage) scripts
-- [ ] Training script with reproducible config
-- [ ] Evaluation report generation
-- [ ] Subgroup analysis scripts
-- [ ] Model card creation
-- [ ] Promotion workflow automation
+### 3.2 Training pipeline (scaffold only)
+- [ ] Dataset acquisition docs & licence – *synthetic fixture licence documented; no field dataset or permissions record*
+- [~] Data dictionary & manifest – *fail-closed manifest contract + JSON Schema (`ml/contract/dataset-manifest.schema.json`, `ml/pest_ml/manifest.py`); no field data dictionary*
+- [~] Splits (no leakage) scripts – *grouped/stratified seeded splits with leakage checks (`ml/pest_ml/splits.py`); chronological forecast splits not implemented*
+- [~] Training script with reproducible config – *deterministic nearest-centroid fixture baseline + checksummed artefact (`ml/pest_ml/train.py`); no image model*
+- [~] Evaluation report generation – *reuses `app.modules.assessments.evaluation` for macro F1, per-class metrics, confusion and top-k (`ml/pest_ml/evaluate.py`); calibration stays `null`*
+- [ ] Subgroup analysis scripts – *no field data to analyse*
+- [~] Model card creation – *generated fixture card + real-model template (`ml/pest_ml/model_card.py`, `ml/model_card.template.md`); no real model card*
+- [~] Promotion workflow automation – *fail-closed trained → evaluated → approved gate (`ml/pest_ml/promote.py`); synthetic fixtures stop at `evaluated`*
 
 ### 3.3 Outbreak risk model (pending)
 - [ ] Feature definition & immutable snapshots
@@ -96,8 +105,26 @@ This document tracks the current state of each gate in the **CropSentinel AI** c
 - [ ] Calibration & back‑test report
 - [ ] Re‑run reproducibility test
 
-## Gate 4 – Outbreak prediction pipeline (P1) – *pending all items*
-(Weather client, ingestion, validation, aggregation, forecast job, fixture tests, no‑score state, run history, coverage metrics)
+## Gate 4 - Outbreak prediction pipeline (P1) - **partial machinery, not met**
+
+> **Evidence (2026-11-06):** `backend/app/modules/forecast/` now separates a pure
+> deterministic rules module (`rules.py`) from the persistence/service layer
+> (`service.py`). `backend/tests/test_forecast_rules.py` and
+> `backend/tests/test_forecast_service.py` prove on **synthetic fixtures** that
+> dry vs wet weather changes the score/band, a verified report changes the score
+> with weather held constant, identical inputs reproduce the same result from the
+> stored feature snapshot, and missing/stale weather, low coverage, a missing
+> calendar or a boundary mismatch return `insufficient_data` with
+> `probability = NULL`. The forecast API is mounted (`/v1/forecasts`,
+> `/v1/coverage`, `/v1/admin/forecasts/*`, `/v1/map/layers/*`).
+>
+> Still **open:** a real weather provider and scheduled/idempotent ingestion
+> runner; reconciliation of the `database/ingestion` variable names with the
+> backend snapshot schema; D8 forecast floors (not pre-registered or met); D9
+> coverage/freshness/suppression values (not approved); D1b pilot zone and
+> boundary version; and any agronomist-approved operating point or field
+> validation. The rule points and band thresholds are demo configuration, not a
+> performance claim. Gate 4 is **not met**.
 
 ## Gate 5 – Alerts and notifications (P1) – *pending all items*
 (Generation from forecasts, gating, dedupe, persistence, delivery channels, status tracking, retry/backoff, history endpoint, recipient testing, pause/kill switch)

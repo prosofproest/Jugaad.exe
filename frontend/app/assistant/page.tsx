@@ -47,7 +47,7 @@ const TOPIC_PROMPTS = [
 
 export default function AssistantPage() {
   const { state, sendChat, newThread } = useWorkspace();
-  const [threadId, setThreadId] = useState(state.threads[0]?.id ?? "");
+  const [threadId, setThreadId] = useState<string | null>(null);
   const [text, setText] = useState("");
   const [imageTone, setImageTone] = useState<number | null>(null);
   const [voiceNote, setVoiceNote] = useState("");
@@ -57,16 +57,13 @@ export default function AssistantPage() {
   const endRef = useRef<HTMLDivElement>(null);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
-  const thread = state.threads.find((item) => item.id === threadId) ?? state.threads[0];
+  const activeThreadId = threadId ?? state.threads[0]?.id ?? "";
+  const thread = state.threads.find((item) => item.id === activeThreadId) ?? state.threads[0];
   const latestAnalyses = state.analyses.slice(0, 3);
 
   useEffect(() => {
-    if (!threadId && state.threads[0]) setThreadId(state.threads[0].id);
-  }, [state.threads, threadId]);
-
-  useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [thread?.messages.length, threadId]);
+  }, [thread?.messages.length, activeThreadId]);
 
   function startNew() {
     const id = newThread(`New conversation ${state.threads.length + 1}`);

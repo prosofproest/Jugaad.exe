@@ -28,7 +28,7 @@ pip install -r ml/plant_diseasedetection/requirements.txt
 ```python
 from ml.plant_diseasedetection import PlantDiseaseDetector
 
-detector = PlantDiseaseDetector()              # downloads weights on first use
+detector = PlantDiseaseDetector()  # downloads weights on first use
 results = detector.predict("path/to/leaf.jpg", conf=0.25)
 for r in results:
     for box in r.boxes:

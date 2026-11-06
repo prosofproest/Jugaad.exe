@@ -12,7 +12,6 @@ when instantiating :class:`PestDetector`.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Dict, Optional
 
 # Repository root (two levels up from this file:
 # .../ml/agroai_pest_detection/model.py)
@@ -49,10 +48,10 @@ class PestDetector:
 
     def __init__(
         self,
-        weights: Optional[str | Path] = None,
+        weights: str | Path | None = None,
         hf_repo: str = DEFAULT_HF_REPO,
         hf_filename: str = DEFAULT_WEIGHTS_FILENAME,
-        device: Optional[str] = None,
+        device: str | None = None,
         verbose: bool = False,
     ) -> None:
         self.hf_repo = hf_repo
@@ -60,10 +59,10 @@ class PestDetector:
         self.device = device
         self.verbose = verbose
         self.model = self._load_model(weights)
-        self._names: Optional[Dict[int, str]] = None
+        self._names: dict[int, str] | None = None
 
     # ------------------------------------------------------------------ loading
-    def _local_weights(self) -> Optional[Path]:
+    def _local_weights(self) -> Path | None:
         if not WEIGHTS_DIR.exists():
             return None
         candidates = sorted(WEIGHTS_DIR.glob("*.pt"))
@@ -71,7 +70,7 @@ class PestDetector:
             return candidates[0]
         return None
 
-    def _load_model(self, weights: Optional[str | Path]):
+    def _load_model(self, weights: str | Path | None):
         YOLO = _import_ultralytics()
 
         if weights is not None:
@@ -105,8 +104,8 @@ class PestDetector:
         save_conf: bool = False,
         save_crop: bool = False,
         show: bool = False,
-        project: Optional[str | Path] = None,
-        name: Optional[str] = None,
+        project: str | Path | None = None,
+        name: str | None = None,
         **kwargs,
     ):
         """Run inference on an image path/URL/PIL image/np array.
@@ -132,9 +131,9 @@ class PestDetector:
 
     # ------------------------------------------------------------------ class names
     @property
-    def names(self) -> Dict[int, str]:
+    def names(self) -> dict[int, str]:
         if self._names is None:
-            if hasattr(self.model, "model") and getattr(self.model, "model") is not None:
+            if hasattr(self.model, "model") and self.model.model is not None:
                 model_names = getattr(self.model.model, "names", {}) or {}
             else:
                 model_names = getattr(self.model, "names", {}) or {}
@@ -150,11 +149,11 @@ class PestDetector:
 
 
 def load_detector(
-    weights: Optional[str | Path] = None,
+    weights: str | Path | None = None,
     *,
     hf_repo: str = DEFAULT_HF_REPO,
     hf_filename: str = DEFAULT_WEIGHTS_FILENAME,
-    device: Optional[str] = None,
+    device: str | None = None,
     verbose: bool = False,
 ) -> PestDetector:
     """Convenience constructor for :class:`PestDetector`."""

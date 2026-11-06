@@ -120,6 +120,7 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-22 | Optional OpenAI-compatible vision engine behind `AssessmentEngine`: config-driven approved labels, bounded JPEG upload, JSON-only candidates, template-rendered replies, fail-closed key/model/label handling, explicit timeout/HTTP/malformed/abstention states; `is_demo` stays true until labels are approved | `backend/app/modules/conversations/engine.py`, `media.py`, `backend/app/core/config.py`; `backend/tests/test_chat_engine.py` (19), `backend/tests/test_chat_api.py::test_provider_engine_reply_is_persisted`; `cd backend && .venv/Scripts/python -m pytest -q` → 336 passed | Phase 2 §5.7 (partial) |
 | W-23 | Phase 1 Weather, Boundaries, Historical Occurrences & Forecast Gate Ingestion: Ingest weather variables (temp min/max/mean, RH min/max/mean, rainfall, wet-day runs, wind, leaf-wetness proxy) with source timestamps, freshness metadata, physical bounds, spatial-matching method (`centroid_nearest_station`, `grid_areal_weighted_mean`, `station_idw`, `admin_polygon_intersection`, `station_exact`); versioned boundary loader (EPSG:4326 GeoJSON MultiPolygon validation, WGS84 range check, WKT conversion, boundary version propagation); historical occurrence ingestion with verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, dedupe history logging; strict forecast scoring pre-flight gate with explicit `insufficient_data` refusal (probability is NULL, zero silent imputation) for missing/stale weather (>24h SLA) or boundary mismatch; plpgsql `check_weather_sufficiency` DB function; 38 database tests passing | `database/schema/01-schema.sql`, `database/schema/02-demo-seed.sql`, `database/ingestion/*`, `database/tests/*` | Gate 1 (§1.4), Gate 4 (§4.1, §4.2, §4.3), Gate 6 |
 | W-24 | Gate 0 hygiene: consolidated ADR file, added `dist/` to `.gitignore`, generated the backend lockfile, rebuilt the venv, made lint/format clean, and verified the documented quickstart from a fresh clone | `docs/adr/0001-target-architecture.md`; `.gitignore`; `backend/requirements.lock`; `backend/.venv`; ruff fixes across `backend/app` and `backend/tests`; fresh clone of `cad44cc` → 216 passed at the time (336 today) | 0.1, 0.4 (all four) |
+| W-25 | Mobile capture + offline queue slice (CHAT-02/CHAT-04, spec 08 §10): camera/gallery capture with preview and 10 MB/JPEG-PNG-WebP checks; upload-first multipart contract with `image.upload_id`; persisted outbox (`ps03.chat.outbox.v1`) with `queued`/`failed` bubbles, Retry/Delete, ordered flush on manual action, 15 s page timer and app resume; upload id and conversation id persisted so retries reuse the same `client_message_id`; missing local image fails rather than fabricating a reply | `mobile/lib/main.dart`, `mobile/lib/src/api_client.dart`, `chat_sync.dart`, `outbox.dart`; `mobile/test/api_client_test.dart`, `chat_sync_test.dart`, `outbox_test.dart`, `widget_test.dart`; `flutter analyze` → “No issues found!”, `flutter test` → **14 passed** (Flutter 3.47.9 / Dart 3.13.7, 2026-11-06); `mobile/README.md` | Gate 2 / Phase 2 §5.7 (mobile subset; unit-verified only — no APK or device run, platform runners absent) |
 
 > **Mounted but not fully covered (2026-11-06).** The router now mounts
 > `observations`, `review`, `forecast`, `alerts` and `admin`; service-level tests pass where
@@ -352,10 +353,18 @@ Build one complete path before adding anything else.
 
 Distinguish these three deliverables; do not let one masquerade as another.
 
+> **Evidence (2026-11-06):** serving machinery exists in
+> `backend/app/modules/assessments/`; a reproducible **synthetic-only** training
+> scaffold now exists in `ml/` (manifest contract, grouped splits, deterministic
+> baseline, evaluation via the backend harness, fail-closed promotion, model
+> card; 23 tests). It ships **no trained image model, real dataset, calibration
+> artefact or operating point**, and synthetic fixtures stop at `evaluated`.
+> Gate 3 remains **open**; `[~]` marks scaffold-only evidence.
+
 ### 3.1 Inference integration
 
 - [ ] Versioned model artefact committed to a registry (not an untracked blob)
-- [ ] Class taxonomy / label map
+- [~] Class taxonomy / label map — synthetic-only map in `ml/contract/label_map.synthetic.json`; production D1a/D2 still open
 - [ ] Preprocessing parity with training
 - [ ] Timeout, retry, and fallback behaviour
 - [x] Model registry records: version, checksum, approval state, retirement (`model_registry` schema in `01-schema.sql` + demo approved models in `02-demo-seed.sql`)
@@ -365,14 +374,14 @@ Distinguish these three deliverables; do not let one masquerade as another.
 
 ### 3.2 Training pipeline
 
-- [ ] Dataset acquisition with documented permissions and licence
-- [ ] Data dictionary and manifest
-- [ ] Grouped splits (no image-level leakage) and chronological splits for forecast data
-- [ ] Training script + experiment configuration + reproducibility metadata
-- [ ] Evaluation report: macro F1, per-class precision/recall, confusion matrix, top-k, calibration
+- [ ] Dataset acquisition with documented permissions and licence — synthetic fixture licence documented; no field dataset
+- [~] Data dictionary and manifest — fail-closed manifest contract and JSON Schema (`ml/contract/dataset-manifest.schema.json`, `ml/pest_ml/manifest.py`); field data dictionary not written
+- [~] Grouped splits (no image-level leakage) and chronological splits for forecast data — grouped/stratified seeded splits with leakage checks (`ml/pest_ml/splits.py`); chronological splits not implemented
+- [~] Training script + experiment configuration + reproducibility metadata — deterministic nearest-centroid baseline and checksummed artefact (`ml/pest_ml/train.py`); no image model
+- [~] Evaluation report: macro F1, per-class precision/recall, confusion matrix, top-k, calibration — reuses `app.modules.assessments.evaluation` (`ml/pest_ml/evaluate.py`); calibration remains `null`
 - [ ] Subgroup analysis (crop, region, device, lighting)
-- [ ] Model card published
-- [ ] Promotion workflow from trained → evaluated → approved → serving
+- [~] Model card published — generated synthetic fixture card plus a real-model template (`ml/pest_ml/model_card.py`, `ml/model_card.template.md`); no real model card
+- [~] Promotion workflow from trained → evaluated → approved → serving — fail-closed workflow (`ml/pest_ml/promote.py`); synthetic fixtures stop at `evaluated`
 
 ### 3.3 Outbreak risk model
 
@@ -485,18 +494,31 @@ only policy in the repository is explicitly labelled `synthetic_unit_test` and
 - [x] Historical occurrence ingestion with verification tier and dedupe history
   - **Evidence:** `database/ingestion/historical_ingest.py` enforces verification tiers, `report_date >= event_date` check (`ck_hist_dates`), source link provenance, deterministic SHA-256 dedupe keys, and dedupe history logging; stored in `historical_occurrences` table #40.
 - [x] Unverified reports kept separate from verified counts (`forecast_eligible_cases` in `01-schema.sql` excludes unverified/rejected reports)
-- [~] Forecast job runs on a schedule and records status (`backend/backend/forecast/jobs.py` and `POST /v1/admin/forecasts/generate`)
-- [ ] Weather data demonstrably changes the risk score (test with two weather fixtures)
-- [ ] Verified reports demonstrably change the risk score (test with two report fixtures)
+- [~] Forecast job runs on a schedule and records status
+  - **Evidence:** `ForecastRun` records started/finished time, status, model version and scored/insufficient area counts; manual admin routes `POST /v1/admin/forecasts/generate` and `/generate-batch` are mounted. **No scheduler/runner exists**, so scheduled, idempotent execution is not demonstrated. The stale `backend/backend/forecast/*` duplicate has been removed.
+- [x] Weather data demonstrably changes the risk score (test with two weather fixtures)
+  - **Evidence:** `backend/tests/test_forecast_rules.py::test_two_weather_fixtures_produce_different_scores_and_bands` and `backend/tests/test_forecast_service.py::test_two_weather_fixtures_change_the_band_and_drivers`; synthetic dry vs wet fixtures score 0.0/low vs 0.9/urgent. The points and thresholds are demo configuration, not an approved operating point.
+- [x] Verified reports demonstrably change the risk score (test with two report fixtures)
+  - **Evidence:** `backend/tests/test_forecast_rules.py::test_verified_reports_alone_change_the_score` and `backend/tests/test_forecast_service.py::test_verified_reports_change_the_score_with_identical_weather`; one confirmed report adds the `verified_local_reports` driver while weather is held constant.
+- [x] Forecast reproducible from the stored fixture/snapshot
+  - **Evidence:** `backend/tests/test_forecast_service.py::test_forecast_is_reproducible_from_the_stored_feature_snapshot` re-derives score, band and drivers from `FeatureSnapshot.features` using the pure `score_weather` function; the same inputs produce the same output and the snapshot stores the rule contributions.
 - [x] No-score state surfaced in API, DB, and UI (`insufficient_data` returned with `probability = NULL` enforced by `ck_forecasts_no_imputation`)
-- [x] Forecast run history and failure visibility (`ForecastRun` model and `GET /v1/forecasts`)
-- [x] Backlog/coverage metrics exposed (`GET /v1/forecasts/coverage` endpoint in `backend/app/api/v1/forecast.py`)
+  - **Evidence:** `backend/tests/test_forecast_service.py` covers missing/stale weather, low coverage, missing calendar and boundary mismatch; each returns `insufficient_data` with `probability = None` and a typed `reason_code`.
+- [x] Forecast run history and failure visibility
+  - **Evidence:** `ForecastRun` model and admin `GET /v1/admin/forecast-runs`; `GET /v1/forecasts` is the user-facing outlook list.
+- [x] Backlog/coverage metrics exposed
+  - **Evidence:** `GET /v1/coverage` in `backend/app/api/v1/forecast.py`; the detail carries verified reports, active reporters, weather completeness/freshness and the demo flag.
 
-> **Status (2026-11-06):** `backend/app/modules/forecast/service.py` contains generation,
-> coverage, no-score and map-layer logic, and `app.db.models` has weather/forecast tables,
-> but `backend/app/api/v1/forecast.py` is **not mounted** in `router.py`, there is no
-> weather ingestion, no forecast test, and no fixture proving that weather or verified
-> reports change a score. `backend/backend/forecast/*` is a stale duplicate. **Not done.**
+> **Status (2026-11-06):** the rules baseline is extracted into pure
+> `backend/app/modules/forecast/rules.py` and wired through
+> `backend/app/modules/forecast/service.py`; `backend/app/api/v1/forecast.py` **is
+> mounted** in `router.py`, and 21 synthetic-fixture tests cover input sensitivity,
+> reproducibility, idempotency and the no-score paths. **Still open:** a real weather
+> provider and scheduler/runner (ingestion is not scheduled or idempotent end to end),
+> D8 forecast floors, approved D9 coverage/freshness/suppression values, D1b pilot
+> zone/boundary version, and an agronomist-approved operating point. The rule points
+> and band thresholds are demo configuration; no field result is claimed. **Gate 4 is
+> not met.**
 
 **Gate 4 exit criteria:** a forecast can be reproduced from fixtures, and its inputs provably affect the output.
 

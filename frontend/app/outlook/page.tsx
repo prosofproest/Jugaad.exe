@@ -169,7 +169,7 @@ export default async function OutlookPage() {
                   <div>
                     <dt>Generated</dt>
                     <dd>
-                      <time dateTime={result.layer.generated_at}>
+                      <time dateTime={result.layer.generated_at} suppressHydrationWarning>
                         {new Date(result.layer.generated_at).toLocaleString()}
                       </time>
                     </dd>

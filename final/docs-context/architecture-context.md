@@ -27,7 +27,7 @@ invariants the implementation must enforce.
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Mobile | **React Native + TypeScript** (Android-first) | Conversational capture + camera, local DB, background sync; single codebase |
+| Mobile | **Flutter + Dart** (Android-first) | Conversational capture + camera, local store, offline outbox and background sync; single codebase (ADR-013) |
 | Web app | **Next.js + TypeScript** (App Router) | Conversational capture, expert portal, district dashboard and admin; API-only data access |
 | API | **Python 3.12 + FastAPI** | Pydantic v2, OpenAPI as the contract |
 | ORM / migrations | **SQLAlchemy 2.0 + Alembic** | Single migration owner; no second ORM |
@@ -56,7 +56,7 @@ clients is a presentation layer over the `conversations` module, not a second ba
 
 ```
 ┌──────────────────────┐   ┌──────────────────────────────┐
-│ React Native app     │   │ Next.js web app               │
+│ Flutter app          │   │ Next.js web app               │
 │ • chat + camera      │   │ • chat + image upload         │
 │ • crop context       │   │ • expert portal / cases       │
 │ • offline queue      │   │ • map layers / filters        │
@@ -371,7 +371,7 @@ Do not pre-build any of this.
 | ADR-003 | Web portals are API-only clients | One contract, no DB coupling, role enforcement server-side | Accepted |
 | ADR-004 | Rules-based forecast before ML | No historical data in year one; defensible baseline | Accepted |
 | ADR-005 | ONNX Runtime on CPU for pilot inference | Cost; latency sufficient for MobileNet-class models | Proposed |
-| ADR-006 | Flutter for capture, SMS/WhatsApp for delivery | Camera + offline needs an app; reach needs messaging | Superseded by ADR-009/010 |
+| ADR-006 | Flutter for capture, SMS/WhatsApp for delivery | Camera + offline needs an app; reach needs messaging | Capture confirmed by ADR-013; delivery still open |
 
 New ADRs are appended in `progress-tracker.md` and referenced here.
 
@@ -448,7 +448,7 @@ The baseline stack in §2 is chosen against these criteria, not by fashion:
 
 Practical guidance from the blueprint:
 
-- React Native for Android-first mobile; test native camera and local storage.
+- Flutter for Android-first mobile (ADR-013); test native camera and local storage.
 - FastAPI or Django REST for the backend; pick one and standardise validation.
 - PyTorch or TensorFlow for training; ONNX Runtime or TFLite for deployment.
 - PostgreSQL + PostGIS for structured and spatial data; MapLibre or Leaflet for maps.

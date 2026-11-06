@@ -16,7 +16,6 @@ import type {
   Capture,
   ChatMessage,
   ChatThread,
-  CropGroup,
   Farm,
   Health,
   Inspection,
@@ -184,6 +183,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       if (raw) {
         const parsed = JSON.parse(raw) as WorkspaceState;
         if (parsed && parsed.currentUser && parsed.farms) {
+          // One-time hydration from localStorage after mount. A lazy initializer
+          // would mismatch the server-rendered seed state.
+          // eslint-disable-next-line react-hooks/set-state-in-effect
           setState(parsed);
         }
       }

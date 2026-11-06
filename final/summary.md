@@ -169,7 +169,7 @@ Failure paths must be designed too: unsupported crop, blurry image, unavailable 
 
 | Area | Recommendation |
 |---|---|
-| Mobile | Flutter or React Native (Android-first) |
+| Mobile | Flutter (Android-first) — ADR-013 |
 | Backend | Python FastAPI or Django REST (pick one, standardise validation) |
 | ML training | PyTorch or TensorFlow |
 | ML deployment | ONNX Runtime or TensorFlow Lite |

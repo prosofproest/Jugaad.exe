@@ -56,7 +56,7 @@ role- and area-scoped and audited.
 
 ### 3.1 In scope
 
-- A chat thread list and a message thread on **mobile (React Native + TypeScript)** and
+- A chat thread list and a message thread on **mobile (Flutter + Dart)** and
   **web (Next.js)**.
 - Sending an image from camera or gallery through the chat composer.
 - Optional short text context (`crop`, `growth stage`, `area`, symptom note); unknown is

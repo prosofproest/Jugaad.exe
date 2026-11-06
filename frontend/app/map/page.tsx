@@ -1,7 +1,8 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense, useMemo, useState } from "react";
 
 import { FarmMap, LAYERS, type FarmLayer } from "@/components/workspace/farm-map";
 import {
@@ -20,17 +21,25 @@ import type { Health } from "@/lib/workspace/types";
 type View = "current" | "crops" | "plants" | "recovery" | "history";
 
 export default function FarmHealthMapPage() {
+  return (
+    <Suspense fallback={null}>
+      <FarmHealthMapContent />
+    </Suspense>
+  );
+}
+
+function FarmHealthMapContent() {
+  const searchParams = useSearchParams();
   const { state } = useWorkspace();
-  const [farmId, setFarmId] = useState(state.farms[0]?.id ?? "");
+  const [selectedFarmId, setFarmId] = useState<string | null>(null);
   const [layer, setLayer] = useState<FarmLayer>("health");
   const [view, setView] = useState<View>("current");
   const [plantFilter, setPlantFilter] = useState("all");
 
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const farm = params.get("farm");
-    if (farm && state.farms.some((item) => item.id === farm)) setFarmId(farm);
-  }, [state.farms]);
+  const farmParam = searchParams.get("farm");
+  const focusedFarmId =
+    farmParam && state.farms.some((item) => item.id === farmParam) ? farmParam : null;
+  const farmId = selectedFarmId ?? focusedFarmId ?? state.farms[0]?.id ?? "";
 
   const farm = state.farms.find((item) => item.id === farmId) ?? state.farms[0];
   const plots = state.plots.filter((plot) => plot.farmId === farm?.id);

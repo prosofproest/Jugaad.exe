@@ -29,7 +29,7 @@ This spec defines **contracts**, not final pixel values. Values live in
 | Target | Consumer | Generated artefact |
 |---|---|---|
 | Web | Tailwind config + CSS variables | `web/styles/tokens.css` |
-| Mobile | React Native theme provider | `frontend/mobile/src/theme/tokens.ts` |
+| Mobile | Flutter theme | `mobile/lib/src/theme.dart` (to be created from `design/tokens.json`) |
 | Docs | This spec / storybook | table export |
 
 Token groups and naming:
@@ -277,7 +277,7 @@ explicitly marked platform-specific.
 | Charts | Recharts or visx | fl_chart |
 | Maps | MapLibre GL JS | Static map image / deep link in v1 (no map editing) |
 | Motion | CSS transitions ≤ 200 ms | implicit animations ≤ 200 ms |
-| Storybook | Storybook per component + state | Storybook for React Native |
+| Storybook | Storybook per component + state | Flutter widget tests; Widgetbook optional |
 
 A component is not "done" until every state in its contract has a story/golden.
 
@@ -323,7 +323,7 @@ A component is not "done" until every state in its contract has a story/golden.
 
 ## 10. Open questions
 
-1. Which icon set is available in both React Native and React (web) without licensing
+1. Which icon set is available in both Flutter and React (web) without licensing
    friction?
 2. Is a shared Storybook pipeline worth the setup cost for a 7-person team?
 3. Does the local language require a different font for legibility at small sizes?

@@ -115,20 +115,21 @@ Component rules:
 
 ---
 
-## 4. TypeScript / React Native (mobile)
+## 4. Dart / Flutter (mobile)
 
-**Tooling:** TypeScript strict, ESLint + Prettier, Zod for runtime schemas, Expo SQLite or
-WatermelonDB, Expo Router or React Navigation, Zustand or Redux Toolkit, React Native
-Testing Library, Detox or Maestro.
+**Tooling:** Dart 3 with sound null safety, `flutter_lints`, `http` for the `/v1` API,
+`shared_preferences` for the persisted outbox, `image_picker` for capture, `flutter_test`
+for unit and widget tests. Flutter is the single mobile stack (ADR-013); do not add a
+second runtime.
 
-- `strict: true`; no `any` in domain models.
-- Discriminated unions for loading/loaded/stale/offline/error.
-- Local DB schema versioned with migrations; never drop unsent observations on upgrade.
+- Enable `flutter analyze` with no warnings in CI.
+- Use sealed classes / pattern matching for loading/loaded/stale/offline/error states.
+- Local store schema versioned with migrations; never drop unsent observations on upgrade.
 - All user-facing strings in i18n catalogues (English + Kannada); no hard-coded copy.
-- Repository layer abstracts API + local DB; components never call HTTP directly.
+- Repository layer abstracts API + local store; widgets never call HTTP directly.
 - Images: compress before queueing, retain diagnostic detail, record original dimensions.
 - Queue operations are idempotent and resumable; persist retry count and last error.
-- Component tests for the result cards, quality feedback and stale banner.
+- Widget tests for the result cards, quality feedback and stale banner.
 - Test on a low-end Android device profile and with airplane mode.
 
 ---
@@ -143,7 +144,7 @@ Testing Library, Detox or Maestro.
 | JSON field | snake_case | `valid_from` |
 | DB table | plural snake_case | `feature_snapshots` |
 | TS component | PascalCase file | `RiskBadge.tsx` |
-| React Native component | PascalCase | `AssessmentCard` |
+| Flutter widget | PascalCase | `AssessmentCard` |
 | Enum value | snake_case string | `needs_visit` |
 | Env var | SCREAMING_SNAKE | `WEATHER_API_KEY` |
 | Feature flag | `feature.<area>.<name>` | `feature.forecast.nowcast` |

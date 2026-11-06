@@ -113,7 +113,7 @@ Image AI:     lightweight CNN fine-tuned on field data, quality gate,
               abstention, top-3 candidates
 Forecast:     nowcast (last 10 days); rules first,
               ML overlay only when data supports it
-Product:      React Native mobile capture app + Next.js web app; in-app + email +
+Product:      Flutter mobile capture app + Next.js web app; in-app + email +
               optional SMS outlook
 Verification: extension-worker-first; `can_confirm` permission for confirmed cases
 Geography:    block/mandal level, never farm level
