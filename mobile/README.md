@@ -109,7 +109,7 @@ Added for this slice (all on the approved list):
 | `flutter pub get` | pass — dependencies resolved |
 | `flutter analyze` | pass — “No issues found!” |
 | `flutter test` | pass — **14 tests** |
-| `flutter build apk --debug` | pass — `build/app/outputs/flutter-apk/app-debug.apk` (149.2 MB debug, all ABIs) |
+| `flutter build apk --debug` | pass — `build/app/outputs/flutter-apk/app-debug.apk` (~166 MB debug, all ABIs, default `http://10.0.2.2:8000`) |
 
 Test coverage:
 
@@ -144,6 +144,10 @@ only `flush()`, so a `201` response could lose its rows. It was fixed at the
 `get_session` unit-of-work boundary (commit on success, rollback on exception)
 with a cross-request regression test; the backend suite then reported
 **375 passed**.
+
+After the smoke, the debug APK was rebuilt without a `--dart-define`, so the
+on-disk artifact again uses the source default `http://10.0.2.2:8000` (the
+server on port 8010 was only a scratch instance).
 
 ## Not verified
 
