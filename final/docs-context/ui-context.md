@@ -185,7 +185,7 @@ Shared web components live in `/components`; Flutter equivalents in
 | `Button` | Actions | default, hover, focus, pressed, disabled, loading |
 | `Card` | Grouped content | default, interactive, disabled |
 | `RiskChip` | Risk band | low, moderate, high, urgent, insufficient |
-| `ConfidenceBand` | Qualitative confidence | low, medium, high, not-calibrated |
+| `ConfidenceBand` | Qualitative confidence | low, medium, high, not_calibrated |
 | `CoverageIndicator` | Data coverage | good, partial, low, unknown |
 | `FreshnessBadge` | Data age | fresh, aging, stale, expired |
 | `StatusChip` | Case/verification state | queued, syncing, synced, pending_review, confirmed, probable, rejected, duplicate, needs_visit, unresolved |
@@ -406,9 +406,9 @@ model limits.
 - **Queue management:** sort by urgency, geography, crop, target, age and uncertainty;
   allow assignment and escalation; show backlog, median age and overdue count.
 - **Case detail:** original image at full resolution, crop context, capture date, quality
-  flags, model candidates with qualitative confidence, model version, forecast context at
-  report time, prior cases (privacy-scoped), and model limitations in the model block — not
-  behind a tooltip.
+  flags, prior cases (privacy-scoped), and model limitations — not behind a tooltip. Model
+  candidates, model version and forecast context at report time are revealed **only after**
+  the reviewer records the primary decision, then shown read-only (D7).
 - **Verification workflow:** `confirmed`, `probable`, `rejected`, `duplicate`, `needs_visit`,
   `unresolved`. Evidence requirements per decision are in
   `../feature-specs/04-expert-review.md` §7.

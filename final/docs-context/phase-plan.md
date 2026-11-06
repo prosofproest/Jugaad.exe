@@ -484,18 +484,32 @@ explain itself. It assists a human; it never diagnoses.
 
 ### 6.4 Calibration, confidence and abstention
 
-- Calibrate scores on representative validation data; otherwise use qualitative bands.
-- Choose abstention thresholds on validation using hard negatives; never optimise them on the
-  test set.
-- Define confidence bands and the wording for each.
-- Define unsupported-crop and out-of-domain behaviour.
-- Audit the score vector, threshold, model version and explanation metadata.
+- Calibrate with temperature scaling on a dedicated calibration split, separate from the
+  model-selection validation split; isotonic only if sample size supports it. If a separate
+  split is not supportable, calibration is not approved and only qualitative bands are shown
+  (D8).
+- Implement the D8 decision function: per-class `τ_c`, top-1/top-2 margin, entropy and an
+  explicit out-of-distribution score, plus quality-gate and unsupported-crop states.
+- Choose thresholds on validation using hard negatives; never optimise them on the test set.
+- Set the operating point safety-first: per-class recall floors take precedence over coverage;
+  a coverage floor prevents an abstain-everything model from passing.
+- Measure risk–coverage curves per class and subgroup; pre-register the D8 image floors in
+  `progress-tracker.md` before opening the frozen test set.
+- Define confidence bands from calibrated probabilities and the wording for each; if
+  calibration is not approved, bands are qualitative only.
+- Define unsupported-crop and out-of-domain behaviour, including held-out-class evaluation.
+- Audit the score vector, threshold set (including OOD), calibration version, model version
+  and explanation metadata.
+- No user-facing control changes a model output; manual review decisions are separate and
+  audited.
 
 ### 6.5 Evaluation
 
-- Report macro F1, per-class precision/recall, confusion matrix, top-k and calibration
-  (ECE/reliability) on the frozen field test set.
-- Report the abstention rate and performance **at the shipped threshold**, with sample counts.
+- Report macro F1, per-class precision/recall, confusion matrix, top-k, calibration
+  (ECE/reliability, Brier) and OOD (unknown-vs-known AUROC, false-accept rate) on the frozen
+  field test set.
+- Report the abstention rate and performance **at the shipped threshold**, with sample counts,
+  and confirm every pre-registered D8 floor is met.
 - Break down by variety, geography, season, device, lighting and image quality.
 - Test robustness: blur, shadow, background, leaf age, distance.
 - Record limitations and failure modes explicitly; no aggregate metric without breakdown.
@@ -516,16 +530,20 @@ explain itself. It assists a human; it never diagnoses.
   result screen; one source of truth, no chat-only variant.
 - Show up to three candidates, qualitative confidence, quality flags, model version and
   generated time.
-- Abstention shows the reason, retake path and escalation; no candidate list.
+- Abstention shows the machine reason code in plain language, retake path and escalation; no
+  candidate list and no risk colour.
 - Unsupported crop shows the supported list and escalation; never a forced class.
 - Include "not a diagnosis" wording and a route to expert review.
+- No control changes a model output; retake creates a new assessment and escalation opens
+  review (D8).
 - Keep all strings externalised for translation.
 
 ### Deliverables
 
 - Quality-gate module with reason codes and tests.
 - Trained image model, preprocessing config and experiment record.
-- Evaluation report on the frozen field test set, including abstention and subgroups.
+- Evaluation report on the frozen field test set, including abstention, calibration, OOD and
+  subgroups, with the D8 floors pre-registered before the set was opened.
 - ONNX artefact and approved registry entry.
 - Versioned inference endpoint and append-only prediction records.
 - Assessment result card with abstention, quality flags and escalation.
@@ -533,11 +551,13 @@ explain itself. It assists a human; it never diagnoses.
 ### Exit gate — Gate 3
 
 - Performance is reported at the shipped abstention threshold on a field-only test set, with
-  sample counts and subgroup breakdowns.
-- Abstention works on hard negatives and unsupported inputs.
-- Quality gate failures return actionable reasons and never block submission.
-- No unsupported percentage confidence is displayed.
-- The model is registered, approved and version-pinned in served predictions.
+  sample counts and subgroup breakdowns; the pre-registered D8 floors are **met**.
+- Abstention works on hard negatives and unsupported inputs; calibration and OOD are
+  evaluated, and OOD is measured on held-out classes.
+- No unsupported percentage confidence is displayed; `not_calibrated` is a word, not a number.
+- No user-facing control overrides a model output.
+- The model is registered, approved and version-pinned in served predictions, and the
+  prediction row carries the threshold set used.
 
 ### Not in this phase
 

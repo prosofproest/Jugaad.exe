@@ -217,6 +217,15 @@ Report panel sample size per area/target; if it is below the D8 minimum, report 
 underpowered and do not gate on it. Never treat an unvisited area or a missing report as a
 negative.
 
+**Pre-registered floors (D8):** before the frozen test season is opened, the evaluator and
+product lead record forecast floors in `progress-tracker.md` §4 (D8): minimum share of
+area-days carrying a scored band, maximum `insufficient_data` rate, minimum lift over the
+climatology/naive baseline, and maximum Brier and calibration error on sentinel-panel
+negatives, each broken down by coverage stratum. The floors are measured on validation data
+only. Opening the test set once and reporting at the shipped operating point is the last step;
+floors written after that opening are void. Any unmet floor fails Gate 4 and the model is not
+approved. No floor value is chosen in this document.
+
 ---
 
 ## 10. Alert hand-off
@@ -269,6 +278,11 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 - [ ] Expired forecasts are marked stale in API and UI.
 - [ ] Demo forecasts are labelled and excluded from operational alerts.
 - [ ] Evaluation report includes temporal + spatial holdout, calibration and sample counts.
+- [ ] The D8 forecast floors were pre-registered before the frozen test season was opened, and
+      every floor is met (share of area-days scored, `insufficient_data` rate, baseline lift,
+      Brier and calibration error), with coverage-stratum breakdowns.
+- [ ] A floor not met fails Gate 4; a re-tune after opening the test set requires a new
+      pre-registration.
 
 ---
 

@@ -101,7 +101,7 @@ audit_events
 | `observations` | id, client_report_id, user_id (creator), subject_user_id (on-behalf), growing_area_id, crop_code, variety, growth_stage, notes, captured_at, submitted_at, status, created_at | `unique(user_id, client_report_id)` |
 | `image_assets` | id, observation_id, storage_key, original_width, original_height, bytes, content_hash, mime, source (`camera`,`gallery`), compression (jsonb), upload_status, created_at | Private bucket |
 | `image_quality_results` | id, image_id, gate_version, result, flags (jsonb), thresholds (jsonb), created_at | Insert-only |
-| `image_predictions` | id, image_id, model_version, candidates (jsonb), confidence_band, calibrated (bool), abstained (bool), abstain_reason, generated_at | Insert-only |
+| `image_predictions` | id, image_id, model_version, candidates (jsonb), probabilities (jsonb), confidence_band, calibrated (bool), calibration_version, abstained (bool), abstain_reason, decision_thresholds (jsonb: per-class `τ_c`, margin `m`, entropy `h`, `ood_max`), ood_score, generated_at | Insert-only; thresholds and OOD stored per row so the decision is reproducible (D8) |
 | `review_requests` | id, observation_id, requested_by, reason, status, created_at | |
 
 Observation status values:
@@ -171,6 +171,15 @@ FOR EACH ROW EXECUTE FUNCTION reject_mutation();
 -- A prediction requires a quality result for the same image
 ALTER TABLE image_predictions
   ADD CONSTRAINT fk_prediction_image FOREIGN KEY (image_id) REFERENCES image_assets(id);
+
+-- An abstention must carry a reason; the threshold set must be stored for reproduction
+ALTER TABLE image_predictions
+  ADD CONSTRAINT ck_abstain_has_reason
+    CHECK (abstained = false OR abstain_reason IS NOT NULL),
+  ADD CONSTRAINT ck_prediction_thresholds
+    CHECK (decision_thresholds IS NOT NULL),
+  ADD CONSTRAINT ck_calibration_version
+    CHECK (calibrated = false OR calibration_version IS NOT NULL);
 
 -- Idempotent observation creation
 ALTER TABLE observations
@@ -315,6 +324,10 @@ hard delete → retain audit and non-identifying aggregates → record completio
       `verified_at <= cutoff` plus event date `<= cutoff` (test).
 - [ ] A `sentinel_visits` row is a negative only when scheduled, absent, in-window and
       coverage-passing; a missing visit is not a negative (test).
+- [ ] Every `image_predictions` row stores `decision_thresholds` (per-class `τ_c`, margin,
+      entropy, `ood_max`) and `ood_score`; the abstention decision is reproducible from them.
+- [ ] An abstained prediction has a reason code; a calibrated prediction has a
+      `calibration_version` (test the check constraints).
 - [ ] Precise geometry is absent from API responses for unauthorised roles (test).
 - [ ] Small-count suppression is enforced in the query layer (test).
 - [ ] Advisory retrieval fails when no approval exists (test).

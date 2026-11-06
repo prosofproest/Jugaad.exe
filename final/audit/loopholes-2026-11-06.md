@@ -37,6 +37,7 @@ decisions D7–D13.
 | 12 | Entry-point scope wording marked pending D1/D2/D4 | `docs-context/AGENTS.md` §1 |
 | 13 | `agronomist` added as a fifth RBAC role (D13); advisory approval now performable | `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `07-advisory-and-alerts.md` §2–§3 |
 | 14 | D7 accepted: sentinel-panel absence sampling, evidence-tier labels, as-of cutoffs, blinded primary read and double-read subset | `progress-tracker.md` §4; `06-forecast-and-risk-map.md` §2/§9/§11; `04-expert-review.md` §3/§6; `05-data-layer.md` §4.4 |
+| 15 | D8 accepted: safety-first abstention function, temperature-scaled calibration on a dedicated split, explicit OOD on held-out classes, no output override, and pre-registered image/forecast floors | `progress-tracker.md` §4; `ml-models.md` §5.3/§6; `phase-plan.md` §6.4–6.5, Gate 3; `01-design-system.md` §3.4/§3.9; `02-reporting-and-capture.md` §4/§9; `05-data-layer.md` §4.3/§5/§13; `TRD.md` §6.3–6.4/§10/§18; `06-forecast-and-risk-map.md` §9/§12 |
 
 ---
 
@@ -50,10 +51,12 @@ decisions D7–D13.
 **Consequence:** a 100%-abstention classifier and a forecast engine that never scores would
 have passed Gates 3, 4 and 5.
 
-**Disposition:** D8 requires pre-registered numeric floors (per-class recall, max abstention,
-minimum share of area-days scored, lift over climatology) and Gate 3 now fails a number that
-does not clear them. R6 is respected: the numbers are set from the measured Phase-3
-baseline, before the frozen test set is opened — the *rule* is the decision.
+**Disposition:** **Fixed by D8 (accepted 2026-11-06).** D8 requires pre-registered numeric
+floors (per-class recall, max abstention, minimum share of area-days scored, lift over
+climatology) and Gate 3 now fails a number that does not clear them. R6 is respected: the
+numbers are set from the measured Phase-3 baseline, before the frozen test set is opened — the
+*rule* is the decision. The floor values remain unrecorded until that measurement; Gates 3
+and 4 cannot close until they are pre-registered and met.
 
 ### C-2 — The forecast track had no observable negative class
 `06:32` required "verified absence within coverage" as the negative label;
@@ -76,7 +79,13 @@ retained in v1 subject to the panel and visit schedule being committed under D3.
 No τ, no margin or entropy rule, no per-class thresholds, no risk–coverage target, no
 override policy.
 
-**Disposition:** D8. R2 is untestable until the function and τ exist.
+**Disposition:** **Fixed by D8 (accepted 2026-11-06).** The decision function is per-class
+`τ_c` on the calibrated top candidate, a top-1/top-2 margin, normalised entropy, an explicit
+OOD threshold, quality-gate and unsupported-crop states. The operating posture is
+safety-first (recall floors before coverage, with a coverage floor to block an
+abstain-everything model). The override policy is fixed: no user-facing control changes a
+model output; manual review is separate and audited. The floor values are measured and
+pre-registered before the frozen test set is opened.
 
 ### C-4 — No open-set detection, so R2's core promise was unimplementable
 `unknown` was treated as a supervised class (`ml-models.md:21`) while `ml-models.md:31`
@@ -85,8 +94,10 @@ class only recognises unknowns present in training; a novel pathogen is out-of-d
 and scores confidently. `TRD.md:314` listed `out_of_domain` as an abstain reason that
 nothing produced.
 
-**Disposition:** D8 must define an out-of-distribution score and evaluate it on held-out
-classes (unknown-vs-known AUROC and false-accept rate at the shipped threshold).
+**Disposition:** **Fixed by D8 (accepted 2026-11-06).** A separate OOD score (embeddings or
+energy) is required and evaluated on held-out classes: unknown-vs-known AUROC and
+false-accept rate at the shipped threshold are gate metrics, not diagnostics. A supervised
+`unknown` class alone is explicitly rejected as open-set detection.
 
 ### C-5 — Labels leaked into the forecast evaluation
 `feature-specs/04-expert-review.md:121` and `PRD.md:266` required reviewers to see "model
@@ -163,7 +174,7 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 | G-21 | Appendix F test catalogue and Appendix H launch checklist have no requirement IDs, owners, evidence or signature fields, so traceability and "signed" cannot be verified | `appendices.md:164,236`, `phase-plan.md:814` | QA lead |
 | G-22 | Device, app-distribution and SMS/WhatsApp provisioning are unscheduled long-lead dependencies | `phase-plan.md:393,607,663`, `roadmap-and-resources.md:133` | Field ops |
 | G-23 | Drift monitoring names signals but sets no threshold, window, minimum sample or action | `operations-and-pilot.md:108,122` | ML lead |
-| G-24 | Shipped abstention threshold is not a column on `image_predictions`, so abstention cannot be reproduced or audited | `TRD.md:753`, `05:103` | Backend lead |
+| G-24 | Shipped abstention threshold is not a column on `image_predictions`, so abstention cannot be reproduced or audited | `TRD.md:753`, `05:103` | **Fixed by D8** — `decision_thresholds` (per-class `τ_c`, margin, entropy, `ood_max`), `ood_score` and `calibration_version` are stored per prediction, with check constraints |
 | G-25 | Retention undefined for the most sensitive data class; backups resurrect deleted rows; no on-device TTL or encryption requirement | `05:274,279`, `TRD.md:684` | D10 |
 
 ---
@@ -173,9 +184,11 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 These need a human decision, not an edit. They are recorded as open above; nothing here
 should be resolved by an agent picking a default.
 
-1. **Numeric floors (C-1, C-3).** Must come from measurement under D8, not from this audit.
-   R6 forbids inventing them, and inventing them here would have created the very defect
-   this audit exists to find.
+1. **Numeric floor values (C-1, C-3, C-4).** The rule, strata and pre-registration procedure
+   are fixed by D8. The values themselves must come from measurement, not from this audit.
+   R6 forbids inventing them, and inventing them here would have created the very defect this
+   audit exists to find. Gate 3 and Gate 4 stay open until the relevant floors are recorded
+   and met.
 2. **Schedule and budget (X-9, X-10).** Both are currently unachievable as written and need
    re-basing against the actual team and the actual season window.
 3. **Data controller (G-25, D10).** Determines consent wording, retention values and the

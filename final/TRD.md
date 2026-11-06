@@ -329,7 +329,7 @@ export_jobs
 | Field | Allowed values |
 |---|---|
 | `observation.status` | `draft`, `pending_upload`, `uploaded`, `assessing`, `assessed`, `abstained`, `failed`, `pending_review`, `reviewed` |
-| `image_predictions.abstain_reason` | `blur`, `exposure`, `resolution`, `no_plant`, `unsupported_crop`, `out_of_domain`, `gate_version_missing` |
+| `image_predictions.abstain_reason` | `below_class_threshold`, `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`, `quality_gate_failed`; the specific quality flag is read from `image_quality_results.flags` |
 | `messages.role` | `user`, `assistant` |
 | `messages.kind` | `image`, `text`, `assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`, `review_requested` |
 | Verification `evidence_tier` | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` |
@@ -345,6 +345,8 @@ export_jobs
 |---|---|
 | Photo assessment ≠ forecast | Separate tables, modules, endpoints and UI components |
 | No assessment without quality pass | Service gate + status check on `image_predictions` |
+| Abstention reproducible | `decision_thresholds` (`τ_c`, margin, entropy, `ood_max`) and `ood_score` stored per prediction; abstained requires a reason code (D8) |
+| Calibration lineage | `calibrated = true` requires a `calibration_version`; probabilities null when calibration is not approved |
 | Predictions append-only | Insert-only repository + DB trigger/permissions |
 | Reviews append-only | Insert-only `reviews` and `review_events` |
 | Only reviewers verify | Role dependency + FK/check; `confirmed` requires pathologist |
@@ -1165,7 +1167,12 @@ The implementation is technically acceptable for pilot only when:
 - [ ] Duplicate observation retry returns the existing observation; no duplicate row.
 - [ ] Predictions, reviews, forecasts and audit rows reject update/delete.
 - [ ] A forecast cannot be inserted without a feature snapshot and model version.
-- [ ] An unverified observation is excluded from forecast feature queries (test).
+- [ ] An unverified observation is excluded from forecast feature queries; only `confirmed` and
+      `probable` (with evidence tier) inside the as-of cutoffs are eligible (test).
+- [ ] Every prediction stores the threshold set and OOD score; abstention is reproducible and
+      an abstained row has a reason code (test).
+- [ ] A calibrated prediction carries a `calibration_version`; probabilities are null when
+      calibration is not approved (test).
 - [ ] Precise geometry is absent from responses for unauthorised roles (test).
 - [ ] Small-count suppression is enforced in the query layer (test).
 - [ ] Advisory retrieval fails when no approval exists or content is expired (test).

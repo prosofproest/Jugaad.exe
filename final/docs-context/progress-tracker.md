@@ -88,8 +88,8 @@ required; any demo reply is labelled.
 - [ ] Quality gate model (blur, exposure, resolution, no-plant).
 - [ ] Field-image baseline; public data used for pretraining only.
 - [ ] Group-held-out field test set frozen before model selection.
-- [ ] Calibration + abstention thresholds chosen on validation.
-- [ ] Evaluation report: macro F1, per-class recall, ECE, abstention rate, subgroups.
+- [ ] Calibration on a dedicated split (temperature scaling) and the D8 abstention decision function (`τ_c`, margin, entropy, OOD) chosen on validation.
+- [ ] Evaluation report: macro F1, per-class recall, ECE/Brier, abstention rate, OOD on held-out classes, subgroups; D8 floors pre-registered before the test set is opened.
 - [ ] ONNX export, registry entry, versioned serving.
 - [ ] Result card with top-3, confidence band, quality flags, escalation.
 
@@ -111,7 +111,8 @@ clear the pre-registered floor fails the gate.
 - [ ] Alert trigger, dedupe, cooldown, delivery status.
 
 **Gate 4:** the D7 event definition, label eligibility rule, sentinel-panel membership and
-visit schedule are fixed and frozen before the test season; the D9 coverage, freshness and
+visit schedule are fixed and frozen before the test season; the D8 forecast floors are
+pre-registered and **met** on sentinel-panel negatives; the D9 coverage, freshness and
 suppression values are recorded and approved; the forecast is reproducible from a stored
 snapshot; the no-score path is verified against those values; the map never merges reports and
 predictions.
@@ -274,19 +275,110 @@ frozen before Gate 4.
 **Blocks:** `06-forecast-and-risk-map.md` §2/§9/§11, `04-expert-review.md` §3/§6,
 `05-data-layer.md` §4.4, `phase-plan.md` §7.1.
 
-### D8 — Abstention rule and numeric acceptance floors `[?]`
+### D8 — Abstention rule and numeric acceptance floors `[x]`
 
-Decision function (e.g. calibrated max-probability below τ, plus margin/entropy and an
-out-of-distribution distance), per-class τ, risk–coverage target, and the override policy
-with audit fields — **plus the numeric floors** for Gates 3–5: minimum per-class recall,
-maximum abstention rate, minimum share of area-days scored, and minimum lift over a
-climatology/naive baseline.
+**Accepted 2026-11-06: the decision function, the operating posture, the calibration and OOD
+requirements, the override policy and the floor-setting process. The floor *values* are not
+invented here — they are measured and pre-registered before the frozen test set is opened, as
+described below.**
 
-R6 forbids inventing these numbers. The decision is therefore the *rule*: measure the
-Phase-3 baseline, then pre-register the floors in this section before the frozen test set is
-opened. Floors set after seeing test results are void.
-**Owner:** ML lead + product lead + evaluator. **Needs by:** before Gate 3 exit.
-**Blocks:** Gate 3, Gate 4, `ml-models.md` §abstention, `01-design-system.md` confidence bands.
+#### Decision function — image assessment
+
+Applied only after the server quality gate passes:
+
+1. Calibrated class probabilities (or the raw decision score when calibration is not
+   approved for display).
+2. Top-1/top-2 margin and normalised entropy.
+3. An explicit out-of-distribution score computed on embeddings or energy, with its threshold
+   fitted on held-out classes.
+
+Abstain with a machine reason code if **any** of these holds: the top candidate's calibrated
+probability is below its class threshold `τ_c`; the margin is below `m`; entropy is above
+`h`; the OOD score is above `ood_max`; the crop is unsupported; the quality gate fails (a
+separate upstream state). Return up to three candidates only when none hold.
+
+`τ_c`, `m`, `h` and `ood_max` are stored per prediction with the model version. Per-class
+`τ_c` is required; a single global threshold is not sufficient for classes of unequal
+prevalence.
+
+#### Operating posture
+
+**Safety-first.** Per-class recall floors take precedence over coverage. Among operating
+points that satisfy the recall and OOD constraints, choose the one that maximises the share
+of images assessed. Never trade a recall floor for coverage. A model that abstains on
+everything fails Gate 3 — the coverage floor exists precisely to prevent that.
+
+#### Calibration
+
+Probabilities used by the decision function are calibrated with **temperature scaling** on a
+dedicated calibration split, separate from the validation split used for model selection and
+from the frozen test set. Isotonic calibration is permitted only where the sample size
+supports it. ECE is a diagnostic, not a fitting method. Report reliability diagram, Brier
+score and ECE on the frozen test set.
+
+If the data cannot support a separate calibration split, calibration is **not approved**:
+the UI shows qualitative bands only, no percentage, and no probability-derived claim. The
+model may still abstain on its raw score.
+
+#### Out-of-distribution
+
+A supervised `unknown` class is not open-set detection: it only recognises unknowns present
+in training. D8 therefore requires a separate OOD score evaluated on **held-out classes** —
+unknown-vs-known AUROC and false-accept rate at the shipped threshold. Both are gate
+metrics, not diagnostics.
+
+#### Numeric floors — measured, never invented
+
+Two floor sets, each pre-registered in this section, timestamped and committed **before** the
+frozen test set is opened:
+
+**Image floors**
+- Minimum per-class recall at the shipped threshold.
+- Maximum overall and per-class abstention rate.
+- Minimum share of quality-passing images assessed.
+- Maximum ECE (only if calibration is approved).
+- Maximum OOD false-accept rate on held-out classes.
+- Minimum top-3 containment for supported classes.
+
+**Forecast floors**
+- Minimum share of area-days carrying a scored band (not `insufficient_data`).
+- Maximum `insufficient_data` rate.
+- Minimum lift over the climatology / naive baseline on the D7 evaluation.
+- Maximum Brier and calibration error on sentinel-panel negatives.
+- Results broken down by coverage stratum.
+
+Procedure:
+1. Freeze dataset, split and model versions.
+2. On validation/calibration data only, measure risk–coverage curves per class and subgroup
+   and the baseline lift.
+3. The evaluator and product lead write the floors and the chosen operating point into this
+   section, with a timestamp and commit, under D7's anti-leakage rules.
+4. Open the frozen test set once and report at the shipped threshold.
+5. Any floor that is not met means the model is **not approved** and Gate 3 (or Gate 4 for
+   forecast) fails. Thresholds may not be retuned after the test set is opened; a retrain
+   requires a new pre-registration.
+
+Floors set after seeing test results are void.
+
+#### Override policy
+
+- There is **no user-facing control that changes a model output**. An abstained prediction
+  stays abstained in the record.
+- A reviewer may still verify a report manually through the normal review flow. That decision
+  is separate, audited, and never rewrites the prediction row or counts as an assessed image
+  in coverage.
+- `confirmed` remains pathologist-only. Extension workers may escalate; agronomists and
+  admins cannot verify.
+- Every manual decision records actor, role, timestamp, reason and the model state it
+  replaced, and appears in the audit log.
+- Manual labels are not fed back as ground truth for model evaluation without D7's labelling
+  protocol and evidence tier; doing so would import confirmation bias into the test set.
+
+**Owner:** ML lead + product lead + evaluator. **Recorded:** 2026-11-06.
+**Floor values:** not yet recorded — Gate 3 and Gate 4 cannot close until the relevant set is
+pre-registered and met.
+**Blocks:** Gate 3, Gate 4, `ml-models.md` §6, `01-design-system.md` confidence bands,
+`02-reporting-and-capture.md` FR-02-25, `05-data-layer.md` `image_predictions`.
 
 ### D9 — Coverage, freshness and suppression values `[?]`
 
@@ -413,6 +505,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
 | 2026-11-06 | **D13 accepted:** `agronomist` added as a fifth role (advisory author/approver, risk-band approval, read-only area; cannot verify cases). Updated the RBAC matrix, MFA list and acceptance criteria in `03-auth-and-roles.md`; role lists in `PRD.md`, `phase-plan.md` and `05-data-layer.md`; review-role table in `04-expert-review.md`; advisory author/approver rules in `07-advisory-and-alerts.md`. Publication now requires two qualified accounts (D3 capacity). |
 | 2026-11-06 | **D7 accepted:** forecast negatives come from a pre-registered sentinel panel, not from missing reports; `probable` is eligible with an evidence tier; as-of cutoffs, label-maturity embargo and blinded primary review are mandatory. Updated forecast task/evaluation/edge cases, review flow and requirements, sentinel tables, label-eligibility invariants in TRD/architecture/workflow rules, and Phase 4 plan. Discrimination/calibration are reported only on sentinel negatives; panel below the D8 minimum is marked underpowered. |
+| 2026-11-06 | **D8 accepted:** safety-first abstention function (per-class `τ_c`, margin, entropy, explicit OOD, quality/crop gates), temperature scaling on a dedicated calibration split, OOD evaluated on held-out classes, and no user-facing override of a model output. Image and forecast floors are pre-registered before the frozen test set is opened; floors set after opening are void. Updated `ml-models.md`, `phase-plan.md` §6.4–6.5 and Gate 3, design-system confidence/abstain states, reporting requirements and acceptance, `image_predictions` schema/constraints (`decision_thresholds`, `ood_score`, `calibration_version`), TRD invariants and forecast evaluation/acceptance. Floor values remain unrecorded pending measurement. |
 
 ---
 

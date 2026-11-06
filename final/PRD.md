@@ -363,7 +363,7 @@ wraps the same observation and photo-assessment pipeline used by the structured 
 | Reply kind | What the user sees | Primary action |
 |---|---|---|
 | `assessment` | Top candidates, confidence band, model version, generation time, "assistive, not a diagnosis" | Add context, request review, open advisory |
-| `abstained` | Specific reason (blur, exposure, no plant, unsupported crop, out of domain) | Retake |
+| `abstained` | Specific machine reason rendered in plain language (`below_class_threshold`, `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`, `quality_gate_failed` with the quality flag) | Retake, request review |
 | `unsupported_crop` | Explanation and supported-crop list | Change crop, escalate |
 | `queued` | "Will assess when connected" | View queue |
 | `failed` | Stable error code and whether retry helps | Retry |
@@ -511,23 +511,32 @@ capability and the spec that owns it.
 
 - **Formulation:** cautious visual triage of visible symptoms, not pathogen identification.
 - **Input:** field image plus optional crop and plant-part context.
-- **Output:** candidate scores, quality flags, confidence band, abstention state and model
-  version.
+- **Output:** candidate scores, quality flags, confidence band, abstention state, abstain
+  reason, model version and the decision thresholds used.
 - **Classes:** supported conditions + healthy + abiotic look-alike + unknown/other.
 - **Quality gate:** separate check for blur, resolution, exposure, plant presence and
   distance; failure returns `abstained` with a reason and never blocks submission.
+- **Abstention (D8):** after the quality gate passes, abstain when the calibrated top
+  candidate is below its class threshold `τ_c`, the top-1/top-2 margin is too small,
+  normalised entropy is too high, the OOD score exceeds `ood_max`, or the crop is
+  unsupported. `τ_c`, margin, entropy and `ood_max` are stored per prediction. Safety-first:
+  per-class recall floors take precedence over coverage.
 - **Architecture:** start with transfer learning (MobileNet/EfficientNet class); compare
   larger models only when data and compute justify it.
 - **Preprocessing:** identical in training and inference; match the pretrained backbone.
-- **Evaluation:** macro F1, per-class precision/recall, confusion, top-k, calibration,
-  abstention rate, subgroup breakdowns and error analysis on the frozen field test set.
+- **Evaluation:** macro F1, per-class precision/recall, confusion, top-k, calibration
+  (temperature-scaled on a dedicated split), abstention rate, OOD on held-out classes,
+  subgroup breakdowns and error analysis on the frozen field test set. Numeric floors are
+  pre-registered before the test set is opened (D8).
 - **Explainability:** Grad-CAM-style outputs are debugging aids, not proof of causal
   reasoning; user-facing wording explains likely visual match, uncertainty, quality and next
   step.
 - **Confidence:** show a percentage only when calibration is validated and approved;
-  otherwise use qualitative bands.
+  otherwise use qualitative bands and `not_calibrated`.
+- **No override:** there is no user-facing control that changes a model output. Manual review
+  is a separate audited decision and never rewrites the prediction.
 - **Prohibited:** presenting a ranked class as a diagnosis; unsupported percentage
-  confidence; forced classification of unknown inputs.
+  confidence; forced classification of unknown inputs; overriding an abstention in the UI.
 
 ### 10.2 Area outlook
 

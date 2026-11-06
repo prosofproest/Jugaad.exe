@@ -236,8 +236,10 @@ Key relationships:
 | Invariant | DB | Service | API | UI |
 |---|---|---|---|---|
 | Photo assessment ≠ forecast | separate tables | separate modules | separate resources | separate cards |
-| No assessment without quality pass | `image_predictions.status` check | inference gate | 200 with `abstained` state | explicit no-result card |
+| No assessment without quality pass | `observation.status` + quality-result FK | inference gate | 200 with `abstained` state | explicit no-result card |
 | Predictions append-only | no UPDATE grant / trigger | insert-only repo | no PATCH endpoint | history view |
+| Abstention reproducible | `decision_thresholds`, `ood_score`, `abstain_reason` checks | inference gate stores thresholds | no override endpoint | reason + no candidates |
+| Calibration lineage | `calibrated` requires `calibration_version` | calibration service | probability null unless approved | `not_calibrated` word |
 | Only reviewers verify | role FK + check | RBAC guard | 403 | hidden controls |
 | Unverified ≠ confirmed feature | Forecast labels filter on evidence tier (`confirmed`, `probable`) and `verified_at <= cutoff`; `unverified` and non-verified states excluded | forecast service | — | coverage note |
 | No chemical advisory | content schema + approval | advisory validator | — | — |

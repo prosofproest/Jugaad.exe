@@ -119,6 +119,12 @@ explicitly marked platform-specific.
 - Displays a word plus a short explanation on detail views.
 - `not_calibrated` renders "not yet calibrated" and must not be shown as a percentage.
 - No numeric percentage prop exists in v1.
+- Bands are derived from the D8 decision function on calibrated probabilities: the top
+  candidate must clear its class threshold `τ_c`, the top-1/top-2 margin and the entropy
+  limit, and the image must not breach the OOD score. A breach is an abstention, not a
+  low-confidence band.
+- If D8 calibration is not approved, only `not_calibrated` is shown and no band implies a
+  probability.
 
 ### 3.5 `CoverageIndicator`
 
@@ -166,13 +172,19 @@ explicitly marked platform-specific.
 | `candidates` | array of `{label, band}` (max 3) |
 | `quality` | `QualityFeedback` result |
 | `confidence` | `ConfidenceBand` |
+| `abstainReason` | enum, required when `state = abstained` |
 | `modelVersion` | string |
 | `generatedAt` | timestamp |
 | `onRetake`, `onEscalate` | actions |
 
 - Title is always "Photo assessment" (localised).
 - `abstained` has no candidate list and no risk colour.
+- `abstainReason` is a machine code rendered as plain-language copy: `below_class_threshold`,
+  `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`,
+  `quality_gate_failed`. Never a free-text guess.
 - Must include "not a diagnosis" in the body, not only in a tooltip.
+- No control on this card changes the model state. Retake creates a new assessment; escalate
+  opens manual review. Neither rewrites the abstained prediction (D8).
 
 ### 3.10 `OutlookCard`
 

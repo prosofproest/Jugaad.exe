@@ -113,8 +113,8 @@ previous image is retained; history is append-only from the user's perspective.
 | CHAT-03 | Must | Sending an image creates exactly one observation and one user message, linked by `client_message_id`; retries do not duplicate either. |
 | CHAT-04 | Must | While offline, the message is stored locally and shown as `queued`; it is sent on reconnect with the same idempotency key. |
 | CHAT-05 | Must | The assistant reply is rendered as an `AssessmentCard`, never as free-form prose containing a diagnosis. |
-| CHAT-06 | Must | The card shows top candidates, confidence band, `model_version`, `generated_at` and `calibrated`. |
-| CHAT-07 | Must | If the quality gate or domain check fails, the reply is `abstained` with a machine reason, plain-language explanation and a retake action. |
+| CHAT-06 | Must | The card shows top candidates, confidence band (or `not_calibrated`), `model_version`, `generated_at` and calibration status. |
+| CHAT-07 | Must | If the quality gate or domain check fails, the reply is `abstained` with a D8 machine reason (`below_class_threshold`, `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`, `quality_gate_failed` plus the quality flag), a plain-language explanation and a retake action. |
 | CHAT-08 | Must | If the crop is unsupported, the reply explains this, lists supported crops and offers escalation; no class is forced. |
 | CHAT-09 | Must | The user can request expert review from the reply; the request is created against the observation and is visible in the thread. |
 | CHAT-10 | Must | The reply must never contain a chemical name, dose, mixture, interval or legal-use instruction. A server-side validator blocks unsafe content. |
@@ -125,6 +125,7 @@ previous image is retained; history is append-only from the user's perspective.
 | CHAT-15 | Should | Conversation list shows crop/area context, last message preview and unread state. |
 | CHAT-16 | Should | The user can delete a conversation; the privacy deletion flow covers messages and attachments. |
 | CHAT-17 | Should | Cached conversations and replies render with a stale marker after their validity window. |
+| CHAT-18 | Must | No chat control changes a model output; an abstained reply stays abstained, retake creates a new assessment, and review is a separate audited request (D8). |
 | CHAT-18 | Should | The composer is usable with one hand on a low-end Android device and with a keyboard/screen reader on web. |
 | CHAT-19 | Later | An approved LLM may rephrase approved template content only; it must pass the same validator and never add facts. |
 
@@ -167,7 +168,8 @@ previous image is retained; history is append-only from the user's perspective.
   "role": "assistant",
   "kind": "abstained",
   "observation_id": "obs_demo_002",
-  "reason_code": "blur",
+  "reason_code": "quality_gate_failed",
+  "quality_flag": "blur",
   "reason_text": "The image is too blurry to assess.",
   "next_steps": ["retake"],
   "model_version": "image-quality-gate-demo-0.1",
@@ -299,7 +301,10 @@ the following are hard requirements:
 - [ ] A user can send an image from mobile and web and receives a structured reply card.
 - [ ] Retrying the same send produces one observation and one message.
 - [ ] Airplane-mode send is queued and delivered once after reconnect.
-- [ ] A blurry image yields `abstained` with a retake action; the image stays in history.
+- [ ] A blurry image yields `abstained` with `quality_gate_failed`, the `blur` flag and a
+      retake action; the image stays in history.
+- [ ] An abstention renders a machine reason code in plain language and no candidate list.
+- [ ] No chat control overrides a model output; retake and review do not rewrite the prediction.
 - [ ] An unsupported crop yields the supported list; no class is forced.
 - [ ] The reply shows model version, generation time and calibration status.
 - [ ] The reply never contains chemical advice; the validator test fails the build if it does.

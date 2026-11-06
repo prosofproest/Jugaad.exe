@@ -281,9 +281,13 @@ Applies to `ml/`, training notebooks that are promoted, and data pipelines.
 
 ### 11.3 Evaluation honesty
 
-- Report macro F1, per-class recall, calibration (ECE/reliability), abstention rate and
-  sample counts together.
+- Report macro F1, per-class recall, calibration (ECE/reliability, Brier), abstention rate,
+  OOD on held-out classes and sample counts together.
 - Evaluate at the shipped abstention threshold, not the best threshold.
+- Calibrate with temperature scaling on a dedicated split, separate from the model-selection
+  validation split; never fit calibration on the test set.
+- Pre-register the D8 floors before opening the frozen test set; a floor written after opening
+  is void.
 - Use grouped image splits and chronological/spatial forecast splits.
 - Freeze the test set before model selection; open it once.
 - Write "not measured" when a number cannot be computed. Never estimate a metric.
@@ -292,8 +296,11 @@ Applies to `ml/`, training notebooks that are promoted, and data pipelines.
 
 - Serving requires a registry status of `approved`; refuse unregistered/unapproved models.
 - Predictions are insert-only and carry `model_version`, `generated_at`, input snapshot
-  reference and calibration status.
+  reference, calibration status and the decision threshold set (`τ_c`, margin, entropy,
+  `ood_max`) plus OOD score, so abstention is reproducible.
 - A model never writes verification status.
+- No endpoint or UI control changes a model output; manual review is a separate audited
+  record.
 - Previous model versions are retained for rollback.
 
 ---

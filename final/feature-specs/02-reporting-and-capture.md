@@ -135,20 +135,22 @@ Rules:
 |---|---|---|
 | FR-02-23 | Render `AssessmentCard` and `OutlookCard` as separate components with distinct titles | MUST |
 | FR-02-24 | Assessment shows up to 3 candidates, qualitative confidence, quality flags, model version, generated time | MUST |
-| FR-02-25 | Abstention shows reason + retake + escalation; no candidate list | MUST |
+| FR-02-25 | Abstention shows a machine reason code rendered as plain language, plus retake and escalation; no candidate list and no risk colour | MUST |
 | FR-02-26 | Unsupported crop shows supported list + escalation; never a forced class | MUST |
 | FR-02-27 | Outlook shows band, horizon, drivers, coverage, issue/validity, model version, stale state | MUST |
 | FR-02-28 | Result includes "not a diagnosis" and "low risk ≠ disease-free" wording | MUST |
 | FR-02-29 | User can request expert review from the result | MUST |
+| FR-02-30 | No UI control changes a model output; an abstained prediction stays abstained, and a review decision never rewrites it (D8) | MUST |
+| FR-02-31 | An abstained result must not count as an assessed image in coverage or evaluation | MUST |
 
 ### History
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-02-30 | List cases with date, crop, sync state, verification state, thumbnail | MUST |
-| FR-02-31 | Case detail shows original image, assessment, outlook at time of report, review outcome | MUST |
-| FR-02-32 | Reviewer response and corrected label are visible in plain language | MUST |
-| FR-02-33 | Offline history reads from local cache; stale indicator where applicable | MUST |
+| FR-02-32 | List cases with date, crop, sync state, verification state, thumbnail | MUST |
+| FR-02-33 | Case detail shows original image, assessment, outlook at time of report, review outcome | MUST |
+| FR-02-34 | Reviewer response and corrected label are visible in plain language | MUST |
+| FR-02-35 | Offline history reads from local cache; stale indicator where applicable | MUST |
 
 ---
 
@@ -215,7 +217,9 @@ A repeated `Idempotency-Key` returns `200` with the existing record.
   compression config, source (camera/gallery), upload state.
 - `image_quality_results`: image_id, gate_version, result, flags, thresholds snapshot.
 - `image_predictions`: image_id, model_version, candidates JSON, confidence band,
-  calibration status, abstained flag, generated_at. Insert-only.
+  calibration status, calibrated probabilities, abstained flag, abstain reason,
+  decision thresholds (per-class `τ_c`, margin, entropy, OOD), OOD score, calibration
+  version, generated_at. Insert-only.
 - `review_requests`: observation_id, requested_by, reason, created_at.
 - `audit_events`: creation, upload complete, review request.
 
@@ -259,7 +263,12 @@ A repeated `Idempotency-Key` returns `200` with the existing record.
 ## 9. Acceptance criteria
 
 - [ ] A supported crop report can be created online and returns a case reference.
-- [ ] A blurry image returns `abstained` with `blurry` and a retake action; no candidates shown.
+- [ ] A blurry image returns `abstained` with `quality_gate_failed` and the `blurry` flag; a
+      retake action is offered and no candidates are shown.
+- [ ] An abstention renders a machine reason code as plain language and shows no candidate
+      list or risk colour (test each reason code).
+- [ ] Retake creates a new assessment row; it never mutates or deletes the abstained row.
+- [ ] No UI control overrides a model output; requesting review does not rewrite the prediction.
 - [ ] An unsupported crop never produces a class; supported list is shown.
 - [ ] Airplane mode: report saves, shows queued, syncs on reconnect.
 - [ ] Retrying a failed upload does not create a second observation.
