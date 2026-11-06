@@ -21,11 +21,16 @@ in under two minutes, and escalate the rest with full context preserved.
 
 ## 2. Roles in this feature
 
-| Role | Can do |
+| Role / permission | Can do |
 |---|---|
-| `extension_worker` | Work assigned area queue; set `probable`, `needs_visit`, `duplicate`, `unresolved`; request pathologist confirmation |
-| `pathologist` | All extension actions + `confirmed`, label correction, severity, lab evidence, taxonomy questions |
-| `admin` | Configure queue rules and SLA; reassign; **cannot** set verification status |
+| `extension_worker` | Work assigned area queue; set `probable`, `needs_visit`, `duplicate`, `rejected`, `unresolved`; request confirmation from a `can_confirm` holder |
+| `extension_worker` + `can_confirm` | All extension actions + `confirmed`, label correction, severity, lab evidence, taxonomy questions |
+| `extension_worker` + `can_approve_advisory` | Approve advisory content for the area (second approver for high-risk content) |
+| `admin` | Configure queue rules and SLA; reassign; grant `can_confirm` / `can_approve_advisory`; **cannot** set verification status |
+
+`can_confirm` and `can_approve_advisory` are scoped permissions, not roles (ADR-010). If
+no account in an area holds `can_confirm`, cases stop at `probable` and the queue shows a
+visible "no confirmer in area" warning.
 
 ---
 
@@ -41,7 +46,7 @@ Queue (triage)
        ├─ Field context: crop, stage, area (approximate), notes, prior cases
        ├─ Contact: request better image / request field details (logged)
        └─ Decision
-            ├─ confirmed        (pathologist only; evidence required)
+            ├─ confirmed        (`can_confirm` only; evidence required)
             ├─ probable         (evidence required)
             ├─ rejected         (evidence required; reason code)
             ├─ duplicate        (link to canonical case)
@@ -56,7 +61,7 @@ Queue (triage)
 ## 4. Verification state machine
 
 ```
-                 ┌────────────► confirmed ◄──── (pathologist only)
+                 ┌────────────► confirmed ◄──── (`can_confirm` only)
                  │                  │
 pending_review ──┼────────────► probable
                  │                  │
@@ -73,7 +78,7 @@ Rules:
 
 - `pending_review` is the default for every submitted report; model output never changes it.
 - Transitions are server-enforced; the client receives the allowed next states.
-- `confirmed` requires `pathologist` role **and** at least one evidence item.
+- `confirmed` requires the `can_confirm` permission **and** at least one evidence item.
 - `duplicate` requires a canonical observation reference.
 - Every transition appends to `review_events`; the current status is a projection.
 - Re-opening a decided case requires a reason and creates a new review event; history is
@@ -102,7 +107,7 @@ urgency = f(severity_hint, model_uncertainty, age, crop_value, area_risk, duplic
 Queue views:
 
 - **My area** (default for extension workers).
-- **Escalations** (pathologist).
+- **Escalations** (`can_confirm` holders and area leads).
 - **Overdue** (any role, read-only for non-owners).
 - **Unassigned** (admin/lead).
 
@@ -123,7 +128,7 @@ the next reviewer or stay unassigned. The cap exists to prevent silent backlog g
 | FR-04-06 | Reviewer can request a better image or more field detail; request is logged and visible to the farmer | MUST |
 | FR-04-07 | Reviewer records one decision from the server-provided state list | MUST |
 | FR-04-08 | Required evidence enforced per decision type | MUST |
-| FR-04-09 | Pathologist-only transitions enforced server-side | MUST |
+| FR-04-09 | `can_confirm`-gated transitions enforced server-side | MUST |
 | FR-04-10 | Label correction records previous label, new label, reviewer, reason | MUST |
 | FR-04-11 | Severity recorded using crop-specific criteria, not a generic scale | SHOULD |
 | FR-04-12 | Lab confirmation is a separate, optional evidence tier | SHOULD |
@@ -132,7 +137,7 @@ the next reviewer or stay unassigned. The cap exists to prevent silent backlog g
 | FR-04-15 | Queue shows backlog, median age and overdue count | MUST |
 | FR-04-16 | Re-opening a decided case requires a reason | MUST |
 | FR-04-17 | Case is locked while another reviewer is editing; lock expires | MUST |
-| FR-04-18 | Reviewer can escalate to pathologist with a note | MUST |
+| FR-04-18 | Reviewer can escalate to a `can_confirm` holder with a note | MUST |
 | FR-04-19 | Verified projection updates atomically with the decision | MUST |
 | FR-04-20 | Reviewer cannot see precise farm coordinates unless role permits | MUST |
 
@@ -142,7 +147,7 @@ the next reviewer or stay unassigned. The cap exists to prevent silent backlog g
 
 | Decision | Minimum evidence |
 |---|---|
-| `confirmed` | Pathologist role + image review note + (field observation or lab evidence) |
+| `confirmed` | `can_confirm` permission + image review note + (field observation or lab evidence) |
 | `probable` | Image review note + at least one supporting observation |
 | `rejected` | Reason code (`not_a_plant`, `healthy`, `abiotic`, `different_pest`, `poor_image`, `other`) + note |
 | `duplicate` | Canonical observation ID |
@@ -180,7 +185,7 @@ Do not hide model limitations behind a tooltip; they belong in the model block.
 | `POST` | `/v1/reviews/{observation_id}/claim` | Claim/unclaim |
 | `GET` | `/v1/reviews/{observation_id}` | Case detail + allowed transitions |
 | `POST` | `/v1/reviews/{observation_id}/decisions` | Record decision |
-| `POST` | `/v1/reviews/{observation_id}/escalate` | Escalate to pathologist |
+| `POST` | `/v1/reviews/{observation_id}/escalate` | Escalate to a `can_confirm` holder |
 | `POST` | `/v1/reviews/{observation_id}/request-info` | Ask farmer for retake/details |
 | `GET` | `/v1/reviews/{observation_id}/events` | Immutable history |
 
@@ -256,7 +261,8 @@ version.
 
 - [ ] Queue default sort is urgency → uncertainty → age, with a documented formula.
 - [ ] An extension worker sees only their assigned area.
-- [ ] An extension worker cannot submit `confirmed` (403) — tested.
+- [ ] An extension worker without `can_confirm` cannot submit `confirmed` (403) — tested.
+- [ ] An extension worker with `can_confirm` can submit `confirmed` — tested.
 - [ ] `confirmed` without evidence is rejected by the server — tested.
 - [ ] A decision writes exactly one review event and one audit event.
 - [ ] `duplicate` requires a valid canonical ID and updates aggregate counts.
@@ -292,11 +298,11 @@ escalation rate, duplicate rate, correction rate, backlog trend.
 
 ## 16. Open questions
 
-1. What is the daily review capacity per extension worker, and what SLA is realistic?
+1. What is the daily review capacity per extension worker, and what SLA is realistic? (D3b)
 2. Does `probable` count as verified for forecast features, or only `confirmed`?
-   (Recommendation: both, with an evidence tier; `unverified` never counts.)
-3. Should extension workers be able to set `confirmed` for a small, high-confidence target
-   list after training?
+   (Recommendation: both, with an evidence tier; `unverified` never counts.) (D7)
+3. Which `extension_worker` accounts should receive `can_confirm` in each pilot area, and
+   how is that permission revoked when someone leaves? (D3b)
 4. Is a lab-confirmation integration in scope, or only manual entry of a result?
 
 ---
@@ -313,5 +319,6 @@ escalation rate, duplicate rate, correction rate, backlog trend.
 | App. F — Example test cases | §13 acceptance criteria |
 
 The rule that a model output is never copied into a decision comes from
-`../docs-context/AGENTS.md` R4. The rule that `confirmed` needs a pathologist and structured
-evidence is enforced in the database and service layers (`05-data-layer.md` §5).
+`../docs-context/AGENTS.md` R4. The rule that `confirmed` needs the `can_confirm` permission
+and structured evidence is enforced in the database and service layers
+(`05-data-layer.md` §5, ADR-010).

@@ -84,7 +84,7 @@ this mean, how sure is it, and what do I do next?*
 
 **Area outlook:**
 > **Area outlook: moderate risk of late blight**
-> For potato in [block name], next 7 days. Issued 6 Nov, valid to 13 Nov.
+> For potato in [block name], based on the last 10 days. Issued 6 Nov, valid for 24 hours.
 > **Why:** recent rainfall and current crop stage match conditions associated with this
 > disease.
 > **Data coverage:** partial — 4 verified reports in this block in the last 14 days.
@@ -119,7 +119,7 @@ separate `OutlookCard`, opened from a link, with its own timestamp and coverage.
 ## 3. Tokens
 
 Single source of truth: `design/tokens.json` (created at scaffold), consumed by Tailwind
-(web) and `ThemeData` (Flutter). Do not hard-code values in components.
+(web) and the React Native theme provider. Do not hard-code values in components.
 
 ### Colour (semantic, not decorative)
 
@@ -175,8 +175,8 @@ Rules:
 
 ## 4. Component inventory
 
-Shared web components live in `/components`; Flutter equivalents in
-`mobile/lib/ui/components/`. Each component has states, not variants-by-boolean.
+Shared web components live in `/components`; React Native equivalents in
+`frontend/mobile/src/components/`. Each component has states, not variants-by-boolean.
 
 ### Core
 
@@ -223,7 +223,7 @@ Shared web components live in `/components`; Flutter equivalents in
 
 ## 5. Screen inventory
 
-### Mobile (Flutter)
+### Mobile (React Native)
 
 | Screen | Spec | Key states |
 |---|---|---|
@@ -290,7 +290,7 @@ Shared web components live in `/components`; Flutter equivalents in
 | Sync failed | `ErrorState` | "Could not send. We will retry." | Retry |
 | Abstained | Neutral card, no risk colour | "No assessment for this photo." | Retake / escalate |
 | Insufficient data | `risk.insufficient` | "Not enough data for this area." | Explain why |
-| Unsupported | Neutral card | "This crop is not supported yet." | Supported list |
+| Unsupported | Neutral card | "This crop is not in the assessed list yet. You can still send the report." | Catalogue / escalate |
 | Error | `ErrorState` | What happened + what to do | Retry / support |
 | Unauthorised | Blocked view | "You do not have access." | Back |
 
@@ -330,7 +330,8 @@ Stale, insufficient and abstained are **not** error states and must not use erro
 ## 9. Localisation
 
 - v1 ships **one** local language plus English for staff tooling.
-- All strings externalised (ARB for Flutter, message catalogs for web).
+- All strings externalised (i18n catalogues shared by web and React Native; English +
+  Kannada).
 - Agronomic terms reviewed by a local expert, not machine-translated.
 - Allow 40% text expansion; no fixed-width buttons with text.
 - Dates: local format in UI, ISO in API. Relative times ("2 hours ago") always paired
@@ -380,7 +381,7 @@ a field is unknown.
 |---|---|---|
 | Onboarding / consent | Plain-language purpose, retention, who sees data, one-time consent | Bundle optional research consent with core access |
 | Home | Registered crops, local outlook, report button, recent cases, alert preferences, queued count | Show a cached outlook without a freshness cue |
-| Crop & field context | Crop from supported list, approximate area, optional variety/stage/area/notes | Require precise coordinates or force a stage |
+| Crop & field context | Crop search over the open catalogue with assessment-availability status, approximate area, optional variety/stage/area/notes | Require precise coordinates or force a stage |
 | Capture | Framing and lighting guidance, focus, flash toggle, gallery import, retake | Take a photo without guidance |
 | Quality feedback | Plain reason and a concrete retake instruction | Blame the user or discard the report |
 | Submitting | Uploading / queued / retrying / failed, with a retry path | Turn a queued report into a "failed" error |

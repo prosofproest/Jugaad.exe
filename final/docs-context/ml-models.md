@@ -191,7 +191,7 @@ A forecast is only meaningful with a precise target.
 | Negative | Verified absence within adequate coverage; never "no report" |
 | Horizon | Aligned to decisions and input reliability (nowcast by default; 7-day outlook only when validated) |
 | Spatial unit | Smallest geography the inputs support without implying false precision |
-| Consumer | Extension worker and farmer SMS/WhatsApp outlook |
+| Consumer | Extension worker and farmer in-app/email (SMS optional) |
 
 Rules:
 

@@ -35,62 +35,83 @@ Do not re-litigate these; they are the starting point.
 - [x] OpenAPI paths -> only `/health`, `/v1/health`; `components: None`, `security: None`
 - [x] `/v1/admin/users`, `/v1/observations`, `/v1/forecasts`, `/v1/advisories`, `/v1/alerts/preferences` -> **404**
 - [x] `Firebase` / `Firestore` / `Cloudinary` / `Kannada` / Kannada Unicode -> **0 matches**
-- [x] No `web/`, `mobile/`, `ml/`, `database/`, `deploy/`, `Dockerfile`, CI workflow, or model artefact
+- [x] No application code in `frontend/`, `database/`, `ml/`, `chatbot/` (placeholders only); no `deploy/`, `Dockerfile`, CI workflow, or model artefact
 
 ---
 
 ## Gate 0 — Resolve the architecture conflict (BLOCKING)
 
-Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
+Nothing else may start until this gate is closed. The architecture conflict is now resolved;
+the remaining Phase 0 work is decisions and documentation debt.
 
 ### 0.1 Architecture Decision Record
 
-- [ ] Create `docs/adr/0001-target-architecture.md`
-  - **Done when:** it states the chosen database, storage, auth provider, frontend stack, role model, language list, model-output semantics, guidance policy, and forecast approach — with rejected alternatives and consequences.
-- [ ] Choose the database: **Firestore** (target) *or* **PostgreSQL + PostGIS** (documented) — record the decision
-- [ ] Choose image storage: **Cloudinary** (target) *or* **S3-compatible** (documented)
-- [ ] Choose the frontend: **single web app**, **web + mobile**, or **Flutter + Next.js**
-- [ ] Choose the auth mechanism: phone OTP / email+password / MFA scope
-- [ ] Confirm the role list: target (farmer, admin) vs documented (farmer, extension worker, pathologist, admin)
-- [ ] Confirm the language list: **English + Kannada**, or documented "one unnamed local language + English"
-- [ ] Define confidence semantics: validated numeric probability vs qualitative band + abstention
-- [ ] Define severity: model output vs expert-review field
-- [ ] Define guidance policy: curated approved content vs LLM-generated — if generated, define validator + approval + audit
-- [ ] Define outbreak approach: rules-based nowcast first vs ML model
-- [ ] Confirm notification channels: in-app + email + optional SMS, or documented SMS/WhatsApp/push
+- [x] Create ADRs at `final/docs-context/adr/`
+  - [x] `0009-data-platform.md` — PostgreSQL + PostGIS + Cloudinary
+  - [x] `0010-v1-roles.md` — farmer, extension_worker, admin
+  - [x] `0011-open-crop-catalogue.md` — open catalogue + validated allowlist
+  - [x] `README.md` — ADR index and rules
+- [x] Choose the database: **PostgreSQL 16 + PostGIS** (ADR-009)
+- [x] Choose image storage: **Cloudinary** (ADR-009)
+- [x] Choose the frontend: **Next.js web + React Native mobile** (ADR-010)
+- [x] Choose the auth mechanism: phone OTP for farmers; email + password + Argon2id for
+      staff; MFA for `admin` and `can_confirm` holders
+- [x] Confirm the role list: **farmer, extension_worker, admin** (ADR-010)
+- [x] Confirm the language list: **English + Kannada** (D13)
+- [x] Define confidence semantics: qualitative band + abstention (D14)
+- [x] Define severity: expert-review field, not a model claim (D14)
+- [x] Define guidance policy: curated, expert-approved, non-chemical (D6)
+- [x] Define outbreak approach: rules-based nowcast first (D2, ADR-004)
+- [ ] Confirm notification channels: in-app + email + optional SMS vs WhatsApp/push
+- [x] Record all decisions in `final/docs-context/phase-0-decisions.md`
 
-### 0.2 Resolve blocking product decisions D1–D6
+### 0.2 Resolve blocking product decisions
 
-- [ ] D1 — Target crop(s)
-- [ ] D2 — Forecast horizon
-- [ ] D3 — Who verifies reports
-- [ ] D4 — Data/account owner
+- [x] D1 — Crop/target policy: open catalogue + validated allowlist (ADR-011)
+- [ ] **D1a** — First validated crop/target allowlist (blocks Gate 3)
+- [x] D2 — Forecast horizon: nowcast (last 10 days)
+- [~] D3 — Verifier: extension-first + `can_confirm`; SLA/capacity still open
+- [ ] D4 — Owning/paying institution
 - [ ] D5 — Primary success metric
-- [ ] D6 — Advisory legality / chemical-advice position
-  - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4 with a date and owner.
+- [x] D6 — Advisory: non-chemical only
+- [x] D13 — Languages: English + Kannada
+- [x] D14 — Output semantics: confidence band + abstention; severity is expert-set
+- [ ] D7–D12 — Forecast event, abstention floors, coverage values, retention, on-behalf
+      identity, client pre-check
+  - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4
+    with a date and owner.
 
 ### 0.3 Reconcile documentation
 
-- [ ] Update `final/PRD.md` — remove false "initial scaffold exists" claim (line 6)
-- [ ] Update `final/TRD.md` — remove false "backend/web/mobile scaffold exists" claim (line 6)
-- [ ] Update `final/docs-context/architecture-context.md` — one stack only
-- [ ] Update `final/feature-specs/03-auth-and-roles.md` — roles, auth mechanism
-- [ ] Update `final/feature-specs/05-data-layer.md` — chosen database/storage
-- [ ] Update `final/feature-specs/06-forecast-and-risk-map.md` — chosen forecast approach
-- [ ] Update `final/feature-specs/07-advisory-and-alerts.md` — guidance policy + channels
-- [ ] Update `final/docs-context/progress-tracker.md` — reflect real state, not aspirational state
-- [ ] Remove or correct every reference to `final/backend` (actual path is `backend/`)
-- [ ] **Done when:** a full-text search finds no contradictory stack, role, or language claims.
+- [x] Update `final/PRD.md` — remove false scaffold claim; three roles; defended config
+- [x] Update `final/TRD.md` — remove false scaffold claim; stack, storage, roles, MFA
+- [x] Update `final/docs-context/architecture-context.md` — one stack only
+- [x] Update `final/feature-specs/03-auth-and-roles.md` — three roles + scoped permissions
+- [x] Update `final/feature-specs/05-data-layer.md` — roles, `can_confirm`, Cloudinary
+- [x] Update `final/docs-context/code-standards.md` — React Native/TypeScript, Cloudinary
+- [x] Update `final/docs-context/project-overview.md` — defended config, roles
+- [x] Update `final/docs-context/AGENTS.md` — repository layout and commands
+- [x] Update `final/docs-context/progress-tracker.md` — real state, ADR log, decisions
+- [x] Update `final/feature-specs/04-expert-review.md` — `pathologist` → `can_confirm`
+- [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — nowcast default
+- [x] Update `final/feature-specs/07-advisory-and-alerts.md` — channels
+- [x] Update `final/feature-specs/02-reporting-and-capture.md` and `08` — React Native
+- [x] Update `final/docs-context/ui-context.md` — React Native, i18n catalogues
+- [x] Update `final/docs-context/phase-plan.md` — Flutter, four roles, pathologist
+- [x] Update `final/docs-context/appendices.md` — `confirmed` check
+- [x] Remove or correct every reference to `final/backend` (actual path is `backend/`)
+- [x] **Done when:** a full-text search finds no contradictory stack, role, or language claims.
 
 ### 0.4 Repository hygiene
 
-- [ ] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `dist/`, `build/` to `.gitignore`
-- [ ] Delete or rebuild the broken `backend/.venv` (contains only pip; `pyvenv.cfg` points at `final\backend\.venv`)
-- [ ] Add a lockfile (`uv.lock`, `poetry.lock`, or `requirements.lock`)
-- [ ] Confirm the documented quickstart works from a clean clone on the supported Python version
+- [x] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` to `.gitignore`
+- [x] Delete or rebuild the broken `backend/.venv` (contains only pip; `pyvenv.cfg` points at `final\backend\.venv`)
+- [x] Add a lockfile (`requirements.lock` generated with `pip freeze`)
+- [x] Confirm the documented quickstart works from a clean clone on the supported Python version
   - **Done when:** `pip install -r requirements.txt && pytest` succeeds with zero manual steps.
 
-**Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
+**Gate 0 exit criteria:** one recorded architecture, all blocking decisions closed, docs
+consistent, clean clone installs and tests pass.
 
 ---
 

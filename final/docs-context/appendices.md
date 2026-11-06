@@ -167,13 +167,16 @@ These examples convert into formal test cases in a quality-management tool.
 
 **Functional**
 
-- Submit a supported crop image with a valid network.
+- Submit a crop from the open catalogue with a valid network; confirm the support status is
+  shown.
 - Submit a blurry image and confirm the app requests a retake; no candidates shown.
-- Submit an unsupported crop and confirm no unsupported assessment is forced.
+- Submit a crop outside the validated allowlist and confirm the response is an explicit
+  abstention (`unsupported_crop` / `unsupported_target`), not a forced class.
 - Save a report offline and synchronise after reconnecting.
 - Retry an upload and confirm no duplicate observation is created.
 - Confirm only authorised experts can change review status.
-- Confirm an extension worker cannot set `confirmed`; a pathologist can.
+- Confirm an extension worker without `can_confirm` cannot set `confirmed`; a holder of
+  `can_confirm` can.
 - Confirm the result screen renders two separate cards with distinct titles and timestamps.
 
 **Forecast**
@@ -223,8 +226,8 @@ These examples convert into formal test cases in a quality-management tool.
 | Coverage | Completeness, freshness and representativeness of inputs |
 | Model drift | Change in input patterns or performance over time |
 | Verification | Human decision on a report: confirmed, probable, rejected, duplicate, needs visit, unresolved |
-| Target | A supported pest/disease condition on the supported crop list |
-| Supported | Explicitly in the approved crop/target/geography list for the current release |
+| Target | A pest/disease condition in the open catalogue; only allowlisted targets are assessed |
+| Supported | Explicitly in the current release's validated crop × target allowlist (ADR-011) |
 | Stale | Past its validity window; must be visually distinct from fresh data |
 | Demo / synthetic | Illustrative data that must be labelled `is_demo` in data, API and UI |
 

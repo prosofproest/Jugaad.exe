@@ -27,26 +27,27 @@ invariants the implementation must enforce.
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Mobile | **Flutter** (Android-first) | Conversational capture + camera, local DB, background sync; single codebase |
+| Mobile | **React Native + TypeScript** (Android-first) | Conversational capture + camera, local DB, background sync; single codebase |
 | Web app | **Next.js + TypeScript** (App Router) | Conversational capture, expert portal, district dashboard and admin; API-only data access |
 | API | **Python 3.12 + FastAPI** | Pydantic v2, OpenAPI as the contract |
 | ORM / migrations | **SQLAlchemy 2.0 + Alembic** | Single migration owner; no second ORM |
 | Database | **PostgreSQL 16 + PostGIS** | Spatial only where queries need it |
-| Object storage | S3-compatible, private buckets | Presigned upload/download, short TTL |
+| Image storage | **Cloudinary** (private, signed delivery) | Short-lived signed uploads; transformations; no public URLs |
 | Image ML | **PyTorch** training → **ONNX Runtime** serving | CPU inference at pilot scale |
 | Forecast | Rules engine + scikit-learn / LightGBM later | Rules first, ML overlay after 2 seasons |
 | Maps | **MapLibre GL JS** + PostGIS `ST_AsMVT` | No custom GIS platform |
 | Jobs | APScheduler or Celery beat (choose at scaffold) | Weather ingest, forecast run, alert dispatch |
-| Notifications | Adapter interface: SMS / WhatsApp / push | Provider chosen per pilot partner |
-| Dev runtime | Docker Compose | API, DB, object storage, web |
+| Notifications | Adapter interface: in-app / email / SMS | WhatsApp and push deferred |
+| Languages | **English + Kannada** | Externalized strings; persisted choice |
+| Dev runtime | Docker Compose | API, DB, Cloudinary mock, web |
 | Observability | Structured JSON logs + Prometheus metrics | No PII in logs |
 
 **Explicitly rejected:** Prisma (Node-only; would create a second schema authority),
-microservices, Kafka, a separate feature store, on-device inference in v1, multi-tenant
-SaaS abstractions.
+Firestore, microservices, Kafka, a separate feature store, on-device inference in v1,
+multi-tenant SaaS abstractions.
 
 The web app and mobile app consume the FastAPI OpenAPI schema; they never read the database
-directly. Generated TypeScript/Dart types come from that schema. The chat surface on both
+directly. Generated TypeScript types come from that schema. The chat surface on both
 clients is a presentation layer over the `conversations` module, not a second backend.
 
 ---
@@ -55,7 +56,7 @@ clients is a presentation layer over the `conversations` module, not a second ba
 
 ```
 ┌──────────────────────┐   ┌──────────────────────────────┐
-│ Flutter app          │   │ Next.js web app               │
+│ React Native app     │   │ Next.js web app               │
 │ • chat + camera      │   │ • chat + image upload         │
 │ • crop context       │   │ • expert portal / cases       │
 │ • offline queue      │   │ • map layers / filters        │
@@ -76,9 +77,9 @@ clients is a presentation layer over the `conversations` module, not a second ba
         └───────┬───────────────┬──────────────┬───────┘
                 │               │              │
                 v               v              v
-        PostgreSQL+PostGIS   Object store   External providers
-        (records, audit,     (images,       (weather, boundaries,
-         snapshots, registry) artefacts)    SMS/WhatsApp, maps)
+        PostgreSQL+PostGIS   Cloudinary     External providers
+        (records, audit,     (private       (weather, boundaries,
+         snapshots, registry) images)        SMS/email, maps)
 ```
 
 Both clients use the same `/v1` API. The chat is a presentation layer over `observations`
@@ -100,7 +101,7 @@ through that interface, not through another module's tables.
 |---|---|---|
 | `identity` | users, roles, sessions, devices, consent | know about images or forecasts |
 | `observations` | observations, crop cycles, growing areas, image assets | compute predictions |
-| `media` | upload validation, storage keys, presigned URLs, derivatives | expose public buckets |
+| `media` | upload validation, storage keys, signed URLs, derivatives | expose public buckets |
 | `conversations` | chat threads, messages, attachments, reply templates, delivery state | compute predictions, write verification, return free-form advice |
 | `inference` | quality gate, photo assessment, model registry reads | write verification status |
 | `forecasts` | forecast runs, feature snapshots, coverage, risk bands | read unverified reports as confirmed |
@@ -122,7 +123,7 @@ through the `observations` interface only.
 
 ```
 client → POST /v1/observations (client_report_id, crop, area, context)
-       → presigned image upload
+       → signed image upload
        → POST /v1/observations/{id}/images/complete
        → quality gate (sync or queued)
        → photo assessment (if quality passes)
@@ -186,7 +187,7 @@ eligible forecast → dedupe key (area,target,band,window) → cooldown check
 ```
 client (web or mobile) → POST /v1/conversations/{id}/messages
   → create observation if needed (idempotent; client_message_id)
-  → presigned image upload → quality gate → inference
+  → signed image upload → quality gate → inference
   → compose reply from versioned template + structured assessment
   → chemical-content validator (reject → failed message, never partial)
   → persist assistant message (assessment_id, model_version, template_version)
@@ -262,9 +263,9 @@ feature spec.
 | Weather (NASA POWER / ERA5-Land) | Daily/hourly variables per grid point, with source timestamp | Mark snapshot incomplete; forecast returns `insufficient_data`; never impute silently |
 | Admin boundaries | Versioned GeoJSON/PostGIS, stable codes | Block forecast issue for unmatched areas; surface error |
 | Map tiles | MapLibre style + vector tiles from own API | Cached last tiles; show "map data unavailable" |
-| SMS/WhatsApp gateway | Adapter with send + receipt callback | Retry with backoff; record failed delivery; no duplicate sends |
-| Object storage | S3 API, presigned URLs | Upload retry; expired URL re-issued |
-| Model artefacts | Registry row + object key + checksum | Refuse to serve unregistered/unapproved model |
+| SMS gateway (optional) | Adapter with send + receipt callback | Retry with backoff; record failed delivery; no duplicate sends |
+| Cloudinary | Signed uploads, authenticated delivery | Upload retry; expired URL re-issued |
+| Model artefacts | Registry row + private object key + checksum | Refuse to serve unregistered/unapproved model |
 
 Every external feature row stores `source_timestamp` and `fetched_at`. No provider secret
 ever ships in a client build.
@@ -278,7 +279,8 @@ ever ships in a client build.
 - Errors use a single envelope (see `code-standards.md` §6).
 - Cursor pagination for queues and histories.
 - `Idempotency-Key` required on observation creation, upload completion and chat messages.
-- Presigned URLs for binary transfer; no multipart through the API process at pilot scale.
+- Signed Cloudinary uploads for binary transfer; no multipart through the API process at
+  pilot scale.
 - Role checks are dependencies, not controller `if` statements.
 - No endpoint exposes raw model scores, feature vectors or storage keys to farmer clients.
 - Chat replies are structured message kinds, not free-form text; the server alone writes
@@ -367,7 +369,7 @@ Do not pre-build any of this.
 | ADR-003 | Web portals are API-only clients | One contract, no DB coupling, role enforcement server-side | Accepted |
 | ADR-004 | Rules-based forecast before ML | No historical data in year one; defensible baseline | Accepted |
 | ADR-005 | ONNX Runtime on CPU for pilot inference | Cost; latency sufficient for MobileNet-class models | Proposed |
-| ADR-006 | Flutter for capture, SMS/WhatsApp for delivery | Camera + offline needs an app; reach needs messaging | Proposed |
+| ADR-006 | Flutter for capture, SMS/WhatsApp for delivery | Camera + offline needs an app; reach needs messaging | Superseded by ADR-009/010 |
 
 New ADRs are appended in `progress-tracker.md` and referenced here.
 
@@ -395,7 +397,7 @@ integrity. The normative rules are in `code-standards.md` §7 and
 |---|---|
 | Identity and sessions | `identity` module; short-lived access token + rotating refresh family; MFA for staff roles |
 | Authorisation | Route dependencies + object-level checks; area scoping joined in the query, never filtered after fetch |
-| Data protection | TLS in transit; encrypted volumes at rest; private object storage with ≤10 min presigned URLs |
+| Data protection | TLS in transit; encrypted volumes at rest; private Cloudinary delivery with ≤10 min signed URLs |
 | Upload safety | Magic-byte validation, size/dimension limits, EXIF GPS stripping unless consented |
 | Secrets | Environment/secret manager only; never in mobile builds, fixtures or logs |
 | Audit | Append-only `audit_events`; reviews, role changes, exports, admin record views and config changes |
@@ -444,7 +446,7 @@ The baseline stack in §2 is chosen against these criteria, not by fashion:
 
 Practical guidance from the blueprint:
 
-- Flutter or React Native for Android-first mobile; test native camera and local storage.
+- React Native for Android-first mobile; test native camera and local storage.
 - FastAPI or Django REST for the backend; pick one and standardise validation.
 - PyTorch or TensorFlow for training; ONNX Runtime or TFLite for deployment.
 - PostgreSQL + PostGIS for structured and spatial data; MapLibre or Leaflet for maps.

@@ -29,7 +29,7 @@ Run from `backend/`:
 | Task | Command |
 |---|---|
 | Create venv | `python -m venv .venv` |
-| Install | `.venv\Scripts\python -m pip install -r requirements.txt` |
+| Install | `.venv\Scripts\python -m pip install -r requirements.txt` (pinned: `requirements.lock`) |
 | Tests | `.venv\Scripts\python -m pytest` |
 | Dev server | `.venv\Scripts\python -m uvicorn app.main:app --reload --port 8000` |
 

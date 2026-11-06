@@ -43,7 +43,7 @@ Home
      ├─ 1. Crop & context   (crop*, variety?, stage?, area*, notes?)
      ├─ 2. Capture          (camera | gallery, guidance, retake)
      ├─ 3. Local quality    (on-device pre-check: blur/exposure/resolution/plant)
-     ├─ 4. Submit           (create observation → presigned upload → complete)
+     ├─ 4. Submit           (create observation → signed upload → complete)
      ├─ 5. Assessment       (server quality gate → classifier | abstain)
      └─ 6. Result           (AssessmentCard + OutlookCard, separate)
 ```
@@ -57,7 +57,7 @@ Home
  └─ 4. Save locally (status=queued, client_report_id generated)
      └─ Sync worker (connectivity regained)
          ├─ POST /observations (Idempotency-Key=client_report_id)
-         ├─ presigned upload → PUT → complete
+         ├─ signed upload → PUT → complete
          ├─ poll/fetch assessment
          └─ reconcile local row (server status wins; local history retained)
 ```
@@ -91,7 +91,7 @@ Rules:
 
 | ID | Requirement | Priority |
 |---|---|---|
-| FR-02-01 | Select crop from the server-provided supported list; unsupported crops are not selectable but are discoverable with an explanation | MUST |
+| FR-02-01 | Select or search any crop from the open catalogue; the UI shows whether a photo assessment is available for it, and a crop without a validated target is still submittable but returns an explicit abstention | MUST |
 | FR-02-02 | Select an approximate growing area from saved areas or admin units; no free-text precise coordinates required | MUST |
 | FR-02-03 | Variety, growth stage and notes are optional; "unknown" is a first-class choice | MUST |
 | FR-02-04 | Remember the last-used crop/area per device, but require confirmation before submit | SHOULD |
@@ -156,10 +156,10 @@ Rules:
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/v1/config/crops` | Supported crops + target lists (cacheable) |
+| `GET` | `/v1/config/crops` | Open crop catalogue + per-crop support status and target lists (cacheable) |
 | `GET` | `/v1/areas` | Saved/available approximate areas |
 | `POST` | `/v1/observations` | Create case (idempotent) |
-| `POST` | `/v1/observations/{id}/images/upload-url` | Presigned upload |
+| `POST` | `/v1/observations/{id}/images/upload-url` | Signed upload descriptor |
 | `POST` | `/v1/observations/{id}/images/{image_id}/complete` | Finalise upload, trigger gate |
 | `GET` | `/v1/observations/{id}` | Case + current states |
 | `GET` | `/v1/observations/{id}/assessment` | Photo assessment result |
@@ -171,7 +171,7 @@ Rules:
 ```json
 {
   "client_report_id": "0f0c2f8e-6a0f-4b1e-9d7a-3c9f0d2a1b44",
-  "crop_code": "potato",
+  "crop_code": "DEMO_CROP_01",
   "area_code": "DEMO_BLOCK_01",
   "variety": null,
   "growth_stage": "vegetative",
@@ -204,6 +204,25 @@ A repeated `Idempotency-Key` returns `200` with the existing record.
 ```
 
 `is_demo` is mandatory for seeded/demo records and must render a visible demo badge.
+
+### Abstention response (illustrative)
+
+```json
+{
+  "observation_id": "obs_demo_002",
+  "state": "abstained",
+  "abstention_reason": "unsupported_target",
+  "quality": {"result": "pass", "flags": []},
+  "candidates": [],
+  "model_version": "photo-demo-0.3.1",
+  "generated_at": "2026-11-06T09:14:00Z",
+  "is_demo": true
+}
+```
+
+The abstention vocabulary is fixed by ADR-011: `unsupported_crop`, `unsupported_target`,
+`insufficient_quality`. An abstention is never rendered as a negative result, a healthy
+plant or "no disease".
 
 ---
 
@@ -250,8 +269,8 @@ A repeated `Idempotency-Key` returns `200` with the existing record.
 | Storage | Queue capped by config; warn at 80%; never silent eviction |
 | Battery | No background GPS; sync batched; no wake-lock during idle |
 | Accessibility | All states reachable by screen reader; 48 dp targets; font scaling to 200% |
-| Localisation | All strings externalised; one local language + English |
-| Security | Images stored privately; presigned URLs short-lived; no EXIF location leak without consent |
+| Localisation | All strings externalised in i18n catalogues; English + Kannada |
+| Security | Images stored privately in Cloudinary; signed URLs short-lived; no EXIF location leak without consent |
 | Privacy | Approximate area only; no precise coordinates required to submit |
 
 ---
@@ -260,7 +279,8 @@ A repeated `Idempotency-Key` returns `200` with the existing record.
 
 - [ ] A supported crop report can be created online and returns a case reference.
 - [ ] A blurry image returns `abstained` with `blurry` and a retake action; no candidates shown.
-- [ ] An unsupported crop never produces a class; supported list is shown.
+- [ ] An unsupported crop never produces a class; it returns `unsupported_crop` and the
+      catalogue shows the support status.
 - [ ] Airplane mode: report saves, shows queued, syncs on reconnect.
 - [ ] Retrying a failed upload does not create a second observation.
 - [ ] Killing the app mid-upload does not lose the report.
@@ -269,8 +289,8 @@ A repeated `Idempotency-Key` returns `200` with the existing record.
 - [ ] Expired cached outlook is marked stale, including while offline.
 - [ ] History shows sync and verification states, and the reviewer response.
 - [ ] Queue size warning appears at the configured threshold.
-- [ ] Every new string is in the ARB files; no hard-coded copy.
-- [ ] Golden tests cover: result, abstained, unsupported, stale, queued, failed.
+- [ ] Every new string is in the i18n catalogues; no hard-coded copy.
+- [ ] Component and E2E tests cover: result, abstained, unsupported, stale, queued, failed.
 
 ---
 
@@ -301,9 +321,9 @@ Never log image bytes, notes, phone numbers or coordinates. Include `request_id`
 ## 12. Open questions
 
 1. Does the pilot partner require reports to be created on behalf of a farmer (worker
-   identity vs farmer identity)? Affects `user_id` semantics.
+   identity vs farmer identity)? Affects `user_id` semantics. (D11)
 2. What is the maximum acceptable image size on the partner's data plan?
-3. Is SMS the only delivery channel for the outlook, or WhatsApp too?
+3. Is an SMS gateway available for outlook alerts, or is in-app the only v1 channel? (D15)
 4. Should a report allow a symptom questionnaire (leaf position, spread pattern) in v1?
    It improves triage but adds friction.
 

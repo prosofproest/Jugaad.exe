@@ -4,8 +4,8 @@
 Update this file in the same change as any scope, schema, API or decision change.
 
 **Last updated:** 2026-11-06
-**Current phase:** Phase 0 — Discovery (documentation complete, decisions open; initial
-full-stack scaffold present but not feature work)
+**Current phase:** Phase 0 — Discovery (architecture decided in ADR-009/010/011; 5 of 12
+blocking decisions answered; documentation reconciliation in progress; no feature code)
 
 ---
 
@@ -34,18 +34,29 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [x] Full 55-chapter blueprint and Appendices A–H mapped to repository files (`../README.md`).
 - [x] Realism audit applied; v1 scope narrowed.
 - [x] Architecture baseline and feature specs drafted.
-- [ ] **D1** Crop + 3–5 targets + agro-climatic zone selected with local experts.
-- [ ] **D2** Nowcast vs 7-day outlook decided.
-- [ ] **D3** Verifier role, capacity and SLA agreed with partner.
+- [x] **Architecture** reconciled to PostgreSQL/PostGIS + Cloudinary + Next.js/React Native
+      (`adr/0009-data-platform.md`, `adr/0010-v1-roles.md`, `adr/0011-open-crop-catalogue.md`).
+- [x] **D1** Crop + targets policy decided: open catalogue + validated-target allowlist
+      (ADR-011). The first concrete allowlist is split out as **D1a** (open).
+- [x] **D2** Nowcast (last 10 days) decided; 7-day outlook deferred.
+- [~] **D3** Verifier role decided (extension-first, `can_confirm` permission); capacity
+      and SLA still open.
 - [ ] **D4** Owning/paying institution identified.
 - [ ] **D5** Primary outcome metric pre-registered.
-- [ ] **D6** Legal position on advisory content confirmed.
+- [x] **D6** Advisory policy decided: non-chemical only (R5 unchanged).
 - [ ] **D7–D12** Scientific-integrity decisions recorded (see §4).
+- [x] **D13** v1 languages decided: English + Kannada.
+- [x] **D14** Output semantics decided: confidence band + abstention; severity is an
+      expert-review field.
+- [x] **D15** Notification channels decided: in-app mandatory; email for staff; SMS optional;
+      WhatsApp/push/IVR deferred.
 - [ ] Crop calendar and epidemic window documented for the pilot area.
 
 **Gate 0:** D1–D12 answered and recorded in §4, each with a recorded date and one named
 accountable owner. Gate 0 carries a calendar target (proposed: **2026-11-20**, confirmed at
 the decision workshop) so that it cannot close by definition. No code that depends on them.
+Working record: `phase-0-decisions.md`. **Gate 0 is currently OPEN** — D1a, D3b, D4 and
+D5, D7–D12 remain.
 
 ### Phase 1 — Data foundation `[ ]`
 
@@ -59,13 +70,13 @@ the decision workshop) so that it cannot close by definition. No code that depen
 - [ ] Quarantine path for suspicious records.
 
 **Gate 1:** documented permissions for every dataset; reproducible ingestion; label
-handbook approved by a pathologist.
+handbook approved by a `can_confirm` holder and an agronomist.
 
 ### Phase 2 — Platform MVP `[ ]`
 
 - [ ] Auth, roles, consent (`03-auth-and-roles.md`).
 - [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
-- [ ] Observation API with idempotency and presigned uploads.
+- [ ] Observation API with idempotency and signed Cloudinary uploads.
 - [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
 - [ ] Conversational capture: `conversations` module + chat on web and mobile
       (`08-conversational-capture.md`).
@@ -145,17 +156,18 @@ epidemic season.
 
 | Workstream | Status | Next action |
 |---|---|---|
-| Documentation | `[x]` | Keep in sync with decisions |
+| Documentation | `[~]` | Reconcile remaining specs to ADR-009/010/011 |
 | Blueprint coverage | `[x]` | Chapter map maintained in `../README.md` |
-| Decisions | `[?]` | Resolve D1–D6 with local experts |
+| Architecture | `[x]` | ADR-009/010/011 accepted; propagate to specs |
+| Decisions | `[~]` | Close D1a, D3b, D4, D5, D7–D12 |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
-| Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[~]` | FastAPI health-scaffold exists; identity + observations next |
-| Mobile | `[~]` | Flutter chat/capture scaffold committed; unverified (Flutter not installed here) |
-| Web | `[~]` | Next.js chat/app shell scaffold committed; build/typecheck recorded |
-| Chat | `[~]` | Spec 08 + client/API scaffolds; real assessment waits on Phase 3 |
+| Labelling | `[ ]` | Draft handbook after D1a |
+| Backend | `[~]` | FastAPI health-scaffold only; identity + observations next |
+| Mobile | `[ ]` | React Native app not started (no code; `frontend/` is a placeholder) |
+| Web | `[ ]` | Next.js app not started (no code; `frontend/` is a placeholder) |
+| Chat | `[ ]` | Spec 08 exists; no implementation |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
-| Forecast | `[ ]` | Implement rules baseline after D1/D2 |
+| Forecast | `[ ]` | Implement rules baseline after D1a/D2 |
 | MLOps | `[ ]` | Registry table design in data layer |
 | Security/privacy | `[ ]` | Threat model before Phase 2 exit |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
@@ -172,37 +184,44 @@ close while any remain open. Where a decision needs a number that the repository
 entitled to invent (R6), the decision must still define *who sets the number, from what
 measurement, before which gate* — the rule for setting the value is itself the decision.
 
-### D1 — Crop + targets + zone `[?]`
+### D1 — Crop + targets + zone `[x]`
+
+**Decision (2026-11-06):** Open, crop-agnostic catalogue with a **validated-target
+allowlist** (ADR-011). Any crop may be submitted; an assessment is returned only for a
+`crop × target` pair on the release allowlist; everything else returns an explicit
+abstention (`unsupported_crop`, `unsupported_target`, `insufficient_quality`). The first
+concrete allowlist is tracked as **D1a** and must be fixed before Gate 3.
+**Owner:** Project owner + agronomist. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
 
 | Option | Consequence |
 |---|---|
 | Potato late blight | Validated weather model exists (BLITECAST/SimCast); forecast credible on day one; narrow advisory |
 | Tomato late blight / early blight / leaf curl | More targets, more public data, weaker forecast baseline for non-blight targets |
 | Rice blast / BLB / brown spot | Large farmer base, harder image data, blast weather models exist |
+| Open catalogue + allowlist (chosen) | Crop-agnostic schema; claims limited to validated entries; abstains elsewhere |
 
-Recommended default: **potato late blight**, one zone, plus healthy + abiotic look-alike +
-unknown. Final choice requires local economic and partner input.
-**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (target 2026-11-20).
+### D2 — Nowcast or 7-day outlook `[x]`
 
-### D2 — Nowcast or 7-day outlook `[?]`
+**Decision (2026-11-06):** **Nowcast over the last 10 days** for v1. A 7-day outlook is
+deferred until at least one season of verified outcomes exists.
+**Owner:** Agronomist + ML lead. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
 
 | Option | Consequence |
 |---|---|
-| Nowcast (last 10 days) | No historical outcome data needed; more accurate; still actionable |
+| Nowcast (last 10 days) (chosen) | No historical outcome data needed; more accurate; still actionable |
 | 7-day outlook | Needs validation against outcomes; risk of overclaiming in year one |
 
-Recommended default: **nowcast for v1**, add outlook when a season of verified outcomes
-exists. **Owner:** Agronomist + ML lead. **Needs by:** Gate 0.
+### D3 — Verifier, capacity, SLA `[~]`
 
-### D3 — Verifier, capacity, SLA `[?]`
+**Decision (2026-11-06):** Extension-first verification, with `confirmed` requiring the
+scoped `can_confirm` permission; `admin` does not verify (ADR-010). **Still open:** review
+SLA, capacity per area, escalation path and the minimum number of `can_confirm` holders.
+**Owner:** Programme lead + partner. **Needs by:** Gate 0 for SLA/capacity.
 
 | Option | Consequence |
 |---|---|
-| Extension-worker-first | Scales; needs training and triage rules; pathologist for escalation |
+| Extension-worker-first (chosen) | Scales; needs training and triage rules; senior reviewer confirms |
 | Pathologist-first | Higher label quality; immediate backlog; not viable at volume |
-
-Recommended default: **extension-first**, pathologist escalation, published SLA and
-workload cap. **Owner:** Programme lead + partner. **Needs by:** Gate 0.
 
 ### D4 — Owning/paying institution `[?]`
 
@@ -218,12 +237,19 @@ confirmation**, versus the existing advisory baseline, pre-registered. Secondary
 prioritisation accuracy, false-alert burden.
 **Owner:** Product lead + evaluator. **Needs by:** Gate 0.
 
-### D6 — Legal position on advisory content `[?]`
+### D6 — Legal position on advisory content `[x]`
 
-Options: non-chemical only (recommended), approved chemical content with legal sign-off
-(not recommended for v1), no advisory in v1 (weakens product).
-Recommended default: **non-chemical + escalation**, legal review before pilot.
-**Owner:** Programme lead + legal. **Needs by:** Gate 0 (legal sign-off before Gate 5).
+**Decision (2026-11-06):** **Non-chemical only.** Advisory content is expert-approved,
+versioned and limited to scouting, monitoring, sanitation, crop management and escalation.
+No pesticide, herbicide, fungicide, dosage, mixture or pre-harvest-interval content. R5 is
+unchanged. Legal review is still required before Gate 5.
+**Owner:** Programme lead + legal. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
+
+| Option | Consequence |
+|---|---|
+| Non-chemical only (chosen) | Lowest liability; matches R5; no chemical content |
+| Approved chemical content with legal sign-off | Would require weakening R5 and a formal liability review |
+| No advisory in v1 | Weakens the product; alerts only |
 
 ### D7 — Forecast event, negative class and label eligibility `[?]`
 
@@ -297,6 +323,34 @@ offline user sees between capture and sync.
 saving or submitting a report (R8), and the server quality gate remains authoritative for
 assessment (FR-02-12).
 
+### D13 — v1 languages `[x]`
+
+**Decision (2026-11-06):** **English + Kannada** in v1, with a language switcher and
+persisted choice. All user-facing strings are externalized, including backend-generated
+error and alert text.
+**Owner:** Product lead. **Decided:** 2026-11-06. **Needs by:** Gate 2.
+
+### D14 — Confidence and severity semantics `[x]`
+
+**Decision (2026-11-06):** Display a **qualitative confidence band plus abstention** by
+default. A numeric probability is shown only when calibration has been measured and passed
+for that allowlist entry. **Severity is an expert-review field**, not a model claim. Photo
+assessment and area outlook remain separate (R1).
+**Owner:** ML lead + product lead. **Decided:** 2026-11-06. **Needs by:** Gate 3.
+
+### D15 — Notification channels `[x]`
+
+**Decision (2026-11-06):** **In-app is mandatory** on web and mobile. **Email** is used for
+staff and institutional recipients. **SMS is optional** per pilot partner and sits behind
+an adapter interface. **WhatsApp, push and IVR are deferred** beyond v1.
+**Owner:** Product lead + programme lead. **Decided:** 2026-11-06. **Needs by:** Gate 5.
+
+| Option | Consequence |
+|---|---|
+| In-app mandatory; email staff; SMS optional (chosen) | No dependency on a messaging provider to launch; adapter keeps SMS switchable |
+| SMS/WhatsApp primary | Requires a Business API contract and template approval before launch |
+| In-app only | Simplest, but excludes feature-phone farmers |
+
 ---
 
 ## 5. ADR log
@@ -308,9 +362,12 @@ assessment (FR-02-12).
 | ADR-003 | Web portals are API-only clients | Accepted | 2026-11-06 |
 | ADR-004 | Rules-based forecast before ML | Accepted | 2026-11-06 |
 | ADR-005 | ONNX Runtime CPU inference for pilot | Proposed | 2026-11-06 |
-| ADR-006 | Flutter capture + SMS/WhatsApp delivery | Proposed | 2026-11-06 |
+| ADR-006 | Flutter capture + SMS/WhatsApp delivery | Superseded by ADR-009/010 | 2026-11-06 |
 | ADR-007 | Full-stack delivery: one API, web app and mobile app are all in scope | Accepted | 2026-11-06 |
 | ADR-008 | Chat is a `conversations` wrapper over photo assessment, not a new model or generative diagnosis | Accepted | 2026-11-06 |
+| ADR-009 | PostgreSQL/PostGIS + Cloudinary as the v1 data platform | Accepted | 2026-11-06 |
+| ADR-010 | v1 roles: farmer, extension_worker, admin; `can_confirm` for confirmation | Accepted | 2026-11-06 |
+| ADR-011 | Open crop catalogue with a validated-target allowlist | Accepted | 2026-11-06 |
 
 ---
 
@@ -352,17 +409,18 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added `final/PRD.md` and `final/TRD.md`: consolidated product and technical requirements distilled from the operating docs, feature specs and phase plan. No gate, scope or decision changed. |
 | 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
 | 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
+| 2026-11-06 | **Phase 0 architecture reconciliation.** Accepted ADR-009 (PostgreSQL/PostGIS + Cloudinary), ADR-010 (three roles: farmer, extension_worker, admin; `can_confirm` permission), ADR-011 (open crop catalogue + validated-target allowlist). Answered D1, D2, D6, D13 (English + Kannada) and D14 (confidence band + abstention; severity is an expert field). Added D15 (in-app/email/SMS channels). Added `phase-0-decisions.md`. Corrected false scaffold claims in this tracker. Gate 0 remains open on D1a, D3b, D4, D5 and D7–D12. |
 
 ---
 
 ## 8. Next five actions
 
-1. Run a decision workshop for D1–D6; record outcomes in §4.
-2. Draft the data acquisition plan (partner MoUs, archive access, collection targets).
-3. Draft the labelling handbook for the chosen crop and target list.
-4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Verify the committed backend/web/mobile scaffolds and keep them minimal; expand only
-   after Gate 0, starting with identity + observations + audit + `conversations`.
+1. Fix **D1a** (first validated crop/target allowlist) and **D3b** (verifier capacity + SLA).
+2. Record **D4** (owning institution) and **D5** (primary metric) with named owners.
+3. Propagate ADR-009/010/011 into `architecture-context.md`, `feature-specs/03`,
+   `feature-specs/05`, `PRD.md` and `TRD.md`.
+4. Close D7–D12 or record explicit interim rules with owners and dates.
+5. Do not start Phase 1 data work or Phase 2 code until Gate 0 closes.
 
 ---
 

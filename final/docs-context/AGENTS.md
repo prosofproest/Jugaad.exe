@@ -20,11 +20,12 @@ An explainable, offline-tolerant decision-support platform with two separate out
 | **Area outlook** | How likely is *this threat* in *this area* over *this window*? | Crop × target × geography × horizon |
 
 Neither output is a laboratory confirmation and neither is a confirmed outbreak.
-The platform is deliberately narrow in v1: one crop, one agro-climatic zone, a small
-target list, a rules-based weather risk model, assistive image triage, extension-worker
-verification, and SMS/WhatsApp delivery. These are the intended shape, not settled scope —
-crop, targets, zone, horizon and channel are fixed by decisions D1, D2 and D4 in
-`progress-tracker.md` §4. See `project-overview.md`.
+The platform is deliberately narrow in v1: an open crop catalogue with a small validated
+target allowlist, one agro-climatic zone, a rules-based weather nowcast over the last 10
+days, assistive image triage with abstention, extension-worker verification, English +
+Kannada, and in-app/email alerts with optional SMS. These are the settled shape; the first
+concrete allowlist (D1a), the pilot zone/institution (D4) and the verifier SLA (D3b) are
+recorded in `progress-tracker.md` §4 and `phase-0-decisions.md`. See `project-overview.md`.
 
 ---
 
@@ -125,25 +126,31 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 
 ---
 
-## 4. Target repository layout
+## 4. Repository layout
+
+Documentation lives under `final/`; application code lives at the repository root.
 
 ```
 /
-├── AGENTS.md                     # pointer to docs-context/AGENTS.md
-├── components/                   # shared web UI components (Next.js portals)
-├── docs-context/                 # this folder: operating context for agents
-├── feature-specs/                # feature-level specifications
-├── backend/                      # FastAPI modular monolith (planned)
-├── mobile/                       # Flutter capture app (planned)
-├── web/                          # Next.js expert portal + district dashboard (planned)
-├── ml/                           # training, evaluation, export to ONNX (planned)
-├── database/                     # migrations, seeds, ERD notes (planned)
-└── deploy/                       # compose, IaC, runbooks (planned)
+├── final/                        # documentation bundle
+│   ├── AGENTS.md                 # pointer to docs-context/AGENTS.md
+│   ├── docs-context/             # operating context (this folder)
+│   ├── feature-specs/            # feature specifications
+│   └── components/               # shared web UI component specs
+├── backend/                      # FastAPI modular monolith
+├── frontend/                     # Next.js web + React Native mobile
+│   ├── web/
+│   └── mobile/
+├── database/                     # migrations, seeds, ERD notes
+├── ml/                           # training, evaluation, export to ONNX
+├── chatbot/                      # conversational capture service
+└── deploy/                       # compose, IaC, runbooks
 ```
 
-Nothing under `backend/`, `mobile/`, `web/`, `ml/`, `database/` or `deploy/` exists yet.
-Do not create scaffolding that implies a decision has been made unless the decision is
-recorded in `progress-tracker.md`.
+`frontend/`, `database/`, `ml/` and `chatbot/` currently contain only `.gitkeep`
+placeholders. `backend/` contains a health-check scaffold only. Do not create scaffolding
+that implies a decision has been made unless the decision is recorded in
+`progress-tracker.md`.
 
 ---
 
@@ -157,9 +164,9 @@ verified commands. Planned shape (do not treat as working):
 | Backend dev | `make api-dev` (uvicorn, reload) |
 | Backend tests | `make api-test` (pytest) |
 | Migrations | `make db-migrate` (alembic upgrade head) |
-| Web dev | `make web-dev` (next dev) |
-| Web tests | `make web-test` (vitest + playwright) |
-| Mobile tests | `make mobile-test` (flutter test) |
+| Web dev | `pnpm --filter web dev` (next dev) |
+| Web tests | `pnpm --filter web test` (vitest + playwright) |
+| Mobile tests | `pnpm --filter mobile test` (jest + detox) |
 | Lint all | `make lint` |
 
 Never document a command you have not run in this repository.
@@ -256,8 +263,8 @@ Refuse and escalate (do not implement) if asked to:
 | **Abstention / no assessment** | Model declined to answer because evidence is insufficient. |
 | **Coverage** | Completeness, freshness and representativeness of inputs for an area. |
 | **Verification** | Human decision on a report: confirmed, probable, rejected, duplicate, needs visit, unresolved. |
-| **Target** | A supported pest/disease condition on the supported crop list. |
-| **Supported** | Explicitly in the approved crop/target/geography list for the current release. |
+| **Target** | A pest/disease condition in the open catalogue; only allowlisted targets are assessed. |
+| **Supported** | Explicitly in the current release's validated crop × target allowlist (ADR-011). |
 | **Stale** | Past its validity window; must be visually distinct from fresh data. |
 
 ---

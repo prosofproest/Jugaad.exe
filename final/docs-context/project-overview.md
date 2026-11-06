@@ -72,15 +72,16 @@ quality checks and human verification.
 
 | Persona | Core need | Primary surface |
 |---|---|---|
-| Smallholder farmer | Short, local-language, low-data flow with one clear next action; no probability jargon | Mobile capture + SMS/WhatsApp outlook |
+| Smallholder farmer | Short, local-language, low-data flow with one clear next action; no probability jargon | Mobile capture + in-app/email outlook (SMS optional) |
 | Progressive farmer / farm manager | Crop-cycle history, multiple fields, trends, exportable records | Mobile |
 | Extension worker | Fast case review, location + crop context, verification recording, approved advice | Expert portal (web) |
 | Plant pathologist | Original image quality, metadata, alternatives, provenance, label correction | Expert portal (web) |
 | District administrator | Aggregated map, time filters, coverage, verified trends, alert audit | District dashboard (web) |
 
 v1 optimises for the **extension worker** as the verification bottleneck owner and the
-**smallholder farmer** as the primary field user. The pathologist is an escalation role,
-not the default reviewer.
+**smallholder farmer** as the primary field user. The pathologist/agronomist is an external
+escalation and advisory approver, reached through a `can_confirm` /
+`can_approve_advisory` permission rather than a fourth app role.
 
 ### 5.1 Stakeholder map
 
@@ -105,16 +106,18 @@ not the default reviewer.
 ## 6. v1 configuration (the defended scope)
 
 ```
-Crop:         1 crop (candidate: potato or tomato — decision pending)
+Crop:         open catalogue; assessment only for the validated allowlist (D1a)
 Zone:         1 agro-climatic zone / district cluster
-Targets:      3–5 conditions + healthy + abiotic look-alike + unknown
+Targets:      validated allowlist + healthy + abiotic look-alike + unknown
 Image AI:     lightweight CNN fine-tuned on field data, quality gate,
               abstention, top-3 candidates
-Forecast:     validated agronomic weather-risk model (rules first),
+Forecast:     nowcast (last 10 days); rules first,
               ML overlay only when data supports it
-Product:      Flutter capture app for field staff + farmer-facing SMS/WhatsApp outlook
-Verification: extension-worker-first; pathologist for escalations only
+Product:      React Native mobile capture app + Next.js web app; in-app + email +
+              optional SMS outlook
+Verification: extension-worker-first; `can_confirm` permission for confirmed cases
 Geography:    block/mandal level, never farm level
+Languages:    English + Kannada
 Timeline:     18 months to limited operational alerts
 Team:         7–9 people
 ```
@@ -136,7 +139,7 @@ produces something useful in month 6 rather than month 18.
 - Expert review queue with triage, verification states, evidence notes, audit trail.
 - Separate map layers: verified reports, unverified reports, modelled risk, coverage.
 - Approved non-chemical advisory retrieval with version and expiry.
-- Alerts over SMS/WhatsApp with deduplication, cooldown and feedback.
+- Alerts over in-app/email/SMS with deduplication, cooldown and feedback.
 - Admin configuration of crops, targets, geographies, thresholds and alert policy.
 - Audit, basic monitoring, model registry, export controls.
 
@@ -255,17 +258,14 @@ Full register with owners: `progress-tracker.md`.
 
 ---
 
-## 14. Open decisions
+## 14. Decisions
 
-Six decisions gate the architecture. They are tracked with options and consequences in
-`progress-tracker.md` §4:
-
-1. Crop + 3–5 targets + agro-climatic zone.
-2. Nowcast or 7-day outlook in v1.
-3. Who verifies, daily capacity, and SLA.
-4. Paying/owning institution after the pilot.
-5. Single primary outcome metric (pre-registered).
-6. Legal position on advisory content.
+The live register is `progress-tracker.md` §4; the Phase 0 working record is
+`phase-0-decisions.md`. Decided: D1 (open catalogue + allowlist, ADR-011), D2 (nowcast),
+D3 role (extension-first, `can_confirm`; ADR-010), D6 (non-chemical only), D13 (English +
+Kannada), D14 (confidence band + abstention; severity is expert-set), D15 (in-app/email/
+optional SMS). Still open and blocking Gate 0: D1a (first allowlist), D3b (capacity + SLA),
+D4 (owning institution), D5 (primary metric) and D7–D12.
 
 No implementation choice may pre-empt these silently.
 

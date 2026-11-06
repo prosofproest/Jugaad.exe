@@ -29,13 +29,13 @@ liability surface or alert fatigue.
 | `crop_code` | yes | Supported crop only |
 | `target_code` | yes | Supported target |
 | `geo_scope` | yes | Area codes or "all supported areas" |
-| `language` | yes | One local language + English |
+| `language` | yes | English or Kannada; both required before public launch |
 | `season` / `valid_from` / `valid_to` | yes | Expiry is mandatory |
 | `title` | yes | Plain language, no alarmism |
 | `body` | yes | Structured sections, see below |
 | `action_types` | yes | From the allowed list |
 | `author_id` | yes | Named agronomist |
-| `approver_id` | yes | Second qualified person |
+| `approver_id` | yes | Second qualified holder of `can_approve_advisory` |
 | `source` | yes | Institutional source / reference |
 | `version` | yes | Immutable version per edit |
 | `content_hash` | yes | Detects unauthorised edits |
@@ -83,8 +83,8 @@ blocker until reworded.
 
 ```
 draft (author)
-  → agronomic review (pathologist/agronomist)
-  → approval (second qualified approver)
+  → agronomic review (agronomist or senior extension worker)
+  → approval by a second holder of `can_approve_advisory`
   → published (served, versioned, expiry set)
   → expired (no longer served; retained for audit)
 ```
@@ -92,6 +92,8 @@ draft (author)
 Rules:
 
 - Author cannot be the sole approver.
+- Approval requires the `can_approve_advisory` permission (ADR-010); the role alone is not
+  sufficient.
 - Every edit creates a new version; published versions are immutable.
 - Changing content requires re-approval and a new version.
 - Expiry is mandatory; the API never serves expired content.
@@ -152,20 +154,28 @@ Alerts are generated from forecasts, not from raw reports. Trigger requires **al
 
 | Channel | Use | Notes |
 |---|---|---|
-| SMS | Primary farmer reach, low-smartphone areas | Short template; no links required |
-| WhatsApp | Where smartphone penetration allows | Template message; opt-in |
-| Push | Staff mobile app | Secondary |
-| IVR | Optional, low-literacy users | Deferred unless partner requires |
-| Web/portal | Staff | Always available |
+| In-app | Primary channel for signed-in web and mobile users | Always available; full advisory detail |
+| SMS | Optional farmer reach where a gateway is available | Short template; no links required |
+| Email | Staff and institutional recipients | Full advisory; opt-in |
+| WhatsApp | Deferred post-v1 | Not built in v1 |
+| Push | Deferred post-v1 | Not built in v1 |
+| IVR | Deferred unless the partner mandates it | Out of v1 |
+
+**Channel decision (D15, 2026-11-06):** in-app is mandatory; email is for staff; SMS is
+optional per pilot partner; WhatsApp, push and IVR are deferred. The adapter interface is
+built in v1 so SMS can be switched on without a schema change.
 
 Rules:
 
 - One message = one crop, one target, one area, one window.
 - Character limits respected per channel; the full advisory is not sent by SMS.
+- Push delivery is out of v1; the mobile app shows in-app alerts on next open and relies on
+  foreground/background refresh, not silent push.
 - Every message includes: area, crop, target, valid period, reason, next action, coverage,
   issue time, and "this is an early warning, not confirmation".
 - No attachments, no image links, no product recommendations.
-- Language matches the user's preference; fall back to the single approved language.
+- Language matches the user's preference (English or Kannada); fall back to English when a
+  translation is missing, and never machine-translate advisory content.
 
 ### Template (SMS, illustrative)
 
@@ -288,10 +298,11 @@ never free text from a model.
 
 ## 14. Open questions
 
-1. Which channel does the partner actually operate (SMS gateway, WhatsApp Business API)?
-2. Who are the two approvers, and are they available within the pilot's turnaround time?
+1. Which SMS gateway (if any) does the partner operate? WhatsApp is out of v1 (D15).
+2. Which named people hold `can_approve_advisory`, and are two of them available within the
+   pilot's turnaround time?
 3. What are the legal review requirements and turnaround for advisory content?
-4. Is IVR required for low-literacy users in the pilot area?
+4. Is IVR required for low-literacy users in the pilot area? (Deferred unless mandated.)
 5. What cooldown values are operationally acceptable without hiding a genuine escalation?
 
 ---

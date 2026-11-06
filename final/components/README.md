@@ -17,4 +17,5 @@ Surface detail for these components is in `../docs-context/ui-context.md` §12 (
 expert portal, district dashboard). Approved output wording is in
 `../docs-context/appendices.md` (Appendices A and B).
 
-The Flutter equivalents live in `../mobile/lib/ui/components/` once that project exists.
+The React Native equivalents live in `frontend/mobile/src/components/` once that project
+exists.

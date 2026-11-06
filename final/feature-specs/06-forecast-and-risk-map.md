@@ -13,9 +13,10 @@ coverage display.
 Produce a defensible, reproducible area-level outlook from weather and crop context, with
 honest coverage and freshness, and present it separately from observed reports.
 
-**v1 stance:** a **nowcast** (risk given the last 10 days) is preferred over a 7-day
-outlook unless D2 is resolved otherwise. A validated rules model is the baseline; ML is an
-overlay only after at least two seasons of verified outcomes.
+**v1 stance (D2 decided, 2026-11-06):** v1 ships a **nowcast** over the last 10 days. A
+7-day outlook is deferred until at least one season of verified outcomes exists. A validated
+rules model is the baseline; ML is an overlay only after at least two seasons of verified
+outcomes.
 
 ---
 
@@ -23,15 +24,15 @@ overlay only after at least two seasons of verified outcomes.
 
 | Field | Value | Status |
 |---|---|---|
-| Crop | 1 supported crop | Blocked on D1 |
-| Target | 3–5 supported conditions | Blocked on D1 |
-| Geography | block/mandal level | Blocked on D1 |
-| Horizon | nowcast (default) or 7 days | Blocked on D2 |
+| Crop | Open catalogue; scored only for the validated allowlist | Policy decided (ADR-011); first allowlist = D1a |
+| Target | Validated allowlist entries for the supported crop | D1a (before Gate 3) |
+| Geography | block/mandal level | Policy decided; pilot zone = D4 |
+| Horizon | **nowcast, last 10 days** | Decided (D2) |
 | Issue cadence | daily (proposed) | Proposed |
-| Event definition | first verified case / incidence threshold / escalation | **Blocked on D1/D5** |
+| Event definition | first verified case / incidence threshold / escalation | **Blocked on D7** |
 | Negative definition | verified absence within coverage, not "no report" | Required |
-| Spatial unit | smallest unit inputs support | Blocked on D1 |
-| Primary consumer | extension worker + farmer SMS | Proposed |
+| Spatial unit | smallest unit inputs support | Decided: block/mandal, never farm |
+| Primary consumer | extension worker + farmer (channel per config) | Proposed |
 
 **Event definition rule:** write it before feature engineering. Keep different event types
 as separate tasks. "No report" is never a negative label.
@@ -268,13 +269,14 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 
 ## 14. Open questions
 
-1. D1/D2 outcomes (crop, targets, horizon) — everything above depends on them.
-2. Which validated rules model applies to the chosen crop? (e.g. BLITECAST/SimCast for
+1. **D1a** — the first validated crop/target allowlist — must be fixed before Gate 3.
+2. **D7** — the exact event definition and negative class — must be frozen before Gate 4.
+3. Which validated rules model applies to each allowlist entry? (e.g. BLITECAST/SimCast for
    potato late blight; Mills table is apple-specific and not transferable.)
-3. Is daily issue cadence supportable by the weather provider's update frequency?
-4. What is the minimum coverage threshold that still permits a scored outlook?
-5. Does the partner need a 7-day outlook for operational planning even if only a nowcast is
-   defensible? If so, label it as experimental.
+4. Is daily issue cadence supportable by the weather provider's update frequency?
+5. What is the minimum coverage threshold that still permits a scored outlook? (D9)
+6. Does the partner need a 7-day outlook for operational planning even if only a nowcast is
+   defensible? If so, label it as experimental and out of v1.
 
 ---
 

@@ -29,7 +29,7 @@ This spec defines **contracts**, not final pixel values. Values live in
 | Target | Consumer | Generated artefact |
 |---|---|---|
 | Web | Tailwind config + CSS variables | `web/styles/tokens.css` |
-| Mobile | Flutter `ThemeData` | `mobile/lib/ui/theme/tokens.dart` |
+| Mobile | React Native theme provider | `frontend/mobile/src/theme/tokens.ts` |
 | Docs | This spec / storybook | table export |
 
 Token groups and naming:
@@ -265,7 +265,7 @@ explicitly marked platform-specific.
 | Charts | Recharts or visx | fl_chart |
 | Maps | MapLibre GL JS | Static map image / deep link in v1 (no map editing) |
 | Motion | CSS transitions ≤ 200 ms | implicit animations ≤ 200 ms |
-| Storybook | Storybook per component + state | Widgetbook or golden gallery |
+| Storybook | Storybook per component + state | Storybook for React Native |
 
 A component is not "done" until every state in its contract has a story/golden.
 
@@ -295,7 +295,7 @@ A component is not "done" until every state in its contract has a story/golden.
 - [ ] No component accepts a raw hex value or magic spacing number.
 - [ ] All copy is externalised; no hard-coded strings in component code.
 - [ ] Touch targets ≥ 48 dp on mobile; focus states visible on web.
-- [ ] Storybook/Widgetbook builds in CI and is reviewed by design before feature work.
+- [ ] Storybook builds in CI and is reviewed by design before feature work.
 
 ---
 
@@ -311,8 +311,9 @@ A component is not "done" until every state in its contract has a story/golden.
 
 ## 10. Open questions
 
-1. Which icon set is available in both Flutter and React without licensing friction?
-2. Is a shared Storybook/Widgetbook pipeline worth the setup cost for a 7-person team?
+1. Which icon set is available in both React Native and React (web) without licensing
+   friction?
+2. Is a shared Storybook pipeline worth the setup cost for a 7-person team?
 3. Does the local language require a different font for legibility at small sizes?
 4. Should the district dashboard support print/PDF export layouts in v1?
 
