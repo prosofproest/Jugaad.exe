@@ -64,6 +64,7 @@ def downgrade() -> None:
         "forecasts",
         "feature_snapshots",
         "weather_snapshots",
+        "historical_occurrences",
         "sentinel_visits",
         "sentinel_sites",
         "review_assignments",

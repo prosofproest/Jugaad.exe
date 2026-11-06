@@ -3,7 +3,7 @@
 **Product:** PS-03 — AI-Based Early Pest and Disease Outbreak Prediction Network
 **Document type:** Technical Requirements Document
 **Version:** 1.1
-**Status:** Draft for review — architecture baseline; Phase 2 §5.1 scaffold exists (web verified, mobile unverified)
+**Status:** Draft for review — architecture baseline; Phase 2 §5.1 scaffold exists (web verified; mobile analyze/test verified, no device build)
 **Owner:** Engineering lead
 **Last updated:** 2026-11-06
 
@@ -35,15 +35,13 @@ ADR in `docs-context/progress-tracker.md` §5.
 
 - A modular-monolith API for identity, observations, media, inference, forecasts, reviews,
   advisories, alerts, admin and audit.
-- A React Native (TypeScript) Android-first capture app with offline queue and sync, plus
-  conversational capture.
+- A Flutter Android capture app with offline queue and sync, plus conversational capture.
 - A Next.js web frontend: conversational capture, expert portal, district dashboard and
   admin, API-only.
 - A conversation service ("chat") shared by web and mobile that wraps the photo-assessment
   pipeline: image message in, structured assessment reply out.
 - A PostgreSQL 16 + PostGIS schema with migrations.
-- Private Cloudinary image storage with signed upload/delivery, plus a private
-  model-artefact store.
+- Private S3-compatible object storage for images and model artefacts.
 - A PyTorch training workflow exporting ONNX; CPU inference at pilot scale.
 - A rules-based forecast engine with immutable feature snapshots.
 - Scheduled jobs for weather ingest, forecast generation and alert dispatch.
@@ -60,7 +58,7 @@ ADR in `docs-context/progress-tracker.md` §5.
 | TRD-O-04 | Make every prediction and forecast reproducible from stored inputs and versions. |
 | TRD-O-05 | Enforce human verification and append-only audit at the lowest practical layer. |
 | TRD-O-06 | Keep precise farm location out of unauthorised responses and public map layers. |
-| TRD-O-07 | Operate on low-cost infrastructure: one VM, managed Postgres, Cloudinary, CPU inference. |
+| TRD-O-07 | Operate on low-cost infrastructure: one VM, managed Postgres, object storage, CPU inference. |
 | TRD-O-08 | Support testability, rollback and recovery before the pilot. |
 | TRD-O-09 | Serve a chat surface on web and mobile whose replies are structured, traceable, validator-checked and never a free-form diagnosis. |
 
@@ -95,7 +93,7 @@ ADR in `docs-context/progress-tracker.md` §5.
 
 ```
 ┌──────────────────────┐   ┌──────────────────────────────┐
-│ React Native app     │   │ Next.js web app               │
+│ Flutter app          │   │ Next.js web app               │
 │ • chat + camera      │   │ • chat + image upload         │
 │ • crop context       │   │ • expert portal / cases       │
 │ • offline queue      │   │ • map layers / filters        │
@@ -118,7 +116,7 @@ ADR in `docs-context/progress-tracker.md` §5.
                 v               v              v
         PostgreSQL+PostGIS   Object store   External providers
         (records, audit,     (images,       (weather, boundaries,
-         snapshots, registry) artefacts)    SMS (optional), maps)
+         snapshots, registry) artefacts)    SMS/WhatsApp, maps)
 ```
 
 Both clients use the same `/v1` API. The chat is a presentation layer over `observations`
@@ -148,23 +146,22 @@ The stack is fixed for v1. A change requires an ADR.
 
 | Layer | Choice | Notes |
 |---|---|---|
-| Mobile | **React Native + TypeScript** (Android-first) | Camera, local DB, background sync, single codebase |
+| Mobile | **Flutter** (Android-first) | Camera, local DB, background sync, single codebase |
 | Web | **Next.js + TypeScript** (App Router) | Expert portal and district dashboard; API-only |
 | API | **Python 3.12 + FastAPI** | Pydantic v2; OpenAPI as the contract |
 | ORM / migrations | **SQLAlchemy 2.0 + Alembic** | Single schema authority; no second ORM |
 | Database | **PostgreSQL 16 + PostGIS 3.x** | Spatial only where queries need it |
-| Image storage | **Cloudinary** (private, signed delivery) | Short-lived signed uploads; no public URLs |
+| Object storage | **S3-compatible private buckets** | Presigned upload/download, short TTL |
 | Image ML | **PyTorch** training → **ONNX Runtime** serving | CPU inference at pilot scale |
 | Forecast | Rules engine; scikit-learn / LightGBM later | Rules first; ML overlay after 2 seasons |
 | Maps | **MapLibre GL JS** + PostGIS `ST_AsMVT` | No custom GIS platform |
 | Jobs | **Celery beat** or **APScheduler** (choose at scaffold) | Weather ingest, forecast, alerts |
-| Notifications | Adapter interface: in-app / email / SMS | WhatsApp and push deferred |
-| Languages | **English + Kannada** | Externalized strings; persisted choice |
-| Dev runtime | **Docker Compose** | API, DB, Cloudinary fake, web |
+| Notifications | Adapter interface: SMS / WhatsApp / push | Provider chosen per pilot partner |
+| Dev runtime | **Docker Compose** | API, DB, object storage, web |
 | Observability | Structured JSON logs + Prometheus metrics | No PII in logs |
 
-**Explicitly rejected:** Prisma or any second schema authority; Firestore; microservices;
-Kafka; a separate feature store; on-device classification in v1; multi-tenant abstractions.
+**Explicitly rejected:** Prisma or any second schema authority; microservices; Kafka; a
+separate feature store; on-device classification in v1; multi-tenant abstractions.
 
 **Version policy:** pin runtime and library versions in lockfiles; record the training
 environment with every model artefact; patch security-critical dependencies on a defined
@@ -181,7 +178,7 @@ through that interface, never through another module's tables.
 |---|---|---|
 | `identity` | users, roles, sessions, devices, consent | know about images or forecasts |
 | `observations` | observations, crop cycles, growing areas, image assets | compute predictions |
-| `media` | upload validation, storage keys, signed URLs, derivatives | expose public buckets |
+| `media` | upload validation, storage keys, presigned URLs, derivatives | expose public buckets |
 | `conversations` | chat threads, messages, attachments, reply templates, delivery state | compute predictions, write verification, generate free-form advice |
 | `inference` | quality gate, photo assessment, model registry reads | write verification status |
 | `forecasts` | forecast runs, feature snapshots, coverage, risk bands | read unverified reports as confirmed |
@@ -323,7 +320,7 @@ export_jobs
 | Observations / media | `observations`, `image_assets`, `image_quality_results`, `image_predictions`, `review_requests` |
 | Conversations | `conversations`, `messages`, `message_attachments`, `message_events` |
 | Review | `reviews`, `review_evidence`, `review_events`, `observation_verification`, `review_assignments` |
-| Forecast / weather | `weather_snapshots`, `feature_snapshots`, `forecasts`, `forecast_runs` |
+| Forecast / weather | `weather_snapshots`, `feature_snapshots`, `forecasts`, `forecast_runs`, `sentinel_sites`, `sentinel_visits` |
 | Advisory / alerts | `advisories`, `advisory_versions`, `advisory_approvals`, `alert_policies`, `alerts`, `alert_deliveries`, `alert_feedback` |
 | Registry / audit | `model_registry`, `audit_events`, `export_jobs` |
 
@@ -332,10 +329,11 @@ export_jobs
 | Field | Allowed values |
 |---|---|
 | `observation.status` | `draft`, `pending_upload`, `uploaded`, `assessing`, `assessed`, `abstained`, `failed`, `pending_review`, `reviewed` |
-| `image_predictions.abstain_reason` | `blur`, `exposure`, `resolution`, `no_plant`, `unsupported_crop`, `out_of_domain`, `gate_version_missing` |
+| `image_predictions.abstain_reason` | `below_class_threshold`, `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`, `quality_gate_failed`; the specific quality flag is read from `image_quality_results.flags` |
 | `messages.role` | `user`, `assistant` |
 | `messages.kind` | `image`, `text`, `assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`, `review_requested` |
 | Verification `evidence_tier` | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` |
+| `sentinel_visits.observed` | `present`, `absent`, `indeterminate` |
 | `risk_band` | `low`, `moderate`, `high`, `urgent`, `insufficient_data` |
 | `coverage` | `good`, `partial`, `low`, `unknown` |
 | `model_registry.status` | `draft`, `validated`, `approved`, `retired` |
@@ -347,10 +345,12 @@ export_jobs
 |---|---|
 | Photo assessment ≠ forecast | Separate tables, modules, endpoints and UI components |
 | No assessment without quality pass | Service gate + status check on `image_predictions` |
+| Abstention reproducible | `decision_thresholds` (`τ_c`, margin, entropy, `ood_max`) and `ood_score` stored per prediction; abstained requires a reason code (D8) |
+| Calibration lineage | `calibrated = true` requires a `calibration_version`; probabilities null when calibration is not approved |
 | Predictions append-only | Insert-only repository + DB trigger/permissions |
 | Reviews append-only | Insert-only `reviews` and `review_events` |
-| Only reviewers verify | Role dependency + FK/check; `confirmed` requires `can_confirm` permission |
-| Unverified ≠ confirmed feature | Forecast query filters `verified_at IS NOT NULL` |
+| Only reviewers verify | Role dependency + FK/check; `confirmed` requires pathologist |
+| Unverified ≠ confirmed feature | Forecast labels filter on evidence tier (`confirmed`, `probable`) and `verified_at <= cutoff`; `unverified` and non-verified states excluded |
 | Forecast lineage | `feature_snapshot_id` and `model_version` NOT NULL |
 | No probability without calibration | `probability` null unless calibration approved |
 | No chemical advisory | Content validator + approval required before serving |
@@ -398,7 +398,7 @@ ALTER TABLE messages
 
 - A forecast with `coverage = 'low'` must be `insufficient_data`, never a scored band.
 - `confirmed` requires a review with a `lab_result` or `field_observation` evidence row and
-  an actor holding the `can_confirm` permission.
+  a `pathologist` actor.
 - Advisory serving requires at least one approval row and `valid_to` in the future.
 - A model cannot be served unless its registry status is `approved`.
 - An assistant message is stored only after the chemical-content validator passes; a
@@ -420,27 +420,25 @@ ALTER TABLE messages
 | Conversation list by owner | `(owner_id, last_message_at desc)` |
 | Messages by conversation | `(conversation_id, created_at)` |
 
-### 6.7 Image storage layout (Cloudinary)
+### 6.7 Object storage layout
 
 ```
-crop-sentinel/
-  observations/<yyyy>/<mm>/<observation_id>/<image_id>/original
-  observations/<yyyy>/<mm>/<observation_id>/<image_id>/preview
+s3://<private-bucket>/
+  observations/<yyyy>/<mm>/<observation_id>/<image_id>/original.<ext>
+  observations/<yyyy>/<mm>/<observation_id>/<image_id>/preview.jpg
   advisories/<advisory_id>/<version>/<file>
+  models/<kind>/<version>/<artefact>
   exports/<export_job_id>/<file>
 ```
 
 **Rules**
 
-- Private delivery; access only via short-lived signed URLs (≤ 10 minutes).
-- Store `public_id` + `version`; never treat a permanent delivery URL as the source of truth.
+- Private bucket; access only via short-lived presigned URLs (≤ 10 minutes).
 - Store a content checksum; detect duplicates by hash.
-- Keep originals; derivatives are generated by transformation, not stored as truth.
+- Keep originals; derivatives are separate and regenerable.
 - Strip EXIF GPS unless explicitly consented and needed.
-- Deletion removes the asset and all derivatives.
-- No unsigned upload presets; no client-side listing; no public IDs enumerable from another
-  user's records.
-- Model artefacts live in a private model-artefact store, not in Cloudinary.
+- Deletion propagates to derivatives and previews.
+- No public read ACLs, no directory listing.
 
 ### 6.8 Migrations
 
@@ -471,8 +469,7 @@ crop-sentinel/
 - ISO-8601 UTC timestamps with `Z`; snake_case fields.
 - Cursor pagination: `?cursor=&limit=` → `{items, next_cursor}`.
 - `Idempotency-Key` required on observation creation and upload completion.
-- Signed Cloudinary uploads for binary transfer; no multipart through the API process at
-  pilot scale.
+- Presigned URLs for binary transfer; no multipart through the API process at pilot scale.
 - Role checks are dependencies, not controller `if` statements.
 - Filters are explicit and whitelisted; no arbitrary query passthrough.
 - No endpoint exposes raw model scores, feature vectors or storage keys to farmer clients.
@@ -635,7 +632,7 @@ Layers: `verified_reports`, `unverified_reports`, `modelled_risk`, `coverage`,
 - Admin access to an individual record requires a reason and writes an audit event before
   returning data.
 - Exports require role check, purpose, row limit and audit; no PII columns.
-- `confirmed` verification requires the `can_confirm` permission.
+- `confirmed` verification is pathologist-only.
 - A conversation is readable and writable only by its owner; staff access requires a role,
   area scope and reason, and writes an audit event before returning content.
 - An assistant message cannot be created by a client; only the server writes `role =
@@ -649,7 +646,7 @@ Layers: `verified_reports`, `unverified_reports`, `modelled_risk`, `coverage`,
 
 ```
 client → POST /v1/observations (client_report_id, crop, area, context)
-       → signed image upload
+       → presigned image upload
        → POST /v1/observations/{id}/images/complete
        → quality gate (sync or queued)
        → photo assessment (only if quality passes)
@@ -718,7 +715,7 @@ eligible forecast → dedupe key (area, target, band, window) → cooldown check
 ```
 client (web or mobile) → POST /v1/conversations/{id}/messages (client_message_id, image ref)
   → create observation if needed (idempotent)
-  → attach image via signed upload; validate + quality gate
+  → attach image via presigned upload; validate + quality gate
   → inference (only if quality passes)
   → compose reply from a versioned template + structured assessment fields
   → chemical-content validator (reject → failed message, never partial)
@@ -736,23 +733,21 @@ The reply never merges area outlook: an outlook is a separate card fetched from
 
 ## 9. Client requirements
 
-### 9.1 React Native mobile app
+### 9.1 Flutter mobile app
 
 **Technical contract**
 
-- TypeScript strict mode; no `any` in domain models.
-- Generated OpenAPI types plus a runtime validator (Zod) for responses; discriminated
-  unions for loading/loaded/stale/offline/error.
-- SQLite (Expo SQLite or WatermelonDB) with versioned migrations; never drop unsent
-  observations on upgrade.
-- Expo Router or React Navigation; Zustand or Redux Toolkit for state.
-- Repository layer abstracts API + local DB; components never call HTTP directly.
-- All user-facing strings in i18n catalogues (English + Kannada); no hard-coded copy.
+- Null safety; no `dynamic` in domain models.
+- `freezed` + `json_serializable` for immutable models and unions
+  (loading/loaded/stale/offline/error).
+- `drift` local DB with versioned migrations; never drop unsent observations on upgrade.
+- `go_router` navigation; `riverpod` state.
+- Repository layer abstracts API + local DB; widgets never call HTTP directly.
+- All user-facing strings in ARB files; no hard-coded copy.
 - Images compressed before queueing while retaining diagnostic detail; original dimensions
   recorded.
 - Queue operations idempotent and resumable; persist retry count and last error.
-- Component tests for result cards, quality feedback and stale banner; Detox or Maestro for
-  the offline E2E path.
+- Golden tests for result cards, quality feedback and stale banner.
 - Test on a low-end Android profile and in airplane mode.
 
 **Chat contract**
@@ -763,7 +758,7 @@ The reply never merges area outlook: an outlook is a separate card fetched from
 - Reply bubbles render structured `AssessmentCard` components; no raw JSON in the UI.
 - Offline messages show `queued`; a retry reuses `client_message_id`.
 - Conversation deletion calls the privacy endpoint and clears local rows.
-- Chat strings live in i18n catalogues like all other copy.
+- Chat strings live in ARB files like all other copy.
 
 **Offline queue state machine**
 
@@ -799,7 +794,7 @@ draft → queued → syncing → synced
 
 - `/chat` and `/chat/[conversationId]` routes; Server Components fetch the thread, a client
   component owns the composer and optimistic messages.
-- Image attach uses the signed-upload flow; drag-and-drop is an addition, not a fork of the
+- Image attach uses the presigned-URL flow; drag-and-drop is an addition, not a fork of the
   capture contract.
 - The assistant reply renders from typed `kind` fields, never from parsed prose.
 - `is_demo` renders a visible badge; abstained/queued/failed states each show one primary
@@ -812,9 +807,8 @@ draft → queued → syncing → synced
 
 1. Client captures an image, records dimensions/source/compression, runs the on-device
    pre-check.
-2. `POST /v1/observations/{id}/images/upload-url` returns a short-TTL signed upload
-   descriptor.
-3. Client uploads directly to Cloudinary.
+2. `POST /v1/observations/{id}/images/upload-url` returns a short-TTL presigned URL.
+3. Client uploads directly to object storage.
 4. `POST /v1/observations/{id}/images/{image_id}/complete` validates magic bytes, content
    type, size and dimensions; stores hash; strips EXIF GPS unless consented.
 5. Server quality gate runs; result is insert-only with `gate_version`, flags and thresholds.
@@ -828,7 +822,7 @@ base64 image through the JSON API at pilot scale.
 
 **Constraints**
 
-- No public delivery URLs; signed URL TTL ≤ 10 minutes.
+- No public buckets; presigned TTL ≤ 10 minutes.
 - Validate magic bytes, not client MIME.
 - Reject oversized or corrupt files with a stable error code.
 - Deduplicate by content hash; do not merge observations automatically.
@@ -951,10 +945,10 @@ band. Late-arriving reports never rewrite a past forecast; they are used in the 
 
 | Control | Requirement |
 |---|---|
-| Authentication | Short-lived access token + rotating refresh token; phone OTP for farmers; Argon2id for staff passwords; MFA for admin and `can_confirm` holders |
+| Authentication | Short-lived access token + rotating refresh token; phone OTP for farmers; Argon2id for staff passwords; MFA for pathologist/agronomist/admin |
 | Authorisation | Role dependency on every route; deny by default; object-level ownership; area scoping in the query |
 | Transport | TLS everywhere; HSTS |
-| Storage | Encrypted volumes at rest; private Cloudinary delivery; signed URLs ≤ 10 min |
+| Storage | Encrypted volumes at rest; private object storage; presigned URLs ≤ 10 min |
 | Uploads | Magic-byte validation, size/dimension limits, EXIF GPS stripping unless consented |
 | Secrets | Environment/secret manager only; never in mobile builds, fixtures or logs |
 | CORS | Explicit allowlist per environment |
@@ -1173,7 +1167,12 @@ The implementation is technically acceptable for pilot only when:
 - [ ] Duplicate observation retry returns the existing observation; no duplicate row.
 - [ ] Predictions, reviews, forecasts and audit rows reject update/delete.
 - [ ] A forecast cannot be inserted without a feature snapshot and model version.
-- [ ] An unverified observation is excluded from forecast feature queries (test).
+- [ ] An unverified observation is excluded from forecast feature queries; only `confirmed` and
+      `probable` (with evidence tier) inside the as-of cutoffs are eligible (test).
+- [ ] Every prediction stores the threshold set and OOD score; abstention is reproducible and
+      an abstained row has a reason code (test).
+- [ ] A calibrated prediction carries a `calibration_version`; probabilities are null when
+      calibration is not approved (test).
 - [ ] Precise geometry is absent from responses for unauthorised roles (test).
 - [ ] Small-count suppression is enforced in the query layer (test).
 - [ ] Advisory retrieval fails when no approval exists or content is expired (test).
@@ -1254,7 +1253,7 @@ The implementation is technically acceptable for pilot only when:
 | **No-score** | Explicit `insufficient_data` outlook when coverage, freshness or approval fails. |
 | **Coverage** | Completeness, freshness and representativeness of inputs for an area. |
 | **Stale** | Past its validity window; must be visually and semantically distinct from fresh data. |
-| **Signed upload URL** | Short-lived signed URL for private Cloudinary upload or delivery. |
+| **Presigned URL** | Short-lived signed URL for direct object-storage access. |
 | **ONNX** | Portable model format used for CPU inference at pilot scale. |
 | **Conversation** | A private chat thread owned by one user; messages are append-only. |
 | **Assistant reply** | A server-authored, template-rendered message carrying structured assessment fields. |

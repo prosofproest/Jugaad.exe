@@ -8,6 +8,7 @@ authorisation dependency is a defect.
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    admin,
     advisories,
     alerts,
     assessments,
@@ -16,8 +17,10 @@ from app.api.v1 import (
     forecast,
     health,
     map,
+    me,
     observations,
     review,
+    uploads,
 )
 
 api_router = APIRouter()
@@ -25,12 +28,14 @@ api_router = APIRouter()
 # Health
 api_router.include_router(health.router)
 
-# Auth & Admin Auth
+# Auth & identity
 api_router.include_router(auth.router)
 if hasattr(auth, "admin_router"):
     api_router.include_router(auth.admin_router)
+api_router.include_router(me.router)
+api_router.include_router(admin.router)
 
-# Observations & Review
+# Observations & review
 api_router.include_router(observations.router)
 api_router.include_router(review.router)
 
@@ -49,8 +54,9 @@ api_router.include_router(forecast.router)
 if hasattr(forecast, "admin_router"):
     api_router.include_router(forecast.admin_router)
 
-# Conversations & Assessments
+# Conversations, uploads & assessments
 api_router.include_router(conversations.router)
+api_router.include_router(uploads.router)
 api_router.include_router(assessments.router)
 
 # Map

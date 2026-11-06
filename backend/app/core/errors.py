@@ -1,4 +1,4 @@
-"""Domain error types and the single RFC 7807-style API error envelope.
+"""RFC 7807-style error envelope used by every endpoint.
 
 ``code`` is stable and machine-readable; clients branch on it, never on
 ``detail`` (``final/TRD.md`` §7.2). The envelope never leaks stack traces,
@@ -7,6 +7,7 @@ SQL or model internals.
 
 from __future__ import annotations
 
+from http import HTTPStatus
 from typing import Any
 
 from fastapi import FastAPI, Request
@@ -14,133 +15,149 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-try:
-    from app.core.request_context import get_request_id
-except ImportError:
-    from app.core.logging import request_id_var
+from app.core.logging import request_id_var
 
-    def get_request_id() -> str:
-        return request_id_var.get() or "unknown"
+PROBLEM_MEDIA_TYPE = "application/problem+json"
+_ERROR_BASE = "https://api.ps03.local/errors/"
 
 
 class ApiError(Exception):
-    """A stable, machine-readable API failure.
+    """A deliberately raised, client-safe error.
 
-    Routers and services raise this instead of constructing ad-hoc responses.
+    Two call shapes exist in the codebase and both are supported:
+
+    * keyword form — ``ApiError(code="forbidden", title="Forbidden", status=403)``
+    * positional form — ``ApiError(403, "forbidden", "Forbidden", detail="...")``
     """
 
     def __init__(
         self,
-        status_code: int = 400,
+        status: int = 400,
         code: str = "bad_request",
-        title: str = "Bad Request",
+        title: str | None = None,
         *,
-        status: int | None = None,
+        status_code: int | None = None,
         detail: str | None = None,
-        fields: list[dict[str, Any]] | None = None,
         retryable: bool = False,
+        fields: list[dict[str, str]] | None = None,
     ) -> None:
-        super().__init__(detail or title)
-        self.status_code = status if status is not None else status_code
+        super().__init__(detail or title or code)
+        self.status = status if status_code is None else status_code
         self.code = code
-        self.title = title
+        self.title = title or code.replace("_", " ").title()
         self.detail = detail
-        self.fields = fields or []
         self.retryable = retryable
+        self.fields = fields or []
 
     @property
-    def status(self) -> int:
-        return self.status_code
+    def status_code(self) -> int:
+        return self.status
 
 
-def error_body(
+def _status_code_for(code: str) -> str:
+    return code.strip().lower().replace("-", "_").replace(" ", "_")
+
+
+def _payload(
     *,
-    status: int,
     code: str,
     title: str,
-    detail: str | None = None,
-    fields: list[dict[str, Any]] | None = None,
+    status: int,
+    detail: str | None,
     retryable: bool = False,
+    fields: list[dict[str, str]] | None = None,
 ) -> dict[str, Any]:
-    body: dict[str, Any] = {
-        "type": f"https://api.ps03.local/errors/{code.replace('_', '-')}",
+    return {
+        "type": f"{_ERROR_BASE}{_status_code_for(code)}",
         "title": title,
         "status": status,
         "code": code,
-        "detail": detail or title,
-        "request_id": get_request_id(),
+        "detail": detail,
+        "request_id": request_id_var.get(),
         "retryable": retryable,
         "fields": fields or [],
     }
-    return body
 
 
-def install_error_handlers(app: FastAPI) -> None:
-    @app.exception_handler(ApiError)
-    async def _api_error(_: Request, error: ApiError) -> JSONResponse:
-        return JSONResponse(
-            status_code=error.status_code,
-            content=error_body(
-                status=error.status_code,
-                code=error.code,
-                title=error.title,
-                detail=error.detail,
-                fields=error.fields,
-                retryable=error.retryable,
-            ),
+def _response(payload: dict[str, Any]) -> JSONResponse:
+    return JSONResponse(
+        status_code=payload["status"],
+        content=payload,
+        media_type=PROBLEM_MEDIA_TYPE,
+    )
+
+
+async def api_error_handler(_: Request, exc: ApiError) -> JSONResponse:
+    return _response(
+        _payload(
+            code=exc.code,
+            title=exc.title,
+            status=exc.status,
+            detail=exc.detail,
+            retryable=exc.retryable,
+            fields=exc.fields,
         )
+    )
 
-    @app.exception_handler(RequestValidationError)
-    async def _validation_error(_: Request, error: RequestValidationError) -> JSONResponse:
-        fields = [
-            {
-                "field": ".".join(str(part) for part in item.get("loc", [])),
-                "message": str(item.get("msg", "Invalid value")),
-                "type": str(item.get("type", "value_error")),
-            }
-            for item in error.errors()
-        ]
-        return JSONResponse(
-            status_code=422,
-            content=error_body(
-                status=422,
-                code="validation_error",
-                title="Request validation failed",
-                detail="One or more fields are invalid.",
-                fields=fields,
-            ),
+
+async def http_exception_handler(_: Request, exc: StarletteHTTPException) -> JSONResponse:
+    status = exc.status_code
+    try:
+        phrase = HTTPStatus(status).phrase
+    except ValueError:
+        phrase = "Request failed"
+    return _response(
+        _payload(
+            code=_status_code_for(phrase),
+            title=phrase,
+            status=status,
+            detail=exc.detail if isinstance(exc.detail, str) else None,
         )
+    )
 
-    @app.exception_handler(StarletteHTTPException)
-    async def _http_error(_: Request, error: StarletteHTTPException) -> JSONResponse:
-        code = "not_found" if error.status_code == 404 else "http_error"
-        if error.status_code == 401:
-            code = "unauthorized"
-        elif error.status_code == 403:
-            code = "forbidden"
-        return JSONResponse(
-            status_code=error.status_code,
-            content=error_body(
-                status=error.status_code,
-                code=code,
-                title=str(error.detail) if error.detail else "Request failed",
-                detail=str(error.detail) if error.detail else None,
-            ),
-            headers=getattr(error, "headers", None),
+
+async def validation_exception_handler(_: Request, exc: RequestValidationError) -> JSONResponse:
+    fields = [
+        {
+            "field": ".".join(str(part) for part in error.get("loc", [])),
+            "message": str(error.get("msg", "invalid value")),
+        }
+        for error in exc.errors()
+    ]
+    return _response(
+        _payload(
+            code="validation_error",
+            title="Request validation failed",
+            status=422,
+            detail="One or more fields are invalid.",
+            fields=fields,
         )
+    )
 
-    @app.exception_handler(Exception)
-    async def _unhandled(request: Request, error: Exception) -> JSONResponse:
-        return JSONResponse(
-            status_code=500,
-            content=error_body(
-                status=500,
-                code="internal_error",
-                title="Internal server error",
-                detail=None,
-                retryable=True,
-            ),
+
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    # Log the type only; the client never receives internals.
+    import logging
+
+    logging.getLogger("app.errors").exception(
+        "unhandled_exception", extra={"path": request.url.path}
+    )
+    return _response(
+        _payload(
+            code="internal_error",
+            title="Internal server error",
+            status=500,
+            detail=None,
         )
+    )
 
 
-register_error_handlers = install_error_handlers
+def register_error_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(ApiError, api_error_handler)
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, validation_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)
+
+
+# Backwards-compatible name used by earlier call sites.
+install_error_handlers = register_error_handlers

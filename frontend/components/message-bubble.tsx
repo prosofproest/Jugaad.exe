@@ -1,4 +1,4 @@
-import type { Message } from "@/lib/api";
+import { publicAssetUrl, type Message } from "@/lib/api";
 
 import { AssessmentCard } from "@/components/assessment-card";
 
@@ -12,18 +12,29 @@ function formatTime(iso: string): string {
   });
 }
 
+function qualityText(image: NonNullable<Message["image"]>): string {
+  const flags = image.quality_flags.length
+    ? ` (${image.quality_flags.join(", ")})`
+    : "";
+  return `quality: ${image.quality_result.replaceAll("_", " ")}${flags}`;
+}
+
 export function MessageBubble({
   message,
   failed = false,
   onRetry,
   onRetake,
   onAddContext,
+  onRequestReview,
+  reviewing = false,
 }: {
   message: Message;
   failed?: boolean;
   onRetry?: () => void;
   onRetake?: () => void;
   onAddContext?: () => void;
+  onRequestReview?: () => void;
+  reviewing?: boolean;
 }) {
   const isUser = message.role === "user";
 
@@ -41,11 +52,23 @@ export function MessageBubble({
 
         {message.text ? <p>{message.text}</p> : null}
 
-        {message.kind === "image" ? (
+        {message.image ? (
+          <figure className="message-photo">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={publicAssetUrl(message.image.preview_url)}
+              alt={`Uploaded plant photo: ${message.image.filename}`}
+              loading="lazy"
+            />
+            <figcaption className="small muted">
+              {message.image.filename} · {message.image.width}×
+              {message.image.height} · {qualityText(message.image)}
+            </figcaption>
+          </figure>
+        ) : message.kind === "image" ? (
           <p className="small muted">
-            <span className="chip chip-muted">Photo attached</span>{" "}
-            Capture metadata only in this phase; the content is not uploaded or
-            analysed.
+            <span className="chip chip-muted">Photo attached</span> Preview
+            unavailable.
           </p>
         ) : null}
 
@@ -53,8 +76,11 @@ export function MessageBubble({
           <AssessmentCard
             assessment={message.assessment}
             nextSteps={message.next_steps}
+            reviewRequest={message.review_request}
             onRetake={onRetake}
             onAddContext={onAddContext}
+            onRequestReview={onRequestReview}
+            reviewing={reviewing}
           />
         ) : null}
 

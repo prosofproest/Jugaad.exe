@@ -80,11 +80,11 @@ lines are now out of date because Phase 2 §5.1 work landed afterwards — use t
 work log below for the current state.
 
 - [x] Repository enumerated — documentation + backend API vertical slices + Phase-1 data platform
-- [x] `backend` pytest suite -> **176 passed** (alert trigger/dispatch, advisory validator/workflow, triage service/decision/quality/OOD/calibration/evaluation/explanation, map layers)
-- [x] `python3 -m unittest discover database/tests` -> **14 passed** (`database/tests/`)
+- [x] `backend` pytest suite -> **294 passed** (alert trigger/dispatch, advisory validator/workflow, triage service/decision/quality/OOD/calibration/evaluation/explanation, map layers, identity, persisted chat)
+- [x] `python3 -m unittest discover database/tests` -> **38 passed** (`database/tests/` across schema/seed, storage rules, weather & boundaries)
 - [x] `python3 -m compileall -q backend/app database` -> **COMPILE_OK**
-- [x] OpenAPI paths -> `/health`, `/v1/auth`, `/v1/observations`, `/v1/reviews`, `/v1/advisories`, `/v1/alerts`, `/v1/forecasts`, `/v1/conversations`, `/v1/assessments`, `/v1/map/layers`
-- [x] `database/` workspace complete with schema (39 tables), Alembic migrations, demo seed, S3/storage rules, backup design, governance registers, collection & labelling protocols
+- [x] OpenAPI paths -> `/health`, `/v1/auth`, `/v1/me`, `/v1/admin/*`, `/v1/observations`, `/v1/reviews`, `/v1/advisories`, `/v1/alerts`, `/v1/forecasts`, `/v1/conversations`, `/v1/uploads`, `/v1/assessments`, `/v1/map/layers`
+- [x] `database/` workspace complete with schema (40 tables including `historical_occurrences`), Alembic migrations, demo seed, S3/storage rules, backup design, governance registers, collection & labelling protocols, and Python ingestion package
 - [x] Shell folders `frontend/`, `chatbot/`, `ml/` present with `.gitkeep`
 
 ---
@@ -102,125 +102,128 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-04 | Product/technical docs reconciled with the implemented stack; false "no scaffold" claims and stale `final/backend` paths removed | `final/PRD.md` line 6; `final/TRD.md` line 6; search across `final/` for `final/backend` → 0 matches; `progress-tracker.md` changelog | 0.3 |
 | W-05 | Backend foundation: app factory, RFC 7807 problem details, request-ID middleware, JSON logging, environment settings, CORS, health route | `backend/app/main.py`, `core/errors.py`, `core/logging.py`, `core/middleware.py`; `tests/test_errors.py`, `test_logging.py`, `test_request_context.py` | 1.5 (liveness only), Gate 9 |
 | W-06 | Persistence baseline: SQLAlchemy base/session and Alembic revision `0001_baseline` (no domain tables yet) | `backend/app/db/base.py`, `db/session.py`, `db/migrations/versions/0001_baseline.py`, `alembic.ini` | 1.3 (baseline only) |
-| W-07 | Demo conversations API: threads, messages, idempotent send (`Idempotency-Key` must equal `client_message_id`), retry, delete; structured `Assessment` reply with state, reason, candidates, confidence band, `model_version`, `generated_at`, `is_demo` | `backend/app/api/v1/conversations.py`, `modules/conversations/*`; OpenAPI `/v1/conversations` | Phase 2 §5.7 (backend subset) |
-| W-08 | Web chat surface: `/chat` list, `/chat/[conversationId]` thread, structured assessment card, metadata-only image composer with drag/drop and 10 MB guard, offline notice, idempotent retry, delete with confirm | `frontend/app/chat/*`, `components/assessment-card.tsx`, `chat-composer.tsx`, `chat-index.tsx`, `chat-thread.tsx`, `message-bubble.tsx`, `sidebar-nav.tsx`, `lib/api.ts` | Phase 2 §5.7 (web subset) |
+| W-07 | Persisted conversations API: threads, messages, idempotent send (`Idempotency-Key` must equal `client_message_id`), retry, delete, validated image upload + preview, deterministic demo assessment and review requests; schema in Alembic `0002_chat_persistence` | `backend/app/api/v1/conversations.py`, `uploads.py`, `modules/conversations/*`, `db/migrations/versions/0002_chat_persistence.py`; `tests/test_chat_api.py` (14 tests) | Phase 2 §5.7 (backend subset) |
+| W-08 | Web chat surface: `/chat` list, `/chat/[conversationId]` thread, real image upload with stored preview, structured assessment card with quality flags, review request/status, offline notice, idempotent retry, delete with confirm | `frontend/app/chat/*`, `components/assessment-card.tsx`, `chat-composer.tsx`, `chat-index.tsx`, `chat-thread.tsx`, `message-bubble.tsx`, `sidebar-nav.tsx`, `lib/api.ts` | Phase 2 §5.7 (web subset) |
 | W-09 | Honest empty-state surfaces for the other outputs: `/outlook` (no score without inputs) and `/review` (locked until auth/review exist) | `frontend/app/outlook/page.tsx`, `frontend/app/review/page.tsx`; production build emits both routes | R1/R3/R4 evidence; no feature claim |
 | W-10 | Design tokens source committed and mirrored into CSS | `design/tokens.json`, `frontend/app/globals.css`; `frontend/README.md` §Design system | Phase 2 §5.1 design foundation |
-| W-11 | Flutter shell committed with API client and widget test; **not run locally** | `mobile/pubspec.yaml`, `mobile/lib/*`, `mobile/test/widget_test.dart`; CI mobile job | Gate 10 (Defined, not verified) |
+| W-11 | Flutter shell committed with API client and widget test; **analyze + test verified locally** (Flutter 3.47.9, 2026-11-06); no APK/device run | `mobile/pubspec.yaml`, `mobile/lib/*`, `mobile/test/widget_test.dart`; `flutter analyze` → clean, `flutter test` → 1 passed; CI mobile job | Gate 10 (analyze/test verified; build not verified) |
 | W-12 | Deploy and CI scaffolding: API/web Dockerfiles, base + dev compose override, dev/staging env templates, CI jobs for backend/web/mobile/compose/image builds | `backend/Dockerfile`, `frontend/Dockerfile`, `deploy/*`, `.github/workflows/ci.yml` | Gate 11 (defined, not run) |
-| W-13 | Test evidence refreshed: 176 unit tests pass, ruff clean; web typecheck, lint and production build pass | `backend/.venv/bin/python -m pytest` → 176 passed; `TEST-MATRIX.md` | Gate 10 (partial) |
+| W-13 | Test evidence refreshed: 294 backend tests pass (including 14 persisted-chat tests); ruff clean on the identity and chat slices; web typecheck, lint and production build pass (6 routes) | `cd backend && pytest` → 294 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
 | W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
-| W-15 | Gate 6 map-layer backend: closed layer enum, per-layer GeoJSON, caller-supplied policy with no D9 defaults, small-count suppression, boundary-version refusal and explicit empty/error states | `backend/app/modules/mapping/*`, `backend/app/api/v1/map.py`, `backend/tests/test_map_layers.py`, `backend/tests/test_map_api.py`; OpenAPI `/v1/map/layers/{layer}` | Gate 6 (4/8) |
-| W-16 | Phase 1 data layer: complete schema slices (39 tables), demo seed (`is_demo = true`, R5 non-chemical compliance), Alembic migration baseline, S3 storage rules (TTL ≤ 10m), backup & recovery design, and 14 unit tests | `database/schema/*`, `database/alembic/*`, `database/storage/*`, `database/backup/*`, `database/tests/*` | Gate 1 (§1.3, §1.4), Gate 3 (§3.1, §3.3), Gate 12 |
+| W-15 | Phase 2 §5.2 identity backend slice: phone OTP, provisioned staff + MFA, five roles, consent versioning, privacy requests/self-export/soft delete, credential-only retention and audited role/admin-view/export events; 64 identity tests | `backend/app/modules/identity/*`, `backend/app/api/v1/auth.py`, `me.py`, `admin.py`; `cd backend && pytest` → 294 passed; `TEST-MATRIX.md` §2a | 1.1 (partial), 1.2 (partial), Gate 7 (partial), Gate 12 (partial) |
+| W-16 | Persisted chat slice: `POST/GET /v1/uploads` (JPEG/PNG/WebP, 10 MB, real decode, SHA-256, demo quality gate), pluggable assessment engine (`demo-chat-0.1`; unknown fails closed), idempotent turns, review requests, web upload → assessment → review flow; 14 tests and a live SQLite smoke | `backend/app/modules/conversations/{media,engine,orm,repository,service}.py`, `backend/app/api/v1/uploads.py`, `backend/app/db/migrations/versions/0002_chat_persistence.py`, `backend/tests/test_chat_api.py`, `frontend/lib/api.ts`, `frontend/components/*` | Phase 2 §5.7 (partial) |
 | W-17 | Phase 0 Discovery package: D1a allowlist, D3b SLA, D4 owning institution, D5 primary metric, crop calendar, target reference sheet, pilot area map, pilot sites | `final/docs-context/phase-0/*` | Gate 0 (§0.2) |
 | W-18 | Phase 2 Backend vertical slices and models: 45 SQLAlchemy models covering all 14 schema slices, auth (OTP/MFA/JWT), observations, review queue, advisories, alerts, forecast, map layers, and seed runner | `backend/app/db/models.py`, `backend/app/db/seed.py`, `backend/app/api/v1/*`, `backend/app/modules/*` | Gate 1 (§1.1, §1.2, §1.3), Gate 2, Gate 5, Gate 7 |
+| W-19 | Phase 1 Weather, Boundaries, Historical Occurrences & Forecast Gate Ingestion: Ingest weather variables (temp min/max/mean, RH min/max/mean, rainfall, wet-day runs, wind, leaf-wetness proxy) with source timestamps, freshness metadata, physical bounds, spatial-matching method (`centroid_nearest_station`, `grid_areal_weighted_mean`, `station_idw`, `admin_polygon_intersection`, `station_exact`); versioned boundary loader (EPSG:4326 GeoJSON MultiPolygon validation, WGS84 range check, WKT conversion, boundary version propagation); historical occurrence ingestion with verification tier, `report_date >= event_date` check, source link provenance, deterministic SHA-256 dedupe key, dedupe history logging; strict forecast scoring pre-flight gate with explicit `insufficient_data` refusal (probability is NULL, zero silent imputation) for missing/stale weather (>24h SLA) or boundary mismatch; plpgsql `check_weather_sufficiency` DB function; 38 database tests passing | `database/schema/01-schema.sql`, `database/schema/02-demo-seed.sql`, `database/ingestion/*`, `database/tests/*` | Gate 1 (§1.4), Gate 4 (§4.1, §4.2, §4.3), Gate 6 |
 
 ---
 
 ## Gate 0 — Resolve the architecture conflict (BLOCKING)
 
-Nothing else may start until this gate is closed. The architecture conflict is now resolved;
-the remaining Phase 0 work is decisions and documentation debt.
+Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
 
-> **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation and the demo-backed
-> web chat surface (§5.7) were built under the explicit instruction recorded in
-> `progress-tracker.md` §2. The exception permits foundation-only work; it does **not**
-> close Gate 0 or authorise domain features.
+> **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation, the demo-backed
+> persisted demo chat surface (§5.7) and the §5.2 identity backend slice were built under the explicit
+> instruction recorded in `progress-tracker.md` §2. The exception permits foundation-only
+> work; it does **not** close Gate 0 or authorise domain features.
 
 ### 0.1 Architecture Decision Record
 
-- [x] Create ADRs at `final/docs-context/adr/`
-  - [x] `0009-data-platform.md` — PostgreSQL + PostGIS + Cloudinary
-  - [x] `0010-v1-roles.md` — farmer, extension_worker, admin
-  - [x] `0011-open-crop-catalogue.md` — open catalogue + validated allowlist
-  - [x] `README.md` — ADR index and rules
-- [x] Choose the database: **PostgreSQL 16 + PostGIS** (ADR-009)
-- [x] Choose image storage: **Cloudinary** (ADR-009)
-- [x] Choose the frontend: **Next.js web + React Native mobile** (ADR-010)
-- [x] Choose the auth mechanism: phone OTP for farmers; email + password + Argon2id for
-      staff; MFA for `admin` and `can_confirm` holders
-- [x] Confirm the role list: **farmer, extension_worker, admin** (ADR-010)
-- [x] Confirm the language list: **English + Kannada** (D13)
-- [x] Define confidence semantics: qualitative band + abstention (D14)
-- [x] Define severity: expert-review field, not a model claim (D14)
-- [x] Define guidance policy: curated, expert-approved, non-chemical (D6)
-- [x] Define outbreak approach: rules-based nowcast first (D2, ADR-004)
-- [ ] Confirm notification channels: in-app + email + optional SMS vs WhatsApp/push
-- [x] Record all decisions in `final/docs-context/phase-0-decisions.md`
+- [x] Create ADRs at `final/docs-context/adr/` (`0009-data-platform.md`, `0010-v1-roles.md`, `0011-open-crop-catalogue.md`, `README.md`)
+- [x] Choose the database: **PostgreSQL 16 + PostGIS** (Firestore rejected) — ADR-002; `architecture-context.md` §2; `05-data-layer.md` §2
+- [x] Choose image storage: **S3-compatible private bucket / storage rules** (TTL ≤ 10m) — `database/storage/01-object-storage-and-presigned-urls.md`
+- [x] Choose the frontend: **Next.js web app + Flutter mobile app** — ADR-007; `architecture-context.md` §2
+- [x] Choose the auth mechanism: **phone OTP for farmers; provisioned staff accounts; MFA for pathologist/agronomist/admin** — `03-auth-and-roles.md` §2
+- [x] Confirm the role list: **five roles — farmer, extension worker, pathologist, agronomist, admin** — D13; `03-auth-and-roles.md` §2
+- [x] Confirm the language list: **English + Kannada** — D13; `ui-context.md` §9; `02-reporting-and-capture.md` §8
+- [x] Define confidence semantics: **qualitative band + abstention; numeric probability only when calibration is approved** — D8; `ml-models.md` §6
+- [x] Define severity: **expert-review field recorded with crop-specific criteria** — `PRD.md` §6.2 reviewer actions; `02-reporting-and-capture.md` §4
+- [x] Define guidance policy: **curated, expert-approved, versioned, non-chemical content; no LLM** — `07-advisory-and-alerts.md` §1; Safety Rule R5
+- [x] Define outbreak approach: **rules-based nowcast first; ML only after verified seasons** — ADR-004; `06-forecast-and-risk-map.md` §2
+- [x] Confirm notification channels: **in-app feed mandatory; email for staff; SMS optional adapter** — `phase-0/` decisions; D15
+- [x] Record all decisions in `final/docs-context/phase-0-decisions.md` and `phase-0/`
 
-### 0.2 Resolve blocking product decisions
+### 0.2 Resolve blocking product decisions D1–D6
 
-- [x] D1 — Crop/target policy: open catalogue + validated allowlist (ADR-011)
-- [ ] **D1a** — First validated crop/target allowlist (blocks Gate 3)
-- [x] D2 — Forecast horizon: nowcast (last 10 days)
-- [~] D3 — Verifier: extension-first + `can_confirm`; SLA/capacity still open
-- [ ] D4 — Owning/paying institution
+- [ ] D1 — Target crop(s)
+- [ ] D2 — Forecast horizon
+- [ ] D3 — Who verifies reports
+- [ ] D4 — Data/account owner
 - [ ] D5 — Primary success metric
-- [x] D6 — Advisory: non-chemical only
+- [ ] D1 — Target crop(s) (allowlist policy D1a drafted in `phase-0/d1a-allowlist-decision.md`)
+- [ ] D2 — Nowcast vs 7-day outlook
+- [ ] D3 — Who verifies reports (extension-first capacity & SLA drafted in `phase-0/d3b-verifier-capacity-sla.md`)
+- [ ] D4 — Data/account owner (`phase-0/d4-owning-institution.md`)
+- [ ] D5 — Primary success metric (`phase-0/d5-primary-metric.md`)
+- [x] D6 — Advisory legality / non-chemical position (Safety Rule R5)
 - [x] D13 — Languages: English + Kannada
 - [x] D14 — Output semantics: confidence band + abstention; severity is expert-set
-- [ ] D7–D12 — Forecast event, abstention floors, coverage values, retention, on-behalf
-      identity, client pre-check
-  - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4
-    with a date and owner.
+- [x] D15 — Notification channels: in-app mandatory, email staff, SMS optional adapter
+- [~] D7–D12 — Forecast event, abstention floors, coverage values, retention, on-behalf identity, client pre-check (interim rules recorded in `phase-0-decisions.md` §7)
 
 ### 0.3 Reconcile documentation
 
-- [x] Update `final/PRD.md` — remove false scaffold claim; three roles; defended config
-- [x] Update `final/TRD.md` — remove false scaffold claim; stack, storage, roles, MFA
-- [x] Update `final/docs-context/architecture-context.md` — one stack only
-- [x] Update `final/feature-specs/03-auth-and-roles.md` — three roles + scoped permissions
-- [x] Update `final/feature-specs/05-data-layer.md` — roles, `can_confirm`, Cloudinary
-- [x] Update `final/docs-context/code-standards.md` — React Native/TypeScript, Cloudinary
-- [x] Update `final/docs-context/project-overview.md` — defended config, roles
-- [x] Update `final/docs-context/AGENTS.md` — repository layout and commands
-- [x] Update `final/docs-context/progress-tracker.md` — real state, ADR log, decisions
-- [x] Update `final/feature-specs/04-expert-review.md` — `pathologist` → `can_confirm`
-- [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — nowcast default
-- [x] Update `final/feature-specs/07-advisory-and-alerts.md` — channels
-- [x] Update `final/feature-specs/02-reporting-and-capture.md` and `08` — React Native
-- [x] Update `final/docs-context/ui-context.md` — React Native, i18n catalogues
-- [x] Update `final/docs-context/phase-plan.md` — Flutter, four roles, pathologist
-- [x] Update `final/docs-context/appendices.md` — `confirmed` check
+- [x] Update `final/PRD.md` — false "initial scaffold exists" claim corrected
+- [x] Update `final/TRD.md` — real scaffold and stack recorded
+- [x] Update `final/docs-context/architecture-context.md` — one stack only (PostgreSQL/PostGIS, S3-compatible, Flutter + Next.js)
+- [x] Update `final/feature-specs/03-auth-and-roles.md` — five roles and phone-OTP/MFA mechanism recorded
+- [x] Update `final/feature-specs/05-data-layer.md` — PostgreSQL/PostGIS and storage rules recorded
+- [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — rules-based nowcast baseline recorded
+- [x] Update `final/feature-specs/07-advisory-and-alerts.md` — curated non-chemical guidance policy recorded (R5)
+- [x] Update `final/docs-context/progress-tracker.md` — reflects the real state, decisions, and unit-tested components
 - [x] Remove or correct every reference to `final/backend` (actual path is `backend/`)
 - [x] **Done when:** a full-text search finds no contradictory stack, role, or language claims.
 
 ### 0.4 Repository hygiene
 
-- [x] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` to `.gitignore`
-- [x] Delete or rebuild the broken `backend/.venv` (contains only pip; `pyvenv.cfg` points at `final\backend\.venv`)
-- [x] Add a lockfile (`requirements.lock` generated with `pip freeze`)
-- [x] Confirm the documented quickstart works from a clean clone on the supported Python version
+- [x] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `build/` to `.gitignore`
+- [x] Delete or rebuild the broken `backend/.venv`
+- [x] Lockfile / package management established (`frontend/package-lock.json`, `backend/requirements.txt`)
+- [~] Clean clone quickstart verification
 
-**Gate 0 exit criteria:** one recorded architecture, all blocking decisions closed, docs
-consistent, clean clone installs and tests pass.
+**Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
 
 ---
 
 ## Gate 1 — Security and data foundation (P0)
 
-> **Status (2026-11-06):** open. The repository has a liveness probe, problem-details
-> errors, structured logs and an Alembic baseline, but no authentication, authorization,
-> domain schema or media pipeline. No data-bearing endpoint is safe to expose.
+> **Status (2026-11-06):** partial. The repository has a liveness probe, problem-details
+> errors, structured logs and an Alembic baseline, plus an in-memory §5.2 identity slice
+> (OTP, staff MFA, roles, consent, privacy, audit). Identity state is lost on restart, the
+> demo chat/assessment/advisory/map routes are still unauthenticated, and there is no
+> domain schema or media pipeline. No data-bearing demo endpoint is safe to expose.
 
 ### 1.1 Authentication
 
-- [~] Farmer registration and login (`backend/app/api/v1/auth.py` `/auth/otp/request` and `/auth/otp/verify`, `modules/identity/service.py`)
-- [~] Admin/staff login with MFA (`backend/app/api/v1/auth.py` `/auth/login`, `/auth/mfa/verify` with TOTP, `core/security.py`)
-- [~] Access + refresh token lifecycle (`backend/app/api/v1/auth.py` `/auth/refresh`, JWT generation and validation)
-- [~] Session revocation / logout (`backend/app/api/v1/auth.py` `/auth/logout`, token versioning and session tracking)
+- [x] Farmer registration and login
+  - **Evidence (2026-11-06):** `POST /v1/auth/otp/request` + `/otp/verify` issue a farmer token; a bad/expired code returns `401`; covered by `backend/tests/test_identity_otp.py` and `test_identity_api.py`.
+- [x] Admin/staff login with MFA
+  - **Evidence (2026-11-06):** password + TOTP; `pathologist`/`agronomist`/`admin` cannot be assigned without an MFA secret and their sessions require the second factor; `test_identity_staff.py`.
+- [x] Access + refresh token lifecycle
+  - **Evidence (2026-11-06):** 15-minute HS256 access token, rotating refresh token with family revocation on reuse; `test_identity_otp.py`.
+- [x] Session revocation / logout
+  - **Evidence (2026-11-06):** `/v1/auth/logout` and `/logout-all`; role/status changes bump `token_version`; `test_identity_otp.py`, `test_identity_staff.py`.
 - [ ] Device binding or session list (if required by chosen design)
-- [~] Consent capture and versioning (`backend/app/api/v1/auth.py` `/auth/consent`, `consents` table in schema and models)
+  - Refresh records carry an optional `device_id`, but there is no session-list endpoint.
+- [x] Consent capture and versioning
+  - **Evidence (2026-11-06):** `/v1/me/consents` records version, timestamp, channel and text hash; a version change forces re-consent; optional research consent is non-blocking; `test_identity_consent_privacy.py`.
 - [ ] Persist auth state and verify it survives a restart
+  - Identity storage is currently in-memory; SQLAlchemy model and Alembic migration pending.
 
 ### 1.2 Authorization
 
-- [x] Role and permission model defined in one place (`backend/app/core/dependencies.py`, `backend/app/db/models.py`: `farmer`, `extension_worker`, `admin`, plus `can_confirm` and `can_approve_advisory`)
-- [~] Deny-by-default route dependencies (`require_roles` and `require_permissions` enforced on all `/admin/*`, `/reviews/*`, `/observations/*` routes)
-- [~] Object-level ownership checks on every farmer record (`backend/app/api/v1/observations.py` filters by `user_id`, extension worker area scoping, admin reason required)
-- [x] Role-change events are audited (`record_audit` in `backend/app/api/v1/auth.py` admin role assignment, `audit_events` table)
+- [x] Role and permission model defined in one place (not scattered conditionals)
+  - **Evidence:** `backend/app/modules/identity/models.py` (`ROLES`, `STAFF_ROLES`, `MFA_REQUIRED_ROLES`) and `dependencies.py` (`require_roles`).
+- [x] Deny-by-default route dependencies
+  - **Evidence:** unauthenticated `/v1/me` and `/v1/admin/users` return `401`; a farmer token on `/v1/admin/users` returns `403`; `test_identity_api.py`.
+- [~] Object-level ownership checks on every farmer record
+  - Object ownership implemented in `backend/app/api/v1/observations.py` and `modules/observations/service.py`; demo chat endpoints currently unauthenticated.
+- [x] Role-change events are audited
+  - **Evidence:** `user.role_changed` with actor, before/after roles and a required reason; `test_identity_staff.py`.
 - [ ] Permission-matrix test covering every role x every protected route
-- [ ] OpenAPI now reports real security schemes (`components.securitySchemes` is no longer `None`)
+  - Only the identity routes are covered; the feature routes have no auth matrix yet.
+- [x] OpenAPI now reports real security schemes (`components.securitySchemes` is no longer `None`)
+  - **Evidence:** `HTTPBearer` is declared and applied to `/v1/me` and `/v1/admin/*`; `test_identity_api.py`. Demo routes remain public.
 
 ### 1.3 Persistence
 
@@ -409,16 +412,20 @@ only policy in the repository is explicitly labelled `synthetic_unit_test` and
 
 ## Gate 4 — Outbreak prediction pipeline (P1)
 
-- [ ] Weather provider client with source timestamp, units, and freshness check
-- [ ] Weather ingestion scheduled and idempotent
-- [ ] Validation: completeness, stale data, implausible values
-- [ ] Verified-report aggregation by geography and time window
+- [x] Weather provider client / ingestion data model with source timestamp, units, and freshness check
+  - **Evidence:** `database/ingestion/weather_ingest.py` implements `WeatherIngestRecord` validating source timestamps (UTC), 6 core weather variables (temp, RH, rainfall, wet-day runs, wind, leaf-wetness proxy), physical bounds, freshness metadata (`freshness_seconds`, `is_stale`), and spatial matching methods; verified by `database/tests/test_weather_and_boundaries.py`.
+- [ ] Weather ingestion scheduled and idempotent (pipeline scheduler runner open).
+- [x] Validation: completeness, stale data (>24h SLA), implausible values, boundary version match
+  - **Evidence:** `evaluate_sufficiency` in `database/ingestion/weather_ingest.py` and `evaluate_forecast_gate` in `database/ingestion/forecast_gate.py`; DB plpgsql function `check_weather_sufficiency` in `01-schema.sql`; produces explicit `insufficient_data` with typed reasons (`weather_missing`, `weather_stale`, `weather_incomplete`, `boundary_mismatch`) — zero silent imputation.
+- [x] Versioned boundary geometry loader and spatial aggregation tracking
+  - **Evidence:** `database/ingestion/boundary_loader.py` validates EPSG:4326 GeoJSON MultiPolygon coordinates against WGS84 bounds, formats WKT, and propagates `boundary_version` to every derived record; spatial matching methods constrained via `ck_weather_spatial_method` in `01-schema.sql`.
+- [x] Historical occurrence ingestion with verification tier and dedupe history
+  - **Evidence:** `database/ingestion/historical_ingest.py` enforces verification tiers, `report_date >= event_date` check (`ck_hist_dates`), source link provenance, deterministic SHA-256 dedupe keys, and dedupe history logging; stored in `historical_occurrences` table #40.
 - [x] Unverified reports kept separate from verified counts (`forecast_eligible_cases` in `01-schema.sql` excludes unverified/rejected reports)
-- [ ] Spatial aggregation using real geometries and boundary versions
 - [~] Forecast job runs on a schedule and records status (`backend/backend/forecast/jobs.py` and `POST /v1/admin/forecasts/generate`)
 - [ ] Weather data demonstrably changes the risk score (test with two weather fixtures)
 - [ ] Verified reports demonstrably change the risk score (test with two report fixtures)
-- [~] No-score state surfaced in API and UI (`no_score` returned when coverage/weather criteria fail)
+- [x] No-score state surfaced in API, DB, and UI (`insufficient_data` returned with `probability = NULL` enforced by `ck_forecasts_no_imputation`)
 - [x] Forecast run history and failure visibility (`ForecastRun` model and `GET /v1/forecasts`)
 - [x] Backlog/coverage metrics exposed (`GET /v1/forecasts/coverage` endpoint in `backend/app/api/v1/forecast.py`)
 
@@ -517,16 +524,16 @@ injects persisted geometry and an approved `MapPolicy`.
 ## Gate 7 — Admin management (P1)
 
 - [ ] Admin dashboard (UI not yet built)
-- [~] User list / create / disable / reset (`POST /v1/admin/users`, role management in `backend/app/api/v1/auth.py`)
-- [x] Role assignment + revocation with audit (`backend/app/api/v1/auth.py`, `record_audit`)
+- [~] User list / create / disable / reset (`POST /v1/admin/users`, staff create and disable implemented in memory; password reset pending)
+- [x] Role assignment + revocation with audit (`backend/app/api/v1/auth.py`, `record_audit`, `user.role_changed` with required reason)
 - [~] Report management: list, filter, detail, moderation (`backend/app/api/v1/observations.py` with admin reason requirement)
 - [x] Alert management: list, pause, acknowledge, policy editor (`PUT /v1/admin/alerts/policy`, `POST /v1/admin/alerts/pause`, `POST /v1/admin/alerts/resume` in `backend/app/api/v1/alerts.py`)
 - [~] Model health: approval and versioning (`GET /v1/admin/models`, `POST /v1/admin/models/{id}/approve` in `backend/app/api/v1/forecast.py`)
 - [ ] System health: dependency status from the readiness probe
 - [ ] Error and failure visibility
-- [x] Audit log: generation, persistence, search, export (`backend/app/modules/audit/service.py`, `audit_events` table + trigger in `01-schema.sql`)
+- [~] Audit log: generation, persistence, search, export (`backend/app/modules/audit/service.py`, `audit_events` immutable table + trigger in `01-schema.sql`)
 - [x] Every admin record view is audited with a reason (`_require_admin_reason` in `observations.py`, `record_audit` on admin calls)
-- [x] Admin-only access enforced server-side (`require_roles("admin")` dependency on all `/admin/*` routers)
+- [x] Admin-only access enforced server-side (`require_roles("admin")` dependency on all `/admin/*` routers; `test_identity_api.py`)
 
 **Gate 7 exit criteria:** an admin can see real data, an unaudited admin view is impossible, and a farmer token gets `403` on every admin route.
 
@@ -595,7 +602,7 @@ injects persisted geometry and an approved `MapPolicy`.
   - **Evidence (2026-11-06):** dev and staging templates exist (`deploy/.env.example`, `deploy/.env.staging.example`); no production profile is defined.
 - [ ] Secrets in a secret manager, not in `.env` in production
 - [ ] TLS enforced
-- [ ] Rate limiting, OTP throttling, account lockout
+- [x] Rate limiting, OTP throttling, account lockout — per-phone/IP OTP limits and staff lockout are implemented in memory; no shared/distributed limiter yet
 - [ ] CSRF strategy if cookies are used
 - [ ] Upload malware/type checks
 - [ ] Backup schedule + documented RTO/RPO
@@ -610,12 +617,12 @@ injects persisted geometry and an approved `MapPolicy`.
 
 ## Gate 12 — Data governance and compliance (P2)
 
-- [x] Consent versioning and withdrawal (drafted in `database/governance/03-consent-wording-and-capture.md`; `consents` table in `01-schema.sql`)
-- [x] Retention policy per data class (drafted in `database/governance/05-retention-and-deletion.md` and `collection/04-secure-upload-and-retention.md`)
-- [ ] User data export
-- [ ] User data deletion (including images and derived records)
-- [x] Audit trail immutable and queryable (`audit_events` table + `trg_audit_events_immutable` trigger in `01-schema.sql`)
-- [x] Demo data labelled and excluded from real alerts (`database/schema/02-demo-seed.sql` with `is_demo = true` + `v_demo_rows` view)
+- [x] Consent versioning and withdrawal (drafted in `database/governance/03-consent-wording-and-capture.md`; `/v1/me/consents` in backend; `consents` table in `01-schema.sql`)
+- [~] Retention policy per data class (policy documented in `database/governance/05-retention-and-deletion.md` and `collection/04-secure-upload-and-retention.md`; D10 open)
+- [~] User data export (self-export of identity records with written purpose in `/v1/me/export`)
+- [~] User data deletion (soft delete implemented; hard deletion awaiting D10)
+- [x] Audit trail immutable and queryable (`audit_events` table + `trg_audit_events_immutable` trigger in `01-schema.sql`, `record_audit` service)
+- [x] Demo data labelled and excluded from real alerts (`database/schema/02-demo-seed.sql` with `is_demo = true` on every row + `v_demo_rows` view)
 - [x] Privacy notice and language coverage (DPIA drafted in `database/governance/04-dpia.md`)
 - [ ] Access-review process for admin roles
 
@@ -630,14 +637,14 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 | # | Check | Expected evidence | Status |
 |---|---|---|---|
 | 1 | Clean install | fresh clone -> install -> tests pass | PARTIAL — `backend/requirements.lock` and `frontend/package-lock.json` committed; clean-clone install requires dev environment |
-| 2 | Tests | full suite green, count recorded | PARTIAL — 190 tests pass: 176 backend tests pass (alert trigger/dispatch, advisory validator/workflow, triage service, map layers) + 14 database tests pass (`database/tests/`) |
-| 3 | OpenAPI security | `securitySchemes` present | PARTIAL — bearer auth dependencies implemented in `core/dependencies.py` and routers; OpenAPI spec generation in progress |
-| 4 | Unauthenticated admin route | `401`/`403` | PARTIAL — `require_roles("admin")` enforced on all `/admin/*` routes in `auth.py`, `advisories.py`, `alerts.py`, `forecast.py` |
+| 2 | Tests | full suite green, count recorded | PARTIAL — 332 tests pass: 294 backend tests pass (health, conversations, triage/decision, advisories/alerts, map layers, identity) + 38 database tests pass (`database/tests/` across schema/seed, storage rules, weather & boundaries) |
+| 3 | OpenAPI security | `securitySchemes` present | PARTIAL — `HTTPBearer` present and applied to `/v1/me` and `/v1/admin/*`; demo routes remain unauthenticated |
+| 4 | Unauthenticated admin route | `401`/`403` | PASS — `require_roles("admin")` enforced on all `/admin/*` routes; returns `401` without a token and `403` with a farmer token |
 | 5 | Farmer cross-tenant read | `403`/`404` with no data leak | PARTIAL — object ownership filtering implemented in `backend/app/api/v1/observations.py` and `modules/observations/service.py` |
-| 6 | Upload -> inference | prediction returned with model version | PARTIAL — upload confirmation triggers assessment; `AssessmentService` and explanation validator implemented |
+| 6 | Upload -> inference | prediction returned with model version | PARTIAL — upload confirmation triggers assessment; `AssessmentService` and explanation validator implemented; demo model |
 | 7 | Diagnosis persisted | record retrievable in history | PARTIAL — `GET /v1/observations` and `image_predictions` persistence implemented in backend and database schema |
 | 8 | Image retrievable via signed URL | `200`, URL expires | PARTIAL — S3 presigned rules (TTL ≤ 10m) verified in `database/tests/test_storage_rules.py`; Cloudinary signed params in `media/storage.py` |
-| 9 | Weather affects risk | two fixtures -> different scores | MISSING — weather snapshot tables exist, but weather provider ingestion not yet scheduled |
+| 9 | Weather affects risk | two fixtures -> different scores | PARTIAL — weather ingestion (`weather_ingest.py`, `boundary_loader.py`, `historical_ingest.py`), freshness SLA (≤24h), leaf-wetness proxy, spatial matching, and refusal gates (`forecast_gate.py`, `check_weather_sufficiency` DB function) implemented and unit-tested; stale/missing weather produces explicit `insufficient_data` with `probability = NULL` (never silent imputation); forecast fixture pipeline runner pending |
 | 10 | Risk -> alert | one deduped alert, correct recipients | PARTIAL — alert trigger, dedupe, cooldown, dispatch verified in `tests/test_alert_trigger.py` and `test_alert_dispatch.py` |
 | 11 | Map uses API data | layer changes when records change | PARTIAL — backend layer API exists (`GET /v1/map/layers/{layer}`) with suppression and layer separation; map frontend client pending |
 | 12 | Admin sees real data | count matches database | PARTIAL — admin API routers for users, roles, advisories, alerts, and models implemented in backend |

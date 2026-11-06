@@ -651,52 +651,91 @@ COMMENT ON COLUMN sentinel_visits.coverage_pass IS
 COMMENT ON TABLE sentinel_visits IS
   'Sole source of forecast negatives. A missing visit is never a negative.';
 
+-- Historical plant clinic, extension and survey records
+CREATE TABLE historical_occurrences (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  crop_code         text NOT NULL REFERENCES crops(code) ON DELETE RESTRICT,
+  target_code       text NOT NULL,
+  geo_code          text NOT NULL,
+  boundary_version  text NOT NULL,
+  verification_tier text NOT NULL,
+  event_date        date NOT NULL,
+  report_date       date NOT NULL,
+  source_link       text NOT NULL,
+  source_dataset    text NOT NULL,
+  dedupe_key        text NOT NULL,
+  dedupe_history    jsonb NOT NULL DEFAULT '[]'::jsonb,
+  severity          text,
+  evidence_summary  text,
+  notes             text,
+  created_at        timestamptz NOT NULL DEFAULT now(),
+  is_demo           boolean NOT NULL DEFAULT false,
+  CONSTRAINT ck_hist_dates CHECK (report_date >= event_date),
+  CONSTRAINT ck_hist_tier CHECK (verification_tier IN (
+    'confirmed', 'probable', 'unverified', 'rejected', 'historical_clinic', 'survey'
+  )),
+  CONSTRAINT uq_hist_dedupe_key UNIQUE (dedupe_key)
+);
+
+COMMENT ON TABLE historical_occurrences IS
+  'Historical extension records, plant clinics and field surveys. Verification tier, source link, report vs event date and dedupe history preserved. Append-only.';
+
 -- =============================================================================
 -- 5. Weather and forecast
 -- =============================================================================
 
 CREATE TABLE weather_snapshots (
-  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  grid_id          text,
-  geo_code         text NOT NULL,
-  source           text NOT NULL,
-  source_timestamp timestamptz NOT NULL,
-  fetched_at       timestamptz NOT NULL DEFAULT now(),
-  variables        jsonb NOT NULL,
-  completeness     numeric,
-  is_stale         boolean NOT NULL DEFAULT false,
-  created_at       timestamptz NOT NULL DEFAULT now(),
-  is_demo          boolean NOT NULL DEFAULT false,
+  id                      uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  grid_id                 text,
+  geo_code                text NOT NULL,
+  boundary_version        text NOT NULL,
+  spatial_matching_method text NOT NULL DEFAULT 'centroid_nearest_station',
+  station_id              text,
+  station_distance_km     numeric(6,2),
+  source                  text NOT NULL,
+  source_timestamp        timestamptz NOT NULL,
+  fetched_at              timestamptz NOT NULL DEFAULT now(),
+  freshness_seconds       integer,
+  variables               jsonb NOT NULL,
+  completeness            numeric,
+  is_stale                boolean NOT NULL DEFAULT false,
+  created_at              timestamptz NOT NULL DEFAULT now(),
+  is_demo                 boolean NOT NULL DEFAULT false,
   CONSTRAINT ck_weather_completeness CHECK (
     completeness IS NULL OR (completeness >= 0 AND completeness <= 1)
-  )
+  ),
+  CONSTRAINT ck_weather_spatial_method CHECK (spatial_matching_method IN (
+    'centroid_nearest_station', 'grid_areal_weighted_mean', 'station_idw', 'admin_polygon_intersection', 'station_exact'
+  ))
 );
 
 COMMENT ON TABLE weather_snapshots IS
-  'One row per ingest unit. Missing/stale weather produces insufficient_data; never impute for a scored forecast.';
+  'One row per ingest unit. Missing/stale weather produces insufficient_data; never impute for a scored forecast. Stores spatial matching method and boundary version.';
 
 CREATE TABLE feature_snapshots (
-  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  crop_code    text NOT NULL REFERENCES crops(code) ON DELETE RESTRICT,
-  target_code  text NOT NULL,
-  geo_code     text NOT NULL,
-  horizon_days integer NOT NULL,
-  issue_time   timestamptz NOT NULL,
-  features     jsonb NOT NULL,
-  source_refs  jsonb NOT NULL,
-  created_at   timestamptz NOT NULL DEFAULT now(),
-  is_demo      boolean NOT NULL DEFAULT false,
+  id               uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  crop_code        text NOT NULL REFERENCES crops(code) ON DELETE RESTRICT,
+  target_code      text NOT NULL,
+  geo_code         text NOT NULL,
+  boundary_version text NOT NULL DEFAULT 'demo-2026-11',
+  horizon_days     integer NOT NULL,
+  issue_time       timestamptz NOT NULL,
+  features         jsonb NOT NULL,
+  source_refs      jsonb NOT NULL,
+  created_at       timestamptz NOT NULL DEFAULT now(),
+  is_demo          boolean NOT NULL DEFAULT false,
   CONSTRAINT ck_feature_snapshots_horizon CHECK (horizon_days >= 0)
 );
 
 COMMENT ON TABLE feature_snapshots IS
-  'Immutable feature payload referenced by forecasts. Every feature must be computable at issue_time.';
+  'Immutable feature payload referenced by forecasts. Every feature must be computable at issue_time. Stores boundary version.';
 
 CREATE TABLE forecasts (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   crop_code           text NOT NULL REFERENCES crops(code) ON DELETE RESTRICT,
   target_code         text NOT NULL,
   geo_code            text NOT NULL,
+  boundary_version    text NOT NULL DEFAULT 'demo-2026-11',
   horizon_days        integer NOT NULL,
   issue_time          timestamptz NOT NULL,
   valid_from          timestamptz NOT NULL,
@@ -725,6 +764,9 @@ CREATE TABLE forecasts (
   CONSTRAINT ck_probability_nullable CHECK (probability IS NULL OR probability BETWEEN 0 AND 1),
   CONSTRAINT ck_forecasts_low_coverage CHECK (
     coverage <> 'low' OR risk_band = 'insufficient_data'
+  ),
+  CONSTRAINT ck_forecasts_no_imputation CHECK (
+    risk_band <> 'insufficient_data' OR probability IS NULL
   )
 );
 
@@ -973,6 +1015,10 @@ CREATE TRIGGER trg_forecasts_immutable
   BEFORE UPDATE OR DELETE ON forecasts
   FOR EACH ROW EXECUTE FUNCTION reject_mutation();
 
+CREATE TRIGGER trg_historical_occurrences_immutable
+  BEFORE UPDATE OR DELETE ON historical_occurrences
+  FOR EACH ROW EXECUTE FUNCTION reject_mutation();
+
 CREATE TRIGGER trg_advisory_versions_immutable
   BEFORE UPDATE OR DELETE ON advisory_versions
   FOR EACH ROW EXECUTE FUNCTION reject_mutation();
@@ -1093,7 +1139,15 @@ CREATE INDEX ix_sentinel_visits_site_date ON sentinel_visits (site_id, visit_dat
 CREATE INDEX ix_sentinel_visits_observer ON sentinel_visits (observer_id);
 CREATE INDEX ix_sentinel_visits_target ON sentinel_visits (target_code);
 
+CREATE INDEX ix_historical_occurrences_crop_target_geo ON historical_occurrences (
+  crop_code, target_code, geo_code, event_date DESC
+);
+CREATE INDEX ix_historical_occurrences_dedupe ON historical_occurrences (dedupe_key);
+CREATE INDEX ix_historical_occurrences_tier ON historical_occurrences (verification_tier);
+CREATE INDEX ix_historical_occurrences_dates ON historical_occurrences (event_date, report_date);
+
 CREATE INDEX ix_weather_geo_time ON weather_snapshots (geo_code, source_timestamp DESC);
+CREATE INDEX ix_weather_spatial ON weather_snapshots (geo_code, boundary_version, spatial_matching_method);
 CREATE INDEX ix_weather_fetched ON weather_snapshots (fetched_at DESC);
 CREATE INDEX ix_feature_snapshots_lookup ON feature_snapshots (
   crop_code, target_code, geo_code, horizon_days, issue_time DESC
@@ -1199,6 +1253,83 @@ WHERE sv.scheduled = true
 COMMENT ON VIEW v_sentinel_negative_candidates IS
   'D7 negative candidates only: scheduled, absent, coverage-passing, supported target, active panel. The caller must also enforce the label window. A missing visit is never a negative.';
 
+-- Evaluates weather sufficiency for an administrative unit and boundary version.
+-- Makes missing, stale or incomplete data explicit by returning is_sufficient = false and a typed reason.
+-- Never silently imputes.
+CREATE OR REPLACE FUNCTION check_weather_sufficiency(
+  p_geo_code text,
+  p_boundary_version text,
+  p_cutoff_time timestamptz,
+  p_max_staleness_hours integer DEFAULT 24,
+  p_min_completeness numeric DEFAULT 0.80
+) RETURNS TABLE (
+  is_sufficient boolean,
+  reason_code text,
+  latest_snapshot_id uuid,
+  source_timestamp timestamptz,
+  age_hours numeric,
+  completeness numeric,
+  variables jsonb
+) AS $$
+DECLARE
+  v_rec record;
+  v_age_hrs numeric;
+  v_has_temp boolean;
+  v_has_rh boolean;
+  v_has_rain boolean;
+  v_has_wind boolean;
+  v_has_wet_days boolean;
+BEGIN
+  SELECT ws.id, ws.source_timestamp, ws.fetched_at, ws.variables, ws.completeness, ws.is_stale, ws.boundary_version
+  INTO v_rec
+  FROM weather_snapshots ws
+  WHERE ws.geo_code = p_geo_code
+    AND ws.source_timestamp <= p_cutoff_time
+  ORDER BY ws.source_timestamp DESC
+  LIMIT 1;
+
+  IF NOT FOUND THEN
+    RETURN QUERY SELECT false, 'weather_missing'::text, NULL::uuid, NULL::timestamptz, NULL::numeric, 0.0::numeric, NULL::jsonb;
+    RETURN;
+  END IF;
+
+  v_age_hrs := ROUND((EXTRACT(EPOCH FROM (p_cutoff_time - v_rec.source_timestamp)) / 3600.0)::numeric, 2);
+
+  IF v_rec.boundary_version <> p_boundary_version THEN
+    RETURN QUERY SELECT false, 'boundary_mismatch'::text, v_rec.id, v_rec.source_timestamp, v_age_hrs, COALESCE(v_rec.completeness, 0.0), v_rec.variables;
+    RETURN;
+  END IF;
+
+  IF v_rec.is_stale OR v_age_hrs > p_max_staleness_hours THEN
+    RETURN QUERY SELECT false, 'weather_stale'::text, v_rec.id, v_rec.source_timestamp, v_age_hrs, COALESCE(v_rec.completeness, 0.0), v_rec.variables;
+    RETURN;
+  END IF;
+
+  IF v_rec.completeness IS NOT NULL AND v_rec.completeness < p_min_completeness THEN
+    RETURN QUERY SELECT false, 'weather_incomplete'::text, v_rec.id, v_rec.source_timestamp, v_age_hrs, v_rec.completeness, v_rec.variables;
+    RETURN;
+  END IF;
+
+  -- Verify core required variables exist in jsonb payload:
+  -- temperature, relative humidity, rainfall, wet_day_runs, wind
+  v_has_temp := (v_rec.variables ? 'temperature_min_c' OR v_rec.variables ? 'temperature_mean_c' OR v_rec.variables ? 'temperature_c');
+  v_has_rh := (v_rec.variables ? 'relative_humidity_max_pct' OR v_rec.variables ? 'relative_humidity_mean_pct' OR v_rec.variables ? 'relative_humidity_pct');
+  v_has_rain := (v_rec.variables ? 'rainfall_mm');
+  v_has_wind := (v_rec.variables ? 'wind_speed_ms' OR v_rec.variables ? 'wind_speed_kmh');
+  v_has_wet_days := (v_rec.variables ? 'wet_day_runs' OR v_rec.variables ? 'wet_hours');
+
+  IF NOT (v_has_temp AND v_has_rh AND v_has_rain AND v_has_wind AND v_has_wet_days) THEN
+    RETURN QUERY SELECT false, 'weather_incomplete'::text, v_rec.id, v_rec.source_timestamp, v_age_hrs, COALESCE(v_rec.completeness, 0.0), v_rec.variables;
+    RETURN;
+  END IF;
+
+  RETURN QUERY SELECT true, 'sufficient'::text, v_rec.id, v_rec.source_timestamp, v_age_hrs, COALESCE(v_rec.completeness, 1.0), v_rec.variables;
+END;
+$$ LANGUAGE plpgsql STABLE;
+
+COMMENT ON FUNCTION check_weather_sufficiency IS
+  'Evaluates whether recent weather data is sufficient to score a forecast. Rejects missing, stale, boundary-mismatched or incomplete data with typed reasons; never silently imputes.';
+
 -- =============================================================================
 -- 11. Demo visibility
 -- =============================================================================
@@ -1224,6 +1355,7 @@ UNION ALL SELECT 'labels', id::text FROM labels WHERE is_demo
 UNION ALL SELECT 'review_events', id::text FROM review_events WHERE is_demo
 UNION ALL SELECT 'sentinel_sites', id::text FROM sentinel_sites WHERE is_demo
 UNION ALL SELECT 'sentinel_visits', id::text FROM sentinel_visits WHERE is_demo
+UNION ALL SELECT 'historical_occurrences', id::text FROM historical_occurrences WHERE is_demo
 UNION ALL SELECT 'weather_snapshots', id::text FROM weather_snapshots WHERE is_demo
 UNION ALL SELECT 'feature_snapshots', id::text FROM feature_snapshots WHERE is_demo
 UNION ALL SELECT 'forecasts', id::text FROM forecasts WHERE is_demo

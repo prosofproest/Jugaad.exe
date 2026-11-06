@@ -5,8 +5,13 @@
 repository. It states what the system is, what must never be violated, and how work is
 planned, built, tested and documented.
 
-**Status:** documentation plus engineering scaffolds (Phase 2 §5.1) and the web chat
-surface (§5.7, demo backend). No real model is connected; demo paths are labelled.
+**Status:** documentation plus engineering scaffolds (Phase 2 §5.1), the persisted
+demo chat slice (§5.7: image upload, demo quality gate, deterministic demo engine,
+review requests; Alembic `0002_chat_persistence`), and the §5.2 identity backend
+slice (in memory: OTP, staff MFA, five roles, consent, privacy, audit). No real
+model is connected; demo paths are labelled and identity state is lost on restart.
+The mobile client passes `flutter analyze` and `flutter test`; no APK or device run
+yet.
 **Last updated:** 2026-11-06
 
 ---
@@ -21,12 +26,11 @@ An explainable, offline-tolerant decision-support platform with two separate out
 | **Area outlook** | How likely is *this threat* in *this area* over *this window*? | Crop × target × geography × horizon |
 
 Neither output is a laboratory confirmation and neither is a confirmed outbreak.
-The platform is deliberately narrow in v1: an open crop catalogue with a small validated
-target allowlist, one agro-climatic zone, a rules-based weather nowcast over the last 10
-days, assistive image triage with abstention, extension-worker verification, English +
-Kannada, and in-app/email alerts with optional SMS. These are the settled shape; the first
-concrete allowlist (D1a), the pilot zone/institution (D4) and the verifier SLA (D3b) are
-recorded in `progress-tracker.md` §4 and `phase-0-decisions.md`. See `project-overview.md`.
+The platform is deliberately narrow in v1: one crop, one agro-climatic zone, a small
+target list, a rules-based weather risk model, assistive image triage, extension-worker
+verification, and SMS/WhatsApp delivery. These are the intended shape, not settled scope —
+crop, targets, zone, horizon and channel are fixed by decisions D1, D2 and D4 in
+`progress-tracker.md` §4. See `project-overview.md`.
 
 ---
 
@@ -127,12 +131,8 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 
 ---
 
-## 4. Repository layout
+## 4. Target repository layout
 
-Documentation lives under `final/`; application code lives at the repository root.
-
-```
-/
 ```
 /
 ├── AGENTS.md                     # pointer to docs-context/AGENTS.md
@@ -140,7 +140,7 @@ Documentation lives under `final/`; application code lives at the repository roo
 ├── docs-context/                 # this folder: operating context for agents
 ├── feature-specs/                # feature-level specifications
 ├── backend/                      # FastAPI modular monolith (scaffold)
-├── mobile/                       # Flutter capture app (scaffold, unverified)
+├── mobile/                       # Flutter capture app (scaffold; analyze/test verified)
 ├── frontend/                     # Next.js web app (scaffold; source docs say web/)
 ├── ml/                           # training, evaluation, export to ONNX (planned)
 ├── database/                     # database workspace; schema authority is backend Alembic
@@ -153,8 +153,9 @@ artifacts, governance registers, Alembic migrations plan, storage rules, and bac
 design — SQLAlchemy models and Alembic migrations in `backend/` are the
 single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
-Nothing beyond the Phase 2 §5.1 foundation and the demo-backed web chat surface
-(§5.7) exists in these folders. Do not create scaffolding that implies a decision
+Nothing beyond the Phase 2 §5.1 foundation, the persisted demo chat slice
+(§5.7), the in-memory §5.2 identity backend slice, and the Phase 1 weather/boundaries/historical
+ingestion components exists in these folders. Do not create scaffolding that implies a decision
 has been made unless the decision is recorded in `progress-tracker.md`.
 
 ---
@@ -162,32 +163,33 @@ has been made unless the decision is recorded in `progress-tracker.md`.
 ## 5. Commands
 
 Verified on 2026-11-06 (Windows 11; Python 3.14.5 in the venv, runtime target
-3.12; Node 24.14.0; Docker client 29.8.0; no Flutter SDK). POSIX paths are in
-each agent's `README.md`.
+3.12; Node 24.14.0; Docker client 29.8.0; Flutter 3.47.9 / Dart 3.13.7). POSIX
+paths are in each agent's `README.md`.
 
 | Task | Command | Last result |
 |---|---|---|
-| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 16 passed |
-| Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean |
-| Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean |
-| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline` |
+| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 294 passed |
+| Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean for the identity slice; pre-existing failures remain elsewhere |
+| Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean for the identity slice; pre-existing differences remain elsewhere |
+| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence` |
 | Review migration SQL offline | `cd backend && .venv\Scripts\python -m alembic upgrade head --sql` | SQL emitted |
 | Backend dev server | `cd backend && .venv\Scripts\python -m uvicorn app.main:app --reload --port 8000` | `/health` returned 200 |
 | Web install | `cd frontend && npm ci` | 346 packages |
 | Web typecheck | `cd frontend && npm run typecheck` | pass |
 | Web lint | `cd frontend && npm run lint` | pass |
 | Web build | `cd frontend && npm run build` | pass; 6 routes |
-| Web chat smoke | `uvicorn` + `next start`, then create/list/open/delete a conversation | pass; list, thread, demo badge, delete and empty state observed |
+| Web chat smoke | `uvicorn` + `next start`, then upload a photo, send it, request review, open the thread and delete | pass; upload → `demo-chat-0.1` assessment → persisted review → preview byte-match → 415 rejection; list, thread, demo badge, delete and empty state observed |
 | Compose parse | `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml config --quiet` | pass |
-| Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | **NOT RUN — Flutter not installed**; CI job defined |
+| Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | pass — 30 packages resolved; analyze clean; 1 widget test passed (Flutter 3.47.9) |
 | Container builds | `docker build -t ps03-api:ci backend` and `docker build -t ps03-web:ci frontend` | **NOT RUN — daemon unavailable**; CI builds |
 
 `alembic upgrade head` against a live database has not been run (no local
 PostGIS). The offline SQL path is verified; applying it is not.
 
-Never document a command you have not run in this repository. The two NOT RUN
-rows are marked as such on purpose and must be converted to evidence before the
-mobile app or containers are called working.
+Never document a command you have not run in this repository. The container-build
+row is marked NOT RUN on purpose and must be converted to evidence before the
+containers are called working. Mobile analyze/test are verified; an APK build and
+device run remain unverified until platform runners are generated and committed.
 
 ---
 
@@ -282,8 +284,8 @@ Refuse and escalate (do not implement) if asked to:
 | **Abstention / no assessment** | Model declined to answer because evidence is insufficient. |
 | **Coverage** | Completeness, freshness and representativeness of inputs for an area. |
 | **Verification** | Human decision on a report: confirmed, probable, rejected, duplicate, needs visit, unresolved. |
-| **Target** | A pest/disease condition in the open catalogue; only allowlisted targets are assessed. |
-| **Supported** | Explicitly in the current release's validated crop × target allowlist (ADR-011). |
+| **Target** | A supported pest/disease condition on the supported crop list. |
+| **Supported** | Explicitly in the approved crop/target/geography list for the current release. |
 | **Stale** | Past its validity window; must be visually distinct from fresh data. |
 
 ---

@@ -75,8 +75,9 @@ export function ChatIndex({
         </p>
       </header>
       <p className="notice notice-warning small">
-        <span className="badge badge-muted">demo</span> No image model is connected
-        in this phase. Replies are labelled template responses, not diagnoses.
+        <span className="badge badge-muted">demo</span> A deterministic demo engine
+        is connected, not a trained model. Uploaded photos pass a demo quality gate
+        and replies are synthetic, labelled template output — never a diagnosis.
       </p>
 
       <div className="toolbar">
@@ -113,7 +114,7 @@ export function ChatIndex({
           <p>
             <strong>No conversations yet.</strong>
           </p>
-          <p>Start one to describe a plant problem or attach a photo preview.</p>
+          <p>Start one to describe a plant problem and attach a photo.</p>
           <button
             type="button"
             className="button-large"

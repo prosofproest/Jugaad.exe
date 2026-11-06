@@ -5,6 +5,7 @@ See ``final/docs-context/architecture-context.md`` §1–§4 for architectural b
 
 from __future__ import annotations
 
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -13,50 +14,95 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.health import health_payload
 from app.api.v1.router import api_router
 from app.core.config import get_settings
-from app.core.errors import install_error_handlers
-from app.core.request_context import RequestContextMiddleware, configure_logging
+from app.core.errors import register_error_handlers
+from app.core.logging import configure_logging
+from app.core.middleware import RequestContextMiddleware
+from app.modules.identity.dependencies import get_identity_service
 
-settings = get_settings()
+OPENAPI_TAGS = [
+    {"name": "health", "description": "Process liveness only."},
+    {
+        "name": "auth",
+        "description": (
+            "Phone OTP for farmers, email/password + TOTP for staff, rotating "
+            "refresh tokens and logout."
+        ),
+    },
+    {
+        "name": "me",
+        "description": "Authenticated profile, versioned consent, export and privacy requests.",
+    },
+    {
+        "name": "admin",
+        "description": (
+            "Admin-only user provisioning, audited record views, role/status changes, "
+            "retention jobs and aggregate-only exports."
+        ),
+    },
+    {
+        "name": "conversations",
+        "description": (
+            "Conversational capture: upload an image, send a message and receive "
+            "a structured assessment card. Demo replies are labelled `is_demo`; "
+            "no real model is served in this phase."
+        ),
+    },
+]
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
-    configure_logging()
-    if settings.seed_reference_data:
-        try:
-            from app.db.session import init_db
+async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+    settings = get_settings()
+    configure_logging(settings.log_level)
+    # Construct identity now so production misconfiguration and the one-time
+    # admin bootstrap fail at startup rather than on the first request.
+    get_identity_service()
+    # Local development and tests use SQLite, where the schema can be created
+    # without a migration step. Deployed environments are Alembic's job.
+    if settings.database_url.startswith("sqlite") and settings.seed_reference_data:
+        from app.db.session import init_db
 
-            init_db(seed=True)
-        except Exception:
-            pass
+        init_db(seed=True)
     yield
 
 
-app = FastAPI(
-    title=settings.app_name,
-    version=settings.version,
-    description=(
-        "PS-03 decision-support API. Photo assessment and area outlook are "
-        "separate outputs and are never merged."
-    ),
-    lifespan=lifespan,
-)
+def create_app() -> FastAPI:
+    settings = get_settings()
+    docs_enabled = settings.docs_enabled and not settings.is_production
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=settings.cors_origins,
-    allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
-)
-app.add_middleware(RequestContextMiddleware)
+    app = FastAPI(
+        title=settings.app_name,
+        version=settings.version,
+        description=(
+            "PS-03 decision-support API. Photo assessment and area outlook are "
+            "separate outputs and are never merged. Error responses follow the "
+            "problem-details envelope documented in final/TRD.md §7.2."
+        ),
+        openapi_tags=OPENAPI_TAGS,
+        docs_url="/docs" if docs_enabled else None,
+        redoc_url=None,
+        openapi_url="/openapi.json" if docs_enabled else None,
+        lifespan=lifespan,
+    )
 
-install_error_handlers(app)
+    app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.cors_origins,
+        allow_credentials=False,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+    )
 
-app.include_router(api_router, prefix=settings.api_v1_prefix)
+    register_error_handlers(app)
+    app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+    @app.get("/health", tags=["health"])
+    def health() -> dict[str, str]:
+        """Unauthenticated liveness probe used by the web client and deploy checks."""
+        return health_payload()
+
+    return app
 
 
-@app.get("/health", tags=["health"])
-def health() -> dict[str, str]:
-    """Unauthenticated liveness probe used by the web client and deploy checks."""
-    return health_payload()
+app = create_app()

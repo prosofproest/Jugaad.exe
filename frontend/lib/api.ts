@@ -13,12 +13,45 @@ export interface Assessment {
   state: AssessmentState;
   reason_code: string | null;
   reason_text: string | null;
-  candidates: { label: string; score: number }[];
+  quality_flag: string | null;
+  quality_flags: string[];
+  candidates: { label: string; display_name: string | null; score: number }[];
   confidence_band: string | null;
   calibrated: boolean;
   model_version: string;
   generated_at: string;
   is_demo: boolean;
+  observation_id: string | null;
+  error_code: string | null;
+  retryable: boolean;
+}
+
+export interface UploadedImage {
+  upload_id: string;
+  filename: string;
+  content_type: string;
+  content_hash: string;
+  width: number;
+  height: number;
+  quality_result: string;
+  quality_flags: string[];
+  preview_url: string;
+}
+
+export interface UploadDescriptor extends UploadedImage {
+  size_bytes: number;
+  quality_gate_version: string;
+  created_at: string;
+  is_demo: boolean;
+}
+
+export interface ReviewRequest {
+  review_request_id: string;
+  conversation_id: string;
+  message_id: string;
+  status: string;
+  reason: string | null;
+  submitted_at: string;
 }
 
 export interface Message {
@@ -28,7 +61,10 @@ export interface Message {
   kind: string;
   text: string | null;
   client_message_id: string | null;
+  observation_id: string | null;
+  image: UploadedImage | null;
   assessment: Assessment | null;
+  review_request: ReviewRequest | null;
   next_steps: string[];
   created_at: string;
   is_demo: boolean;
@@ -47,15 +83,21 @@ export interface SendResult {
   assistant_message: Message;
 }
 
-export interface AttachmentInput {
-  filename: string;
-  content_type: string;
+/**
+ * A reference to an image already uploaded through `POST /v1/uploads`.
+ * Raw bytes never travel in the JSON message body.
+ */
+export interface ImageReference {
+  uploadId: string;
+  filename?: string;
+  contentType?: string;
+  contentHash?: string;
 }
 
 export interface SendMessageInput {
   clientMessageId: string;
   text?: string;
-  image?: AttachmentInput;
+  image?: ImageReference;
 }
 
 export interface Health {
@@ -97,6 +139,24 @@ export function apiBaseUrl(): string {
     process.env.NEXT_PUBLIC_API_BASE_URL ??
     "http://localhost:8000"
   );
+}
+
+/**
+ * The browser-visible API origin. Unlike `apiBaseUrl()`, this never reads the
+ * server-only `API_BASE_URL`, so an `<img>` rendered on the server and hydrated
+ * in the browser resolves to the same host.
+ */
+export function publicApiBaseUrl(): string {
+  return process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8000";
+}
+
+/** Turn a relative API path such as `/v1/uploads/up_x` into a browser URL. */
+export function publicAssetUrl(path: string): string {
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+  const base = publicApiBaseUrl().replace(/\/$/, "");
+  return `${base}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
@@ -170,12 +230,48 @@ export function sendMessage(
       text: input.text ?? null,
       image: input.image
         ? {
-            filename: input.image.filename,
-            content_type: input.image.content_type,
+            upload_id: input.image.uploadId,
+            filename: input.image.filename ?? null,
+            content_type: input.image.contentType ?? null,
+            content_hash: input.image.contentHash ?? null,
           }
         : null,
     }),
   });
+}
+
+/**
+ * Upload raw image bytes. The backend validates the declared type, the real
+ * decode, the size ceiling and the demo quality gate before storing anything.
+ * The returned `upload_id` is what the chat message references.
+ */
+export async function uploadImage(file: File): Promise<UploadDescriptor> {
+  const form = new FormData();
+  form.append("file", file, file.name);
+  return request<UploadDescriptor>("/v1/uploads", {
+    method: "POST",
+    // Do not set Content-Type: the browser adds the multipart boundary.
+    body: form,
+  });
+}
+
+/**
+ * Ask a human expert to review an assistant assessment. This is an audited,
+ * separate request and never changes the stored prediction.
+ */
+export function requestReview(
+  conversationId: string,
+  messageId: string,
+  reason?: string,
+): Promise<ReviewRequest> {
+  return request<ReviewRequest>(
+    `/v1/conversations/${conversationId}/messages/${messageId}/review`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reason: reason ?? null }),
+    },
+  );
 }
 
 export function retryMessage(
@@ -186,4 +282,31 @@ export function retryMessage(
     `/v1/conversations/${conversationId}/messages/${messageId}/retry`,
     { method: "POST" },
   );
+}
+
+/**
+ * GIS layers are separate by design (spec 06 §7–§8). There is deliberately no
+ * merged "risk" endpoint and the web client must never combine these values.
+ */
+export type MapLayerName =
+  | "verified_reports"
+  | "unverified_reports"
+  | "modelled_risk"
+  | "coverage"
+  | "boundaries";
+
+export interface MapLayer {
+  type: "FeatureCollection";
+  layer: MapLayerName;
+  boundary_version: string;
+  generated_at: string;
+  aggregation_level: string;
+  features: unknown[];
+  empty: boolean;
+  empty_message: string | null;
+  small_count_suppression_applied: boolean;
+}
+
+export function getMapLayer(layer: MapLayerName): Promise<MapLayer> {
+  return request<MapLayer>(`/v1/map/layers/${layer}`);
 }

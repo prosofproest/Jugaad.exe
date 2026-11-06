@@ -366,34 +366,160 @@ INSERT INTO sentinel_visits (
 ON CONFLICT (site_id, visit_date, target_code) DO NOTHING;
 
 -- -----------------------------------------------------------------------------
+-- 4.b Historical Occurrence Records (Plant Clinics, Surveys, Provenance & Dedupe)
+-- -----------------------------------------------------------------------------
+
+INSERT INTO historical_occurrences (
+  id, crop_code, target_code, geo_code, boundary_version, verification_tier,
+  event_date, report_date, source_link, source_dataset, dedupe_key, dedupe_history,
+  severity, evidence_summary, notes, is_demo
+) VALUES
+  (
+    '00000000-0000-0000-0038-000000000001', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 'confirmed', '2023-08-12', '2023-08-15',
+    'https://farm-archives.karnataka.gov.in/clinics/2023/rep-10492',
+    'karnataka_plant_clinic_archive_2020_2024',
+    'sha256:hist-clinic-2023-08-12-rice-blast-blk1',
+    '[{"source": "survey_field_849", "matched_at": "2023-08-18T10:00:00Z", "status": "deduplicated_into_clinic_record"}]'::jsonb,
+    'moderate',
+    'Microscopy confirmation of Piricularia oryzae conidia; diamond/spindle shaped lesions on flag leaf.',
+    'Historical outbreak in Hunsur rural block during continuous wet week of Kharif 2023.',
+    true
+  ),
+  (
+    '00000000-0000-0000-0038-000000000002', 'DEMO_TOMATO', 'DEMO_TOM_EBLIGHT', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 'probable', '2023-10-04', '2023-10-05',
+    'https://farm-archives.karnataka.gov.in/surveys/2023/surv-0421',
+    'uas_bangalore_extension_surveys_2023',
+    'sha256:hist-survey-2023-10-04-tom-eblight-blk1',
+    '[]'::jsonb,
+    'mild',
+    'Concentric ring target-pattern leaf spots on lower tomato canopy.',
+    'Field extension survey record; high humidity conditions.',
+    true
+  ),
+  (
+    '00000000-0000-0000-0038-000000000003', 'DEMO_RICE', 'DEMO_RICE_BPH', 'DEMO-BLK-002',
+    'DEMO-BV-2026-V1', 'confirmed', '2024-09-20', '2024-09-22',
+    'https://farm-archives.karnataka.gov.in/clinics/2024/rep-12044',
+    'karnataka_plant_clinic_archive_2020_2024',
+    'sha256:hist-clinic-2024-09-20-rice-bph-blk2',
+    '[]'::jsonb,
+    'severe',
+    'Hopper burn circular patches; density >15 nymphs per hill.',
+    'Confirmed in Bilikere block; drainage advisories issued.',
+    true
+  )
+ON CONFLICT (dedupe_key) DO NOTHING;
+
+-- -----------------------------------------------------------------------------
 -- 5. Demo Weather, Feature Snapshots, Forecast Runs & Forecasts
 -- -----------------------------------------------------------------------------
 
 INSERT INTO weather_snapshots (
-  id, grid_id, geo_code, source, source_timestamp, fetched_at, variables, completeness, is_stale, is_demo
+  id, grid_id, geo_code, boundary_version, spatial_matching_method, station_id,
+  station_distance_km, source, source_timestamp, fetched_at, freshness_seconds,
+  variables, completeness, is_stale, is_demo
 ) VALUES
   (
-    '00000000-0000-0000-0040-000000000001', 'GRID-DEMO-001', 'DEMO-BLK-001', 'IMD-AutoStation-Demo',
-    now() - interval '2 days', now() - interval '2 days',
-    '{"temperature_c": 26.4, "relative_humidity_pct": 89.2, "rainfall_mm": 18.5, "wet_hours": 11.2, "wind_speed_kmh": 14.0}'::jsonb,
+    '00000000-0000-0000-0040-000000000001', 'GRID-DEMO-001', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 'centroid_nearest_station', 'IMD-KAR-CHIKKABALLAPUR-01',
+    6.80, 'IMD-AutoStation-Demo', now() - interval '2 hours', now() - interval '1 hour', 3600,
+    '{
+      "temperature_min_c": 19.5,
+      "temperature_max_c": 29.8,
+      "temperature_mean_c": 24.6,
+      "relative_humidity_min_pct": 68.0,
+      "relative_humidity_max_pct": 96.0,
+      "relative_humidity_mean_pct": 84.5,
+      "rainfall_mm": 18.5,
+      "wet_day_runs": 4,
+      "wind_speed_ms": 3.8,
+      "leaf_wetness_proxy_hours": 9.5
+    }'::jsonb,
     1.000, false, true
   ),
   (
-    '00000000-0000-0000-0040-000000000002', 'GRID-DEMO-002', 'DEMO-BLK-002', 'IMD-AutoStation-Demo',
-    now() - interval '2 days', now() - interval '2 days',
-    '{"temperature_c": 28.1, "relative_humidity_pct": 74.5, "rainfall_mm": 2.1, "wet_hours": 4.0, "wind_speed_kmh": 9.5}'::jsonb,
+    '00000000-0000-0000-0040-000000000002', 'GRID-DEMO-002', 'DEMO-BLK-002',
+    'DEMO-BV-2026-V1', 'grid_areal_weighted_mean', 'IMD-GRID-0.1DEG-76.35',
+    4.20, 'IMD-AutoStation-Demo', now() - interval '3 hours', now() - interval '1 hour', 7200,
+    '{
+      "temperature_min_c": 21.0,
+      "temperature_max_c": 31.2,
+      "temperature_mean_c": 26.1,
+      "relative_humidity_min_pct": 55.0,
+      "relative_humidity_max_pct": 86.0,
+      "relative_humidity_mean_pct": 72.0,
+      "rainfall_mm": 2.5,
+      "wet_day_runs": 1,
+      "wind_speed_ms": 2.9,
+      "leaf_wetness_proxy_hours": 4.0
+    }'::jsonb,
     1.000, false, true
+  ),
+  (
+    -- Explicit STALE weather snapshot (age 48 hours > 24 hours threshold)
+    '00000000-0000-0000-0040-000000000003', 'GRID-DEMO-001', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 'centroid_nearest_station', 'IMD-KAR-CHIKKABALLAPUR-01',
+    6.80, 'IMD-AutoStation-Demo', now() - interval '48 hours', now() - interval '1 hour', 169200,
+    '{
+      "temperature_min_c": 18.0,
+      "temperature_max_c": 28.0,
+      "temperature_mean_c": 23.0,
+      "relative_humidity_min_pct": 60.0,
+      "relative_humidity_max_pct": 90.0,
+      "relative_humidity_mean_pct": 78.0,
+      "rainfall_mm": 0.0,
+      "wet_day_runs": 0,
+      "wind_speed_ms": 2.0,
+      "leaf_wetness_proxy_hours": 2.0
+    }'::jsonb,
+    1.000, true, true
+  ),
+  (
+    -- Explicit INCOMPLETE weather snapshot (missing rainfall, wet_day_runs, wind)
+    '00000000-0000-0000-0040-000000000004', 'GRID-DEMO-002', 'DEMO-BLK-002',
+    'DEMO-BV-2026-V1', 'station_idw', 'IMD-KAR-CHIKKABALLAPUR-02',
+    12.40, 'IMD-AutoStation-Demo', now() - interval '2 hours', now() - interval '1 hour', 3600,
+    '{
+      "temperature_min_c": 22.0,
+      "temperature_mean_c": 27.0,
+      "relative_humidity_mean_pct": 65.0
+    }'::jsonb,
+    0.400, false, true
   )
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO feature_snapshots (
-  id, crop_code, target_code, geo_code, horizon_days, issue_time, features, source_refs, is_demo
+  id, crop_code, target_code, geo_code, boundary_version, horizon_days, issue_time,
+  features, source_refs, is_demo
 ) VALUES
   (
-    '00000000-0000-0000-0041-000000000001', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001', 7,
-    now() - interval '2 days',
-    '{"consecutive_wet_days": 4, "mean_temp_7d": 25.8, "mean_rh_7d": 88.5, "cases_prev_14d": 2, "sentinel_negatives": 1}'::jsonb,
+    '00000000-0000-0000-0041-000000000001', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 7, now() - interval '2 hours',
+    '{
+      "consecutive_wet_days": 4,
+      "mean_temp_7d": 24.6,
+      "mean_rh_7d": 84.5,
+      "rainfall_sum_7d": 18.5,
+      "leaf_wetness_hours_7d": 9.5,
+      "cases_prev_14d": 2,
+      "sentinel_negatives": 1
+    }'::jsonb,
     '{"weather_snapshot_id": "00000000-0000-0000-0040-000000000001", "boundary_version": "DEMO-BV-2026-V1"}'::jsonb,
+    true
+  ),
+  (
+    -- Feature snapshot with stale weather reference for insufficient_data forecast demonstration
+    '00000000-0000-0000-0041-000000000002', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 7, now() - interval '1 hour',
+    '{
+      "consecutive_wet_days": null,
+      "mean_temp_7d": null,
+      "gate_status": "insufficient_data",
+      "refusal_reason": "weather_stale"
+    }'::jsonb,
+    '{"weather_snapshot_id": "00000000-0000-0000-0040-000000000003", "boundary_version": "DEMO-BV-2026-V1"}'::jsonb,
     true
   )
 ON CONFLICT (id) DO NOTHING;
@@ -402,22 +528,30 @@ INSERT INTO forecast_runs (
   id, started_at, finished_at, status, model_version, areas_total, areas_scored, areas_insufficient, is_demo
 ) VALUES
   (
-    '00000000-0000-0000-0042-000000000001', now() - interval '2 days', (now() - interval '2 days') + interval '4 minutes',
+    '00000000-0000-0000-0042-000000000001', now() - interval '2 hours', (now() - interval '2 hours') + interval '4 minutes',
     'succeeded', 'demo-forecast-model-v1', 5, 4, 1, true
   )
 ON CONFLICT (id) DO NOTHING;
 
 INSERT INTO forecasts (
-  id, crop_code, target_code, geo_code, horizon_days, issue_time, valid_from, valid_to,
-  risk_band, probability, confidence_band, coverage, drivers, model_version,
-  feature_snapshot_id, is_demo
+  id, crop_code, target_code, geo_code, boundary_version, horizon_days, issue_time,
+  valid_from, valid_to, risk_band, probability, confidence_band, coverage, drivers,
+  model_version, feature_snapshot_id, is_demo
 ) VALUES
   (
-    '00000000-0000-0000-0043-000000000001', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001', 7,
-    now() - interval '2 days', now() - interval '2 days', now() + interval '5 days',
+    '00000000-0000-0000-0043-000000000001', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 7, now() - interval '2 hours', now() - interval '2 hours', now() + interval '5 days',
     'high', 0.765, 'medium', 'good',
-    '[{"feature": "consecutive_wet_days", "weight": 0.45}, {"feature": "mean_rh_7d", "weight": 0.38}]'::jsonb,
+    '[{"feature": "consecutive_wet_days", "weight": 0.45}, {"feature": "mean_rh_7d", "weight": 0.38}, {"feature": "leaf_wetness_hours_7d", "weight": 0.17}]'::jsonb,
     'demo-forecast-model-v1', '00000000-0000-0000-0041-000000000001', true
+  ),
+  (
+    -- Explicit insufficient_data forecast: NO silent imputation, probability IS NULL
+    '00000000-0000-0000-0043-000000000002', 'DEMO_RICE', 'DEMO_RICE_BLAST', 'DEMO-BLK-001',
+    'DEMO-BV-2026-V1', 7, now() - interval '1 hour', now() - interval '1 hour', now() + interval '5 days',
+    'insufficient_data', NULL, 'not_calibrated', 'low',
+    '[{"reason": "weather_stale", "message": "Weather snapshot age exceeds 24h freshness SLA; forecast refused without imputation."}]'::jsonb,
+    'demo-forecast-model-v1', '00000000-0000-0000-0041-000000000002', true
   )
 ON CONFLICT (id) DO NOTHING;
 

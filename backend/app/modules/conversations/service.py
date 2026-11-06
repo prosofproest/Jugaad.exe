@@ -1,739 +1,404 @@
-"""Database-backed conversational capture.
+"""Conversation service (spec 08).
 
-A conversation wraps the same photo-assessment pipeline as the report flow. It
-never diagnoses, never merges the area outlook into a reply and never invents a
-result when an upload is incomplete. Assistant messages are append-only.
+The service owns the turn: validate the referenced upload, run the pluggable
+assessment engine, persist the user message and the append-only assistant reply
+in one transaction, and expose review requests. It never fabricates a result:
+the engine decides the state, and a missing upload is a client error.
+
+The demo engine is selected by ``APP_CHAT_ENGINE`` and always marks its output
+``is_demo``. Photo assessment and area outlook stay separate; nothing here
+produces or merges an outlook.
 """
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.errors import ApiError
-from app.db.base import new_id
-from app.db.models import (
-    Conversation,
-    ImageAsset,
-    Message,
-    MessageAttachment,
-    MessageEvent,
-    ReviewRequest,
-    User,
+from app.core.config import Settings
+from app.modules.conversations import repository as repo
+from app.modules.conversations.engine import (
+    AssessmentEngine,
+    UploadContext,
+    get_assessment_engine,
 )
-from app.modules.assessment import service as assessment_service
-from app.modules.audit.service import record_audit
-from app.modules.identity import service as identity_service
-from app.modules.media import storage
-from app.modules.observations import service as observation_service
+from app.modules.conversations.media import inspect_image, store_image
+from app.modules.conversations.models import (
+    Assessment,
+    Candidate,
+    Conversation,
+    ImageRefOut,
+    Message,
+    MessageCreate,
+    ReviewRequestOut,
+    SendResult,
+    UploadDescriptor,
+)
+from app.modules.conversations.orm import ConversationRow, ImageUploadRow, MessageRow
 
-CHAT_TEMPLATE_VERSION = "chat-template-2026-11-v1"
-NOT_DIAGNOSIS = "Assistive photo assessment, not a diagnosis."
-REASON_TEXT = {
-    "low_resolution": "The photo is too small to assess reliably. Retake it closer to the leaves.",
-    "blur": "The photo is too blurry to assess. Hold the phone steady and retake.",
-    "metadata_missing": "The photo details are incomplete, so it cannot be assessed. Retake it.",
-    "unsupported_type": "That image format cannot be assessed. Use a JPEG or PNG photo.",
-    "insufficient_quality": "The image did not pass the quality check. Retake it in good light.",
-    "unsupported_crop": "This crop is not yet supported for photo assessment.",
-    "unsupported_target": "No validated target exists for this crop yet.",
-}
+OWNER_ID = "demo_user"
+NOT_A_DIAGNOSIS = "Assistive photo assessment — not a diagnosis."
 
 
-def _now() -> datetime:
-    return datetime.now(timezone.utc)
+class ConversationNotFoundError(Exception):
+    """Raised when a conversation does not exist for the caller."""
+
+
+class MessageNotFoundError(Exception):
+    """Raised when a message does not exist in the conversation."""
+
+
+class UploadNotFoundError(Exception):
+    """Raised when an upload does not exist for the caller."""
+
+
+class InvalidReviewTargetError(Exception):
+    """Raised when a review is requested for a message that cannot take one."""
 
 
 def _id(prefix: str) -> str:
-    return new_id(prefix)
+    from uuid import uuid4
+
+    return f"{prefix}_{uuid4().hex}"
 
 
-def _conversation(db: Session, conversation_id: str) -> Conversation:
-    row = db.get(Conversation, conversation_id)
-    if row is None or row.deleted_at is not None:
-        raise ApiError(404, "not_found", "Conversation not found")
+def _now() -> datetime:
+    return datetime.now(UTC)
+
+
+def _aware(value: datetime) -> datetime:
+    """SQLite returns naive timestamps; treat stored values as UTC."""
+
+    return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+
+
+def _conversation(row: ConversationRow) -> Conversation:
+    return Conversation(
+        conversation_id=row.id,
+        owner_id=row.owner_id,
+        title=row.title,
+        created_at=_aware(row.created_at),
+        last_message_at=_aware(row.last_message_at),
+    )
+
+
+def _image_ref(row: ImageUploadRow) -> ImageRefOut:
+    return ImageRefOut(
+        upload_id=row.id,
+        filename=row.filename,
+        content_type=row.content_type,
+        content_hash=row.sha256,
+        width=row.width,
+        height=row.height,
+        quality_result=row.quality_result,
+        quality_flags=list(row.quality_flags or []),
+        preview_url=f"/v1/uploads/{row.id}",
+    )
+
+
+def _review(row) -> ReviewRequestOut:
+    return ReviewRequestOut(
+        review_request_id=row.id,
+        conversation_id=row.conversation_id,
+        message_id=row.message_id,
+        status=row.status,
+        reason=row.reason,
+        submitted_at=_aware(row.created_at),
+    )
+
+
+def _message(session: Session, row: MessageRow) -> Message:
+    assessment = Assessment.model_validate(row.assessment) if row.assessment else None
+    image = ImageRefOut.model_validate(row.image) if row.image else None
+    review = repo.get_review_for_message(session, message_id=row.id)
+    return Message(
+        message_id=row.id,
+        conversation_id=row.conversation_id,
+        role=row.role,
+        kind=row.kind,
+        text=row.text,
+        client_message_id=row.client_message_id,
+        observation_id=row.observation_id,
+        image=image,
+        assessment=assessment,
+        review_request=_review(review) if review else None,
+        next_steps=list(row.next_steps or []),
+        created_at=_aware(row.created_at),
+        is_demo=row.is_demo,
+    )
+
+
+def _require_conversation(session: Session, conversation_id: str) -> ConversationRow:
+    row = repo.get_conversation(session, conversation_id=conversation_id, owner_id=OWNER_ID)
+    if row is None:
+        raise ConversationNotFoundError(conversation_id)
     return row
 
 
-def _require_read(
-    db: Session, *, user: User, conversation: Conversation, reason: str | None
-) -> None:
-    if conversation.owner_id == user.id:
-        return
-    roles = identity_service.active_roles(db, user.id)
-    if "admin" in roles:
-        if not reason:
-            raise ApiError(
-                400,
-                "reason_required",
-                "Admin access to a conversation requires a reason",
-            )
-    elif "extension_worker" in roles:
-        if conversation.area_code is None or conversation.area_code not in {
-            row.geo_code for row in _area_assignments(db, user.id)
-        }:
-            raise ApiError(403, "forbidden", "This conversation is outside your area")
-        if not reason:
-            raise ApiError(
-                400,
-                "reason_required",
-                "Staff access to a conversation requires a reason",
-            )
-    else:
-        raise ApiError(403, "forbidden", "This conversation belongs to another user")
-    record_audit(
-        db,
-        action="conversation.staff_viewed",
-        actor=user,
-        entity_type="conversation",
-        entity_id=conversation.id,
-        reason=reason,
+def create_conversation(session: Session, title: str | None) -> Conversation:
+    row = repo.create_conversation(
+        session,
+        owner_id=OWNER_ID,
+        title=title or "New conversation",
     )
+    return _conversation(row)
 
 
-def _area_assignments(db: Session, user_id: str):
-    from app.db.models import UserAreaAssignment
-
-    return db.scalars(
-        select(UserAreaAssignment).where(UserAreaAssignment.user_id == user_id)
-    ).all()
+def list_conversations(session: Session) -> list[Conversation]:
+    return [_conversation(row) for row in repo.list_conversations(session, owner_id=OWNER_ID)]
 
 
-def create_conversation(
-    db: Session,
+def get_conversation(session: Session, conversation_id: str) -> Conversation:
+    return _conversation(_require_conversation(session, conversation_id))
+
+
+def delete_conversation(session: Session, conversation_id: str) -> None:
+    repo.delete_conversation(session, _require_conversation(session, conversation_id))
+
+
+def list_messages(session: Session, conversation_id: str) -> list[Message]:
+    _require_conversation(session, conversation_id)
+    return [
+        _message(session, row)
+        for row in repo.list_messages(session, conversation_id=conversation_id)
+    ]
+
+
+def _build_assessment(
+    result,
     *,
-    user: User,
-    title: str | None,
-    crop_code: str | None,
-    area_code: str | None,
-) -> Conversation:
-    conversation = Conversation(
-        owner_id=user.id,
-        title=(title or "New conversation")[:300],
-        crop_code=crop_code,
-        area_code=area_code,
-        last_message_at=None,
-        unread_count=0,
-    )
-    db.add(conversation)
-    db.flush()
-    record_audit(
-        db,
-        action="conversation.created",
-        actor=user,
-        entity_type="conversation",
-        entity_id=conversation.id,
-    )
-    return conversation
-
-
-def _last_message(db: Session, conversation_id: str) -> Message | None:
-    return db.scalar(
-        select(Message)
-        .where(Message.conversation_id == conversation_id)
-        .order_by(Message.created_at.desc())
-    )
-
-
-def serialize_conversation(db: Session, conversation: Conversation) -> dict:
-    last = _last_message(db, conversation.id)
-    return {
-        "conversation_id": conversation.id,
-        "title": conversation.title,
-        "crop_code": conversation.crop_code,
-        "area_code": conversation.area_code,
-        "created_at": conversation.created_at.isoformat(),
-        "last_message_at": conversation.last_message_at.isoformat()
-        if conversation.last_message_at
-        else None,
-        "unread_count": conversation.unread_count,
-        "last_message": (
-            {
-                "message_id": last.id,
-                "role": last.role,
-                "kind": last.kind,
-                "preview": (last.text or "")[:140],
-                "created_at": last.created_at.isoformat(),
-                "is_demo": last.is_demo,
-            }
-            if last
-            else None
-        ),
-    }
-
-
-def list_conversations(db: Session, *, user: User, limit: int = 50) -> dict:
-    rows = db.scalars(
-        select(Conversation)
-        .where(
-            Conversation.owner_id == user.id,
-            Conversation.deleted_at.is_(None),
-        )
-        .order_by(Conversation.updated_at.desc())
-        .limit(limit)
-    ).all()
-    return {"items": [serialize_conversation(db, row) for row in rows]}
-
-
-def get_conversation(
-    db: Session, *, user: User, conversation_id: str, reason: str | None
-) -> dict:
-    conversation = _conversation(db, conversation_id)
-    _require_read(db, user=user, conversation=conversation, reason=reason)
-    return serialize_conversation(db, conversation)
-
-
-def serialize_message(message: Message, attachments: list[ImageAsset]) -> dict:
-    payload = dict(message.payload or {})
-    return {
-        "message_id": message.id,
-        "conversation_id": message.conversation_id,
-        "role": message.role,
-        "kind": message.kind,
-        "text": message.text,
-        "client_message_id": message.client_message_id,
-        "reply_to_message_id": message.reply_to_message_id,
-        "observation_id": message.observation_id,
-        "assessment_id": message.assessment_id,
-        "assessment": payload.get("assessment"),
-        "next_steps": payload.get("next_steps", []),
-        "reason_code": payload.get("reason_code"),
-        "reason_text": payload.get("reason_text"),
-        "model_version": message.model_version,
-        "template_version": payload.get("template_version"),
-        "generated_at": message.generated_at.isoformat()
-        if message.generated_at
-        else None,
-        "created_at": message.created_at.isoformat(),
-        "is_demo": message.is_demo,
-        "attachments": [
-            {
-                "image_id": image.id,
-                "content_type": image.mime,
-                "upload_status": image.upload_status,
-            }
-            for image in attachments
-        ],
-        "notice": NOT_DIAGNOSIS,
-    }
-
-
-def _attachments(db: Session, message_id: str) -> list[ImageAsset]:
-    return db.scalars(
-        select(ImageAsset)
-        .join(MessageAttachment, MessageAttachment.image_id == ImageAsset.id)
-        .where(MessageAttachment.message_id == message_id)
-    ).all()
-
-
-def list_messages(
-    db: Session, *, user: User, conversation_id: str, reason: str | None
-) -> dict:
-    conversation = _conversation(db, conversation_id)
-    _require_read(db, user=user, conversation=conversation, reason=reason)
-    if conversation.owner_id == user.id and conversation.unread_count:
-        conversation.unread_count = 0
-    rows = db.scalars(
-        select(Message)
-        .where(Message.conversation_id == conversation.id)
-        .order_by(Message.created_at)
-    ).all()
-    return {
-        "conversation_id": conversation.id,
-        "items": [
-            serialize_message(row, _attachments(db, row.id)) for row in rows
-        ],
-        "assessment_and_outlook_separate": True,
-    }
-
-
-def _assistant_payload(
-    db: Session, observation, image: ImageAsset | None
-) -> dict:
-    if image is None:
-        return {
-            "kind": "text",
-            "text": "Attach a photo of the affected plant to get an assistive photo assessment.",
-            "payload": {
-                "template_version": CHAT_TEMPLATE_VERSION,
-                "next_steps": ["add_image"],
-            },
-            "is_demo": False,
-            "model_version": CHAT_TEMPLATE_VERSION,
-            "generated_at": _now(),
-        }
-
-    if not storage.exists(image.storage_key):
-        return {
-            "kind": "queued",
-            "text": "The photo is saved and will be assessed when the upload completes.",
-            "payload": {
-                "template_version": CHAT_TEMPLATE_VERSION,
-                "next_steps": ["wait", "view_queue"],
-                "queued_at": _now().isoformat(),
-            },
-            "is_demo": False,
-            "model_version": CHAT_TEMPLATE_VERSION,
-            "generated_at": _now(),
-        }
-
-    if image.upload_status != "uploaded":
-        image.upload_status = "uploaded"
-    assessment = assessment_service.assessment_payload(db, observation)
-    if assessment.get("state") in {"unavailable", "pending_upload", "failed"}:
-        quality = assessment_service.run_quality_gate(db, image)
-        prediction = assessment_service.run_assessment(
-            db, observation=observation, image=image, quality=quality
-        )
-        assessment = assessment_service.assessment_payload(db, observation)
-        assessment_id = prediction.id
-    else:
-        prediction = assessment_service.latest_prediction(db, observation.id)
-        assessment_id = prediction.id if prediction else None
-
-    state = assessment.get("state")
-    reason_code = assessment.get("abstention_reason")
-    if state == "abstained":
-        quality = assessment.get("quality") or {}
-        flags = list(quality.get("flags") or [])
-        reason_code = flags[0] if flags else reason_code or "insufficient_quality"
-        reason_text = REASON_TEXT.get(
-            reason_code, "The photo could not be assessed reliably. Retake it."
-        )
-        text = f"{NOT_DIAGNOSIS} {reason_text}"
-        next_steps = ["retake", "request_review"]
-        kind = "unsupported_crop" if reason_code == "unsupported_crop" else "abstained"
-    elif state == "assessed":
-        text = f"{NOT_DIAGNOSIS} Open the card to see what the model may be seeing."
-        next_steps = ["add_context", "request_review", "read_advisory"]
-        kind = "assessed"
-    else:
-        reason_code = reason_code or "assessment_failed"
-        reason_text = REASON_TEXT.get(
-            reason_code, "The assessment did not complete. Retry when connected."
-        )
-        text = f"{NOT_DIAGNOSIS} {reason_text}"
-        next_steps = ["retry"]
-        kind = "failed"
-
-    return {
-        "kind": kind,
-        "text": text,
-        "payload": {
-            "template_version": CHAT_TEMPLATE_VERSION,
-            "assessment": assessment,
-            "reason_code": reason_code,
-            "reason_text": REASON_TEXT.get(reason_code),
-            "next_steps": next_steps,
-            "assessment_and_outlook_separate": True,
-        },
-        "is_demo": bool(assessment.get("is_demo")),
-        "model_version": assessment.get("model_version"),
-        "generated_at": _now(),
-        "assessment_id": assessment_id,
-    }
-
-
-def _resolve_observation(
-    db: Session,
-    *,
-    user: User,
-    conversation: Conversation,
+    generated_at: datetime,
     observation_id: str | None,
-    crop_code: str | None,
-    area_code: str | None,
-    client_message_id: str,
-) -> object | None:
-    if observation_id:
-        observation = observation_service.writable_observation(
-            db, user, observation_id
-        )
-        if conversation.crop_code is None:
-            conversation.crop_code = observation.crop_code
-        if conversation.area_code is None:
-            conversation.area_code = observation.area_code
-        return observation
-
-    crop = crop_code or conversation.crop_code
-    area = area_code or conversation.area_code
-    if not crop or not area:
-        return None
-    observation, _created = observation_service.create_observation(
-        db,
-        user=user,
-        client_report_id=f"chat:{client_message_id}"[:128],
-        crop_code=crop,
-        area_code=area,
-        variety=None,
-        growth_stage=None,
-        notes=None,
-        captured_at=None,
-        subject_user_id=None,
-        idempotency_key=f"chat-observation:{client_message_id}"[:200],
+) -> Assessment:
+    return Assessment(
+        state=result.state,
+        reason_code=result.reason_code,
+        reason_text=result.reason_text,
+        quality_flag=result.quality_flag,
+        quality_flags=list(result.quality_flags),
+        candidates=[Candidate(**candidate) for candidate in result.candidates],
+        confidence_band=result.confidence_band,
+        calibrated=result.calibrated,
+        model_version=result.model_version,
+        generated_at=generated_at,
+        is_demo=result.is_demo,
+        observation_id=observation_id,
+        error_code=result.error_code,
+        retryable=result.retryable,
     )
-    conversation.crop_code = crop
-    conversation.area_code = area
-    return observation
 
 
 def send_message(
-    db: Session,
-    *,
-    user: User,
+    session: Session,
     conversation_id: str,
+    payload: MessageCreate,
     idempotency_key: str,
-    client_message_id: str,
-    text: str | None,
-    observation_id: str | None,
-    image_id: str | None,
-    crop_code: str | None,
-    area_code: str | None,
-) -> dict:
-    conversation = _conversation(db, conversation_id)
-    _require_read(db, user=user, conversation=conversation, reason=None)
-    if conversation.owner_id != user.id:
-        raise ApiError(403, "forbidden", "Only the owner can send messages")
+    *,
+    engine: AssessmentEngine | None = None,
+) -> SendResult:
+    conversation = _require_conversation(session, conversation_id)
 
-    if client_message_id != idempotency_key:
-        raise ApiError(
-            422,
-            "idempotency_mismatch",
-            "Idempotency-Key must match client_message_id",
-        )
-
-    existing = db.scalar(
-        select(Message).where(
-            Message.conversation_id == conversation.id,
-            Message.client_message_id == client_message_id,
-        )
+    existing = repo.find_turn(
+        session,
+        conversation_id=conversation_id,
+        client_message_id=payload.client_message_id,
     )
     if existing is not None:
-        assistant = db.scalar(
-            select(Message).where(
-                Message.conversation_id == conversation.id,
-                Message.reply_to_message_id == existing.id,
-            )
+        user, assistant = existing
+        return SendResult(
+            user_message=_message(session, user),
+            assistant_message=_message(session, assistant),
         )
-        if assistant is not None:
-            return {
-                "user_message": serialize_message(
-                    existing, _attachments(db, existing.id)
-                ),
-                "assistant_message": serialize_message(
-                    assistant, _attachments(db, assistant.id)
-                ),
-                "idempotent_replay": True,
-            }
 
-    observation = _resolve_observation(
-        db,
-        user=user,
-        conversation=conversation,
-        observation_id=observation_id,
-        crop_code=crop_code,
-        area_code=area_code,
-        client_message_id=client_message_id,
+    upload_row: ImageUploadRow | None = None
+    image_payload: dict | None = None
+    if payload.image is not None and payload.image.upload_id is not None:
+        upload_row = repo.get_upload(
+            session,
+            upload_id=payload.image.upload_id,
+            owner_id=OWNER_ID,
+        )
+        if upload_row is None:
+            raise UploadNotFoundError(payload.image.upload_id)
+        image_payload = _image_ref(upload_row).model_dump(mode="json")
+
+    engine = engine or get_assessment_engine()
+    upload_context = (
+        UploadContext(
+            upload_id=upload_row.id,
+            sha256=upload_row.sha256,
+            width=upload_row.width,
+            height=upload_row.height,
+            quality_result=upload_row.quality_result,
+            quality_flags=tuple(upload_row.quality_flags or []),
+        )
+        if upload_row is not None
+        else None
+    )
+    result = engine.assess(
+        upload=upload_context,
+        crop_id=payload.crop_id,
+        context=payload.text,
     )
 
-    image: ImageAsset | None = None
-    if image_id:
-        if observation is None:
-            raise ApiError(
-                422,
-                "observation_required",
-                "An observation is required before attaching an image",
-            )
-        image = db.get(ImageAsset, image_id)
-        if image is None or image.observation_id != observation.id:
-            raise ApiError(404, "not_found", "Image not found for this observation")
+    now = _now()
+    assessment = _build_assessment(
+        result,
+        generated_at=now,
+        observation_id=upload_row.id if upload_row is not None else None,
+    )
+    assistant_text = f"{NOT_A_DIAGNOSIS} {result.reason_text}".strip()
 
-    user_message = Message(
+    user_message = MessageRow(
         id=_id("msg"),
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role="user",
-        kind="image" if image else "text",
-        text=text[:2000] if text else None,
-        client_message_id=client_message_id,
-        observation_id=observation.id if observation else None,
-        payload={"template_version": CHAT_TEMPLATE_VERSION},
+        kind="image" if upload_row is not None else "text",
+        text=payload.text,
+        client_message_id=payload.client_message_id,
+        turn_id=payload.client_message_id,
+        observation_id=upload_row.id if upload_row is not None else None,
+        image=image_payload,
         is_demo=False,
-        created_at=_now(),
+        created_at=now,
     )
-    db.add(user_message)
-    db.flush()
-    if image is not None:
-        db.add(
-            MessageAttachment(
-                message_id=user_message.id,
-                image_id=image.id,
-            )
-        )
-
-    reply = _assistant_payload(db, observation, image) if observation else {
-        "kind": "text",
-        "text": "Add the crop and approximate area, then attach a photo.",
-        "payload": {
-            "template_version": CHAT_TEMPLATE_VERSION,
-            "next_steps": ["add_context", "add_image"],
-        },
-        "is_demo": False,
-        "model_version": CHAT_TEMPLATE_VERSION,
-        "generated_at": _now(),
-    }
-    assistant_message = Message(
+    assistant_message = MessageRow(
         id=_id("msg"),
-        conversation_id=conversation.id,
+        conversation_id=conversation_id,
         role="assistant",
-        kind=reply["kind"],
-        text=reply["text"],
-        reply_to_message_id=user_message.id,
-        observation_id=observation.id if observation else None,
-        assessment_id=reply.get("assessment_id"),
-        model_version=reply.get("model_version"),
-        generated_at=reply.get("generated_at"),
-        payload=reply["payload"],
-        is_demo=bool(reply.get("is_demo")),
-        created_at=_now(),
+        kind="assessment" if result.state == "assessed" else result.state,
+        text=assistant_text,
+        turn_id=payload.client_message_id,
+        observation_id=upload_row.id if upload_row is not None else None,
+        assessment=assessment.model_dump(mode="json"),
+        next_steps=list(result.next_steps),
+        is_demo=result.is_demo,
+        created_at=now,
     )
-    db.add(assistant_message)
-    conversation.last_message_at = assistant_message.created_at
-    conversation.updated_at = assistant_message.created_at
-    db.add(
-        MessageEvent(
-            message_id=user_message.id,
-            type="sent",
-            payload={"client_message_id": client_message_id},
-        )
+    repo.append_turn(
+        session,
+        conversation=conversation,
+        user_message=user_message,
+        assistant_message=assistant_message,
     )
-    db.add(
-        MessageEvent(
-            message_id=assistant_message.id,
-            type=f"reply.{reply['kind']}",
-            payload={
-                "model_version": assistant_message.model_version,
-                "is_demo": assistant_message.is_demo,
-            },
-        )
-    )
-    record_audit(
-        db,
-        action="conversation.message_sent",
-        actor=user,
-        entity_type="conversation",
-        entity_id=conversation.id,
+    repo.add_event(
+        session,
+        conversation_id=conversation_id,
+        message_id=assistant_message.id,
+        event_type="assessment_completed",
         detail={
-            "message_id": user_message.id,
-            "reply_kind": assistant_message.kind,
-            "observation_id": user_message.observation_id,
-            "has_image": image is not None,
+            "state": result.state,
+            "reason_code": result.reason_code,
+            "model_version": result.model_version,
+            "is_demo": result.is_demo,
         },
     )
-    db.flush()
-    return {
-        "user_message": serialize_message(user_message, _attachments(db, user_message.id)),
-        "assistant_message": serialize_message(
-            assistant_message, _attachments(db, assistant_message.id)
-        ),
-        "idempotent_replay": False,
-    }
+
+    return SendResult(
+        user_message=_message(session, user_message),
+        assistant_message=_message(session, assistant_message),
+    )
+
+
+def retry_message(session: Session, conversation_id: str, message_id: str) -> Message:
+    """Return the stored message. A retry never fabricates a new result.
+
+    Re-running an assessment is a new user turn (a retake), not an edit of the
+    append-only assistant reply.
+    """
+
+    _require_conversation(session, conversation_id)
+    row = repo.get_message(session, conversation_id=conversation_id, message_id=message_id)
+    if row is None:
+        raise MessageNotFoundError(message_id)
+    return _message(session, row)
 
 
 def request_review(
-    db: Session, *, user: User, conversation_id: str, message_id: str
-) -> dict:
-    conversation = _conversation(db, conversation_id)
-    _require_read(db, user=user, conversation=conversation, reason=None)
-    if conversation.owner_id != user.id:
-        raise ApiError(403, "forbidden", "Only the owner can request review")
-    source = db.get(Message, message_id)
-    if source is None or source.conversation_id != conversation.id:
-        raise ApiError(404, "not_found", "Message not found")
-    if source.observation_id is None:
-        raise ApiError(
-            422,
-            "observation_required",
-            "Send a photo before requesting expert review",
+    session: Session,
+    conversation_id: str,
+    message_id: str,
+    reason: str | None,
+) -> ReviewRequestOut:
+    _require_conversation(session, conversation_id)
+    message = repo.get_message(session, conversation_id=conversation_id, message_id=message_id)
+    if message is None:
+        raise MessageNotFoundError(message_id)
+    if message.role != "assistant":
+        raise InvalidReviewTargetError(message_id)
+
+    row, created = repo.create_review_request(
+        session,
+        conversation_id=conversation_id,
+        message_id=message_id,
+        owner_id=OWNER_ID,
+        reason=reason,
+    )
+    if created:
+        repo.add_event(
+            session,
+            conversation_id=conversation_id,
+            message_id=message_id,
+            event_type="review_requested",
+            detail={"review_request_id": row.id},
         )
-    observation = observation_service.readable_observation(
-        db, user, source.observation_id
-    )
-    review_request = observation_service.request_review(
-        db, user=user, observation=observation, reason="requested from chat"
-    )
-    assistant = Message(
-        id=_id("msg"),
-        conversation_id=conversation.id,
-        role="assistant",
-        kind="review_requested",
-        text="Expert review requested. You can follow the case status here.",
-        reply_to_message_id=source.id,
-        observation_id=observation.id,
-        model_version=CHAT_TEMPLATE_VERSION,
-        generated_at=_now(),
-        payload={
-            "template_version": CHAT_TEMPLATE_VERSION,
-            "review_request_id": review_request.id,
-            "status": review_request.status,
-            "submitted_at": review_request.created_at.isoformat(),
-            "next_steps": ["view_status"],
-        },
-        is_demo=False,
-        created_at=_now(),
-    )
-    db.add(assistant)
-    conversation.last_message_at = assistant.created_at
-    conversation.updated_at = assistant.created_at
-    db.add(
-        MessageEvent(
-            message_id=assistant.id,
-            type="review_requested",
-            payload={"review_request_id": review_request.id},
-        )
-    )
-    db.flush()
-    return {
-        "review_request_id": review_request.id,
-        "status": review_request.status,
-        "message": serialize_message(assistant, []),
-    }
+    return _review(row)
 
 
-def retry_message(
-    db: Session, *, user: User, conversation_id: str, message_id: str
-) -> dict:
-    conversation = _conversation(db, conversation_id)
-    _require_read(db, user=user, conversation=conversation, reason=None)
-    if conversation.owner_id != user.id:
-        raise ApiError(403, "forbidden", "Only the owner can retry a message")
-    source = db.get(Message, message_id)
-    if source is None or source.conversation_id != conversation.id:
-        raise ApiError(404, "not_found", "Message not found")
-    if source.role != "user":
-        raise ApiError(422, "invalid_retry", "Only a user message can be retried")
-
-    image = None
-    attachments = _attachments(db, source.id)
-    if attachments:
-        image = attachments[0]
-    if source.observation_id is None or image is None:
-        reply = {
-            "kind": "failed",
-            "text": "There is no uploaded photo to retry. Send a new photo.",
-            "payload": {
-                "template_version": CHAT_TEMPLATE_VERSION,
-                "error_code": "nothing_to_retry",
-                "retryable": False,
-                "next_steps": ["add_image"],
-            },
-            "is_demo": False,
-            "model_version": CHAT_TEMPLATE_VERSION,
-            "generated_at": _now(),
-        }
-    else:
-        observation = observation_service.writable_observation(
-            db, user, source.observation_id
-        )
-        reply = _assistant_payload(db, observation, image)
-    assistant = Message(
-        id=_id("msg"),
-        conversation_id=conversation.id,
-        role="assistant",
-        kind=reply["kind"],
-        text=reply["text"],
-        reply_to_message_id=source.id,
-        observation_id=source.observation_id,
-        assessment_id=reply.get("assessment_id"),
-        model_version=reply.get("model_version"),
-        generated_at=reply.get("generated_at"),
-        payload=reply["payload"],
-        is_demo=bool(reply.get("is_demo")),
-        created_at=_now(),
+def create_upload(
+    session: Session,
+    *,
+    settings: Settings,
+    filename: str,
+    content_type: str,
+    data: bytes,
+) -> UploadDescriptor:
+    inspected = inspect_image(data, content_type)
+    upload_id = _id("up")
+    storage_path = store_image(settings, OWNER_ID, upload_id, content_type, data)
+    row = repo.create_upload(
+        session,
+        upload_id=upload_id,
+        owner_id=OWNER_ID,
+        filename=filename[:255] or "upload",
+        content_type=content_type,
+        size_bytes=len(data),
+        sha256=inspected.content_hash,
+        storage_path=storage_path,
+        width=inspected.width,
+        height=inspected.height,
+        laplacian_variance=inspected.metrics.laplacian_variance,
+        mean_luma=inspected.metrics.mean_luma,
+        clipped_fraction=inspected.metrics.clipped_fraction,
+        plant_presence=inspected.metrics.plant_presence,
+        quality_result=inspected.quality.result,
+        quality_flags=list(inspected.quality.flags),
+        quality_gate_version=inspected.quality.gate_version,
     )
-    db.add(assistant)
-    conversation.last_message_at = assistant.created_at
-    conversation.updated_at = assistant.created_at
-    db.add(
-        MessageEvent(
-            message_id=assistant.id,
-            type="retried",
-            payload={"source_message_id": source.id, "kind": reply["kind"]},
-        )
-    )
-    db.flush()
-    return {
-        "message_id": assistant.id,
-        "kind": assistant.kind,
-        "assistant_message": serialize_message(assistant, []),
-        "retryable": bool(reply["payload"].get("retryable", reply["kind"] != "assessed")),
-    }
+    return upload_descriptor(row)
 
 
-def delete_conversation(db: Session, *, user: User, conversation_id: str) -> None:
-    conversation = _conversation(db, conversation_id)
-    if conversation.owner_id != user.id:
-        raise ApiError(403, "forbidden", "This conversation belongs to another user")
-    message_ids = [
-        row.id
-        for row in db.scalars(
-            select(Message).where(Message.conversation_id == conversation.id)
-        ).all()
-    ]
-    if message_ids:
-        for row in db.scalars(
-            select(MessageAttachment).where(
-                MessageAttachment.message_id.in_(message_ids)
-            )
-        ).all():
-            db.delete(row)
-        for row in db.scalars(
-            select(MessageEvent).where(MessageEvent.message_id.in_(message_ids))
-        ).all():
-            db.delete(row)
-        for row in db.scalars(
-            select(Message).where(Message.id.in_(message_ids))
-        ).all():
-            db.delete(row)
-    conversation.deleted_at = _now()
-    conversation.updated_at = _now()
-    record_audit(
-        db,
-        action="conversation.deleted",
-        actor=user,
-        entity_type="conversation",
-        entity_id=conversation.id,
-        detail={"messages_deleted": len(message_ids)},
+def upload_descriptor(row: ImageUploadRow) -> UploadDescriptor:
+    return UploadDescriptor(
+        upload_id=row.id,
+        filename=row.filename,
+        content_type=row.content_type,
+        content_hash=row.sha256,
+        size_bytes=row.size_bytes,
+        width=row.width,
+        height=row.height,
+        quality_result=row.quality_result,
+        quality_flags=list(row.quality_flags or []),
+        quality_gate_version=row.quality_gate_version,
+        preview_url=f"/v1/uploads/{row.id}",
+        created_at=_aware(row.created_at),
+        is_demo=True,
     )
 
 
-def list_events(
-    db: Session, *, user: User, conversation_id: str, reason: str | None
-) -> dict:
-    conversation = _conversation(db, conversation_id)
-    _require_read(db, user=user, conversation=conversation, reason=reason)
-    message_ids = [
-        row.id
-        for row in db.scalars(
-            select(Message).where(Message.conversation_id == conversation.id)
-        ).all()
-    ]
-    if not message_ids:
-        return {"items": []}
-    rows = db.scalars(
-        select(MessageEvent)
-        .where(MessageEvent.message_id.in_(message_ids))
-        .order_by(MessageEvent.created_at)
-    ).all()
-    return {
-        "items": [
-            {
-                "event_id": row.id,
-                "message_id": row.message_id,
-                "type": row.type,
-                "payload": row.payload,
-                "created_at": row.created_at.isoformat(),
-            }
-            for row in rows
-        ]
-    }
+def get_upload_row(session: Session, upload_id: str) -> ImageUploadRow:
+    row = repo.get_upload(session, upload_id=upload_id, owner_id=OWNER_ID)
+    if row is None:
+        raise UploadNotFoundError(upload_id)
+    return row

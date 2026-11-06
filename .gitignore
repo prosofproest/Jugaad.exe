@@ -36,3 +36,6 @@ next-env.d.ts
 .env
 .env.local
 .env.*.local
+
+# Local media/upload storage (development only; never commit user images)
+backend/var/

@@ -9,10 +9,13 @@ import { MessageBubble } from "@/components/message-bubble";
 import {
   ApiError,
   deleteConversation,
+  requestReview,
   sendMessage,
+  uploadImage,
   type Conversation,
   type Message,
   type SendMessageInput,
+  type UploadedImage,
 } from "@/lib/api";
 
 function errorText(caught: unknown): string {
@@ -27,6 +30,7 @@ function errorText(caught: unknown): string {
 function optimisticMessage(
   conversationId: string,
   payload: SendMessageInput,
+  image: UploadedImage | null,
 ): Message {
   return {
     message_id: payload.clientMessageId,
@@ -35,7 +39,10 @@ function optimisticMessage(
     kind: payload.image ? "image" : "text",
     text: payload.text?.trim() ? payload.text : null,
     client_message_id: payload.clientMessageId,
+    observation_id: image?.upload_id ?? null,
+    image,
     assessment: null,
+    review_request: null,
     next_steps: [],
     created_at: new Date().toISOString(),
     is_demo: false,
@@ -59,6 +66,7 @@ export function ChatThread({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [focusToken, setFocusToken] = useState(0);
+  const [reviewingId, setReviewingId] = useState<string | null>(null);
   const listRef = useRef<HTMLOListElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -105,21 +113,69 @@ export function ChatThread({
   }
 
   async function handleSend(input: ComposerPayload): Promise<boolean> {
+    const clientMessageId = crypto.randomUUID();
+    let uploaded: UploadedImage | null = null;
+
+    if (input.file) {
+      setSending(true);
+      setError(null);
+      setFailedId(null);
+      try {
+        const descriptor = await uploadImage(input.file);
+        uploaded = {
+          upload_id: descriptor.upload_id,
+          filename: descriptor.filename,
+          content_type: descriptor.content_type,
+          content_hash: descriptor.content_hash,
+          width: descriptor.width,
+          height: descriptor.height,
+          quality_result: descriptor.quality_result,
+          quality_flags: descriptor.quality_flags,
+          preview_url: descriptor.preview_url,
+        };
+      } catch (caught) {
+        setError(errorText(caught));
+        setSending(false);
+        return false;
+      }
+    }
+
     const payload: SendMessageInput = {
-      clientMessageId: crypto.randomUUID(),
+      clientMessageId,
       text: input.text || undefined,
-      image: input.file
+      image: uploaded
         ? {
-            filename: input.file.name,
-            content_type: input.file.type || "application/octet-stream",
+            uploadId: uploaded.upload_id,
+            filename: uploaded.filename,
+            contentType: uploaded.content_type,
+            contentHash: uploaded.content_hash,
           }
         : undefined,
     };
     setMessages((current) => [
       ...current,
-      optimisticMessage(conversation.conversation_id, payload),
+      optimisticMessage(conversation.conversation_id, payload, uploaded),
     ]);
     return post(payload);
+  }
+
+  async function handleReview(messageId: string) {
+    setReviewingId(messageId);
+    setError(null);
+    try {
+      const review = await requestReview(conversation.conversation_id, messageId);
+      setMessages((current) =>
+        current.map((message) =>
+          message.message_id === messageId
+            ? { ...message, review_request: review }
+            : message,
+        ),
+      );
+    } catch (caught) {
+      setError(errorText(caught));
+    } finally {
+      setReviewingId(null);
+    }
   }
 
   async function handleDelete() {
@@ -184,10 +240,11 @@ export function ChatThread({
       </div>
 
       <p className="notice notice-warning small">
-        <span className="badge badge-muted">demo</span> No image model is connected
-        in this phase. Replies are labelled template responses and are never a
-        diagnosis. Photo assessment and area outlook stay separate; this thread
-        never shows an outlook.
+        <span className="badge badge-muted">demo</span> This thread uses a
+        deterministic demo engine, not a trained model. Uploaded photos are checked
+        by a demo quality gate and replies are synthetic, labelled template output —
+        never a diagnosis. Photo assessment and area outlook stay separate; this
+        thread never shows an outlook.
       </p>
 
       {offline ? (
@@ -224,6 +281,8 @@ export function ChatThread({
                 }
                 onRetake={() => setFocusToken((value) => value + 1)}
                 onAddContext={() => setFocusToken((value) => value + 1)}
+                onRequestReview={() => void handleReview(message.message_id)}
+                reviewing={reviewingId === message.message_id}
               />
             ))}
           </ol>

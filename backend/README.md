@@ -1,7 +1,8 @@
 # Backend — FastAPI modular monolith
 
-**Status:** engineering scaffold only (Phase 2 §5.1). No product feature is
-implemented; the conversations module is an in-memory, demo-labelled shell.
+**Status:** engineering scaffold (Phase 2 §5.1) plus the in-memory §5.2 identity
+slice. No product feature is served against real data; conversations are a
+demo-labelled shell and identity state is lost on restart.
 **Stack:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, PostgreSQL
 (see `../final/docs-context/architecture-context.md`).
 
@@ -33,10 +34,10 @@ Run from `backend/` (Windows paths shown; POSIX uses `.venv/bin/python`):
 | Task | Command |
 |---|---|
 | Create venv | `python -m venv .venv` |
-| Install | `.venv\Scripts\python -m pip install -r requirements.txt` (pinned: `requirements.lock`) |
-| Tests | `.venv\Scripts\python -m pytest` |
-| Lint | `.venv\Scripts\python -m ruff check app tests` — clean |
-| Format check | `.venv\Scripts\python -m ruff format --check app tests` — clean |
+| Install | `.venv\Scripts\python -m pip install -r requirements.txt` (POSIX: `.venv/bin/pip install -r requirements.txt`) |
+| Tests | `pytest` — **294 passed** |
+| Lint | `ruff check app tests` |
+| Format check | `ruff format --check app tests` |
 | Migration history | `.venv\Scripts\python -m alembic history` |
 | Review migration SQL offline | `.venv\Scripts\python -m alembic upgrade head --sql` |
 | Apply migrations | `.venv\Scripts\python -m alembic upgrade head` (needs a live database) |
@@ -59,6 +60,24 @@ Environment variables use the `APP_` prefix (or an untracked `.env`); see
 | `APP_DOCS_ENABLED` | `true` | Serve `/docs` and `/openapi.json` outside production |
 | `APP_DATABASE_URL` | local compose URL | SQLAlchemy URL; never logged |
 | `APP_CORS_ORIGINS` | `["http://localhost:3000"]` | JSON list of allowed browser origins |
+| `APP_AUTH_SECRET` | dev-only value | HS256 secret for access/MFA tokens and OTP hashing; production requires ≥32 chars and refuses the dev default |
+| `APP_AUTH_*_TTL_*` / limits | see `core/config.py` | Access/refresh/MFA/OTP lifetimes, OTP and lockout limits |
+| `APP_AUTH_DELETION_RETENTION_DAYS` | unset | D10 is open; unset means soft delete with no hard-delete date |
+| `APP_AUTH_BOOTSTRAP_ADMIN_*` | unset | One-time first-admin email/password/TOTP seed; all three required together and never logged |
+
+## Identity (spec 03 §5.2)
+
+`app/modules/identity/` provides phone OTP for farmers, provisioned staff accounts,
+five roles, password + TOTP staff login, rotating refresh tokens, versioned consent,
+privacy requests/self-export/soft deletion and audit events. Routes are
+`/v1/auth/*`, `/v1/me/*` and `/v1/admin/*`.
+
+This slice is **in memory** and has no Alembic migration yet; restarting the process
+clears users, sessions and consents. The pre-existing demo chat/assessment/advisory/map
+routes are still unauthenticated. Real SMS delivery and password reset need providers
+that are not chosen; production OTP delivery fails closed. Passwords use stdlib
+`scrypt` rather than Argon2id to avoid an unapproved dependency. D10 (retention) and
+D11 (on-behalf/offline sessions) remain open.
 
 ## Migrations
 

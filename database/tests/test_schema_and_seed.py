@@ -36,8 +36,8 @@ class TestDatabaseSchemaAndSeed(unittest.TestCase):
             # 4. Review & Verification
             "reviews", "review_evidence", "labels", "review_events", "observation_verification",
             "review_assignments", "sentinel_sites", "sentinel_visits",
-            # 5. Weather & Forecast
-            "weather_snapshots", "feature_snapshots", "forecasts", "forecast_runs",
+            # 5. Weather, Historical Occurrences & Forecast
+            "weather_snapshots", "historical_occurrences", "feature_snapshots", "forecasts", "forecast_runs",
             # 6. Advisory & Alerts
             "advisories", "advisory_versions", "advisory_approvals", "alert_policies", "alerts", "alert_deliveries",
             # 7. Registry, Audit & Exports
@@ -49,7 +49,7 @@ class TestDatabaseSchemaAndSeed(unittest.TestCase):
         )
         missing = expected_tables - found_tables
         self.assertEqual(len(missing), 0, f"Missing tables in 01-schema.sql: {missing}")
-        self.assertEqual(len(found_tables), 39)
+        self.assertEqual(len(found_tables), 40)
 
     def test_append_only_guards(self):
         """Verifies immutable trigger guards on append-only tables."""
@@ -66,6 +66,7 @@ class TestDatabaseSchemaAndSeed(unittest.TestCase):
             "advisory_versions",
             "advisory_approvals",
             "audit_events",
+            "historical_occurrences",
         ]
 
         for table in expected_append_only:
