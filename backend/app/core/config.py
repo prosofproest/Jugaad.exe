@@ -9,9 +9,30 @@ from __future__ import annotations
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import BaseModel, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
+
+
+class ChatLabel(BaseModel):
+    """One candidate label the vision provider is allowed to choose.
+
+    The approved crop/target taxonomy is a product decision (D1/D2). It is not
+    hard-coded here: a deployment supplies the approved labels as JSON and marks
+    them approved. Until then results stay visibly demo-labelled.
+    """
+
+    label: str
+    display_name: str
+
+    @field_validator("label", "display_name")
+    @classmethod
+    def _not_blank(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("chat label fields must not be blank")
+        return value
 
 
 class Settings(BaseSettings):
@@ -37,10 +58,24 @@ class Settings(BaseSettings):
 
     # Chat assessment engine. ``demo`` serves a deterministic, visibly labelled
     # synthetic result so the end-to-end path works without an external model.
-    # Any other value fails closed with ``model_not_configured``; a real
-    # provider is added behind the same seam once its key and governance
-    # decision exist.
+    # ``openai_compatible`` calls a vision provider behind the same seam.
+    # Unknown values fail closed with ``model_not_configured``.
     chat_engine: str = "demo"
+
+    # OpenAI-compatible vision provider. The key is read from the environment
+    # or an untracked .env and is never logged. Empty key/model/labels fail
+    # closed at request time rather than inventing an assessment.
+    chat_api_key: str | None = None
+    chat_base_url: str = "https://api.openai.com/v1"
+    chat_model: str | None = None
+    # Approved candidate labels, supplied as JSON. Example:
+    # APP_CHAT_LABELS=[{"label":"early_blight","display_name":"Possible early blight"}]
+    chat_labels: list[ChatLabel] = []
+    # ``is_demo`` stays true until the operator confirms the label set is the
+    # approved release taxonomy. No taxonomy is invented in code.
+    chat_labels_approved: bool = False
+    chat_timeout_s: float = 30.0
+    chat_max_image_side: int = 1024
 
     # Chat image uploads. Local development storage only; a deployment replaces
     # this with object storage. No file is ever served without an owner check.

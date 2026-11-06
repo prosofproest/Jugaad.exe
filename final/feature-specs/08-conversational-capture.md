@@ -203,11 +203,14 @@ DELETE /v1/conversations/{id}
 GET    /v1/conversations/{id}/messages?cursor=
 POST   /v1/conversations/{id}/messages
 POST   /v1/conversations/{id}/messages/{message_id}/retry
+POST   /v1/conversations/{id}/messages/{message_id}/review
+POST   /v1/uploads                              # multipart image upload (Phase 2 demo)
+GET    /v1/uploads/{upload_id}                  # owner-scoped preview bytes
 GET    /v1/conversations/{id}/events            # optional SSE; polling otherwise
 ```
 
-`POST /v1/conversations/{id}/messages` accepts either JSON (text-only) or a multipart
-descriptor that references a signed image upload:
+`POST /v1/conversations/{id}/messages` accepts JSON. An image is uploaded first with a
+multipart `POST /v1/uploads`; the message then references the returned `upload_id`:
 
 ```json
 {
@@ -225,11 +228,31 @@ descriptor that references a signed image upload:
 Rules:
 
 - `Idempotency-Key` is required, matching `client_message_id` semantics.
-- The server creates the observation before attaching the image (same rule as spec 02).
-- The server returns a `message` plus an `assessment` reference; the client renders the
-  card from structured fields.
+- The server validates and stores the image before the message is accepted. In the
+  Phase 2 demo slice the `image_uploads` row is the observation record for the turn;
+  creating a full `observations` row and linking `image_assets` is deferred until the
+  capture pipeline in spec 02 lands.
+- The server returns the stored user and assistant messages, each with its structured
+  `assessment`/`image` descriptor; the client renders the card from those fields.
 - No endpoint returns raw scores to farmer clients beyond the documented candidates.
-- An assistant message is append-only.
+- An assistant message is append-only. `POST …/review` creates at most one
+  `chat_review_requests` row per assistant message and returns the same row on replay.
+- Every assistant reply is validated before it is stored. If the reply text, the
+  assessment reason or a candidate display name contains a chemical product, dose,
+  mixture, application interval or spray instruction, the turn is stored as `failed`
+  with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and
+  `next_steps` set to `["request_review"]`. A `validator_rejected` `message_events` row
+  records the validator version and rule categories; the unsafe text is never stored.
+- The assessment engine is a pluggable seam. `APP_CHAT_ENGINE=demo` serves the
+  deterministic labelled engine; `APP_CHAT_ENGINE=openai_compatible` calls a vision
+  model through an OpenAI-compatible chat-completions endpoint. The model may only
+  choose from the configured `APP_CHAT_LABELS`; the server renders the reply from fixed
+  templates, so the provider never supplies user-facing advice. Missing key/model/labels
+  and malformed output become `failed` states (`model_not_configured`,
+  `invalid_model_response`, `model_unavailable`, `model_timeout`); a model abstention
+  becomes `abstained`/`model_abstained`. `is_demo` stays true until the label set is the
+  approved D1/D2 taxonomy and `APP_CHAT_LABELS_APPROVED=true`; no taxonomy is invented in
+  code.
 
 ---
 
@@ -237,13 +260,20 @@ Rules:
 
 | Table | Purpose | Key constraints |
 |---|---|---|
-| `conversations` | Thread owned by one user | `owner_id` FK; `deleted_at` for user deletion |
-| `messages` | Append-only user and assistant messages | `conversation_id`, `role`, `kind`, `client_message_id` unique per conversation |
-| `message_attachments` | Links a message to `image_assets` | one image per user message in v1 |
-| `message_events` | delivery/assessment state transitions | append-only |
+| `conversations` | Thread owned by one user | `owner_id` (demo owner until auth); `deleted_at` for user deletion |
+| `messages` | Append-only user and assistant messages | `conversation_id`; `client_message_id` unique per conversation; `turn_id` pairs the user/assistant rows |
+| `message_events` | delivery/assessment/review state transitions | append-only |
+| `image_uploads` | Validated image metadata and quality metrics | `owner_id`; SHA-256; bytes live outside the database |
+| `chat_review_requests` | Expert-review request for one assistant message | unique `message_id`; separate from the observation-review `review_requests` table |
 
-Replies store `assessment_id`, `model_version`, `generated_at` and `is_demo`. The
-`assistant` message is never edited; corrections are new messages.
+Replies store an immutable `assessment` JSON snapshot (`model_version`, `generated_at`,
+`calibrated`, `is_demo`) and, for an image turn, an `image` JSON descriptor referencing
+the `image_uploads` row. The `assistant` message is never edited; corrections are new
+messages.
+
+Phase 2 implements this demo path. Linking a message to `image_assets` through
+`message_attachments` is deferred until the observation pipeline in spec 02 is wired in;
+the upload row and the message descriptor are the traceable record in the meantime.
 
 ---
 
@@ -260,8 +290,10 @@ the following are hard requirements:
    monitoring, sanitation, crop management and escalation.
 4. Severe, uncertain or unsupported cases surface "request expert review" as the primary
    action.
-5. The server-side content validator rejects chemical vocabulary before a message is
-   stored; a template test asserts this.
+5. The server-side content validator (`chat-safety-0.1`) rejects chemical vocabulary
+   before a message is stored. It is fail-closed: a blocked reply becomes a `failed`
+   assessment with no candidates, and the rejection is audited without copying the
+   unsafe text. Unit and API tests assert this.
 6. No free-form generative text is served in v1. Template rendering is deterministic and
    versioned.
 7. The chat cannot be used to bypass verification: requesting review creates the same

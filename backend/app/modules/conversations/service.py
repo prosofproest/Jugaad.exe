@@ -36,9 +36,14 @@ from app.modules.conversations.models import (
     UploadDescriptor,
 )
 from app.modules.conversations.orm import ConversationRow, ImageUploadRow, MessageRow
+from app.modules.conversations.validator import validate_reply
 
 OWNER_ID = "demo_user"
 NOT_A_DIAGNOSIS = "Assistive photo assessment — not a diagnosis."
+SAFE_WITHHELD_TEXT = (
+    "The reply was withheld because it did not pass the content-safety check. "
+    "No assessment is shown. You can request expert review."
+)
 
 
 class ConversationNotFoundError(Exception):
@@ -232,6 +237,7 @@ def send_message(
             height=upload_row.height,
             quality_result=upload_row.quality_result,
             quality_flags=tuple(upload_row.quality_flags or []),
+            storage_path=upload_row.storage_path,
         )
         if upload_row is not None
         else None
@@ -250,6 +256,39 @@ def send_message(
     )
     assistant_text = f"{NOT_A_DIAGNOSIS} {result.reason_text}".strip()
 
+    # CHAT-10: the reply is template text from the approved non-chemical set.
+    # If the engine returned anything outside that set, withhold it rather than
+    # store unsafe content. The validator covers the reply, the reason text and
+    # every candidate display name because all three reach the user.
+    validation = validate_reply(
+        assistant_text,
+        result.reason_text,
+        *(candidate.get("display_name") for candidate in result.candidates),
+    )
+    if validation.allowed:
+        next_steps = list(result.next_steps)
+        assistant_kind = "assessment" if result.state == "assessed" else result.state
+    else:
+        assessment = Assessment(
+            state="failed",
+            reason_code="unsafe_content_blocked",
+            reason_text=SAFE_WITHHELD_TEXT,
+            quality_flag=result.quality_flag,
+            quality_flags=list(result.quality_flags),
+            candidates=[],
+            confidence_band=None,
+            calibrated=False,
+            model_version=result.model_version,
+            generated_at=now,
+            is_demo=result.is_demo,
+            observation_id=upload_row.id if upload_row is not None else None,
+            error_code="unsafe_content_blocked",
+            retryable=False,
+        )
+        assistant_text = f"{NOT_A_DIAGNOSIS} {SAFE_WITHHELD_TEXT}".strip()
+        next_steps = ["request_review"]
+        assistant_kind = "failed"
+
     user_message = MessageRow(
         id=_id("msg"),
         conversation_id=conversation_id,
@@ -267,12 +306,12 @@ def send_message(
         id=_id("msg"),
         conversation_id=conversation_id,
         role="assistant",
-        kind="assessment" if result.state == "assessed" else result.state,
+        kind=assistant_kind,
         text=assistant_text,
         turn_id=payload.client_message_id,
         observation_id=upload_row.id if upload_row is not None else None,
         assessment=assessment.model_dump(mode="json"),
-        next_steps=list(result.next_steps),
+        next_steps=next_steps,
         is_demo=result.is_demo,
         created_at=now,
     )
@@ -288,12 +327,25 @@ def send_message(
         message_id=assistant_message.id,
         event_type="assessment_completed",
         detail={
-            "state": result.state,
-            "reason_code": result.reason_code,
+            "state": assessment.state,
+            "reason_code": assessment.reason_code,
             "model_version": result.model_version,
             "is_demo": result.is_demo,
         },
     )
+    if not validation.allowed:
+        # Audit the rejection without copying the unsafe text into the event.
+        repo.add_event(
+            session,
+            conversation_id=conversation_id,
+            message_id=assistant_message.id,
+            event_type="validator_rejected",
+            detail={
+                "validator_version": validation.version,
+                "categories": list(validation.categories),
+                "model_version": result.model_version,
+            },
+        )
 
     return SendResult(
         user_message=_message(session, user_message),

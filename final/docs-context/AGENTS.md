@@ -7,11 +7,13 @@ planned, built, tested and documented.
 
 **Status:** documentation plus engineering scaffolds (Phase 2 §5.1), the persisted
 demo chat slice (§5.7: image upload, demo quality gate, deterministic demo engine,
-review requests; Alembic `0002_chat_persistence`), and the §5.2 identity backend
-slice (in memory: OTP, staff MFA, five roles, consent, privacy, audit). No real
-model is connected; demo paths are labelled and identity state is lost on restart.
-The mobile client passes `flutter analyze` and `flutter test`; no APK or device run
-yet.
+optional OpenAI-compatible vision adapter, review requests; Alembic
+`0002_chat_persistence`), and the §5.2 identity backend slice (in memory: OTP,
+staff MFA, five roles, consent, privacy, audit). No real model is connected by
+default; demo paths are labelled, the provider adapter is mock- and local-stub
+tested (no vendor call), and
+identity state is lost on restart. The mobile client passes `flutter analyze` and
+`flutter test`; no APK or device run yet.
 **Last updated:** 2026-11-06
 
 ---
@@ -168,7 +170,7 @@ paths are in each agent's `README.md`.
 
 | Task | Command | Last result |
 |---|---|---|
-| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 294 passed |
+| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 336 passed |
 | Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean for the identity slice; pre-existing failures remain elsewhere |
 | Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean for the identity slice; pre-existing differences remain elsewhere |
 | Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence` |

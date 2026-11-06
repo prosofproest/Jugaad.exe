@@ -2,6 +2,10 @@
 
 Schema authority: SQLAlchemy models + Alembic migrations in ``backend/``.
 No second ORM, no manual production DDL (``final/feature-specs/05-data-layer.md``).
+
+The helpers here are shared by every ORM module so a timestamp stored on SQLite
+reads back the same way it does on PostgreSQL: naive UTC in the database,
+timezone-aware UTC in Python.
 """
 
 from __future__ import annotations
@@ -12,6 +16,8 @@ from uuid import uuid4
 from sqlalchemy import DateTime, MetaData, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
+
+UTC = timezone.utc
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -33,18 +39,18 @@ class UTCDateTime(TypeDecorator[datetime]):
             return None
         if value.tzinfo is None:
             return value
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return value.astimezone(UTC).replace(tzinfo=None)
 
     def process_result_value(self, value: datetime | None, dialect) -> datetime | None:  # type: ignore[no-untyped-def]
         if value is None:
             return None
         if value.tzinfo is None:
-            return value.replace(tzinfo=timezone.utc)
-        return value.astimezone(timezone.utc)
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
 
 
 def utc_now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def new_id(prefix: str) -> str:
@@ -56,11 +62,17 @@ class Base(DeclarativeBase):
 
 
 class TimestampMixin:
+    """UTC timestamps for every mutable row."""
+
     created_at: Mapped[datetime] = mapped_column(
         UTCDateTime, default=utc_now, server_default=func.now(), nullable=False
     )
     updated_at: Mapped[datetime] = mapped_column(
-        UTCDateTime, default=utc_now, server_default=func.now(), onupdate=utc_now, nullable=False
+        UTCDateTime,
+        default=utc_now,
+        onupdate=utc_now,
+        server_default=func.now(),
+        nullable=False,
     )
 
 

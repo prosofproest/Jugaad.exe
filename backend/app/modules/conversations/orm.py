@@ -133,10 +133,15 @@ class ImageUploadRow(Base):
 
 
 class ReviewRequestRow(Base):
-    """One expert-review request per assistant message (CHAT-09, CHAT-18)."""
+    """One expert-review request per assistant message (CHAT-09, CHAT-18).
 
-    __tablename__ = "review_requests"
-    __table_args__ = (UniqueConstraint("message_id", name="uq_review_requests_message_id"),)
+    Chat requests are a separate table from the observation-review queue in
+    ``app.db.models.ReviewRequest`` (``review_requests``): a chat assessment is
+    not yet a verified observation, so the two workflows must not share rows.
+    """
+
+    __tablename__ = "chat_review_requests"
+    __table_args__ = (UniqueConstraint("message_id", name="uq_chat_review_requests_message_id"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     conversation_id: Mapped[str] = mapped_column(

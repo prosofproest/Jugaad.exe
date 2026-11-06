@@ -1,8 +1,11 @@
 # Backend — FastAPI modular monolith
 
-**Status:** engineering scaffold (Phase 2 §5.1) plus the in-memory §5.2 identity
-slice. No product feature is served against real data; conversations are a
-demo-labelled shell and identity state is lost on restart.
+**Status:** engineering scaffold (Phase 2 §5.1), the persisted demo chat slice
+(§5.7: uploads, demo quality gate, pluggable assessment engine with an optional
+OpenAI-compatible vision adapter, content-safety validator, review requests) and
+the in-memory §5.2 identity slice. No product feature is served against real
+data; chat replies are demo-labelled unless an operator supplies an approved
+label set, and identity state is lost on restart.
 **Stack:** Python 3.12+, FastAPI, Pydantic v2, SQLAlchemy 2, Alembic, PostgreSQL
 (see `../final/docs-context/architecture-context.md`).
 
@@ -35,7 +38,7 @@ Run from `backend/` (Windows paths shown; POSIX uses `.venv/bin/python`):
 |---|---|
 | Create venv | `python -m venv .venv` |
 | Install | `.venv\Scripts\python -m pip install -r requirements.txt` (POSIX: `.venv/bin/pip install -r requirements.txt`) |
-| Tests | `pytest` — **294 passed** |
+| Tests | `pytest` — **336 passed** |
 | Lint | `ruff check app tests` |
 | Format check | `ruff format --check app tests` |
 | Migration history | `.venv\Scripts\python -m alembic history` |
@@ -59,6 +62,17 @@ Environment variables use the `APP_` prefix (or an untracked `.env`); see
 | `APP_LOG_LEVEL` | `INFO` | Root log level for the JSON stream |
 | `APP_DOCS_ENABLED` | `true` | Serve `/docs` and `/openapi.json` outside production |
 | `APP_DATABASE_URL` | local compose URL | SQLAlchemy URL; never logged |
+| `APP_CHAT_ENGINE` | `demo` | `demo` serves the labelled deterministic engine; `openai_compatible` calls a vision provider; any other value fails closed with `model_not_configured` |
+| `APP_CHAT_API_KEY` | unset | Bearer key for the provider; never logged. Unset fails closed |
+| `APP_CHAT_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoint; `/chat/completions` is appended |
+| `APP_CHAT_MODEL` | unset | Provider model id; unset fails closed |
+| `APP_CHAT_LABELS` | `[]` | JSON list of `{"label","display_name"}` the model may choose from; empty fails closed |
+| `APP_CHAT_LABELS_APPROVED` | `false` | `false` keeps `is_demo=true`; set `true` only for the approved D1/D2 taxonomy |
+| `APP_CHAT_TIMEOUT_S` | `30` | Provider request timeout in seconds |
+| `APP_CHAT_MAX_IMAGE_SIDE` | `1024` | Downscale bound for the JPEG sent to the provider; the stored original is unchanged |
+| `APP_MEDIA_ROOT` | `var/media` | Local image storage root; a deployment replaces this with object storage |
+| `APP_MAX_UPLOAD_BYTES` | `10485760` | Upload ceiling (10 MB) |
+| `APP_MAX_IMAGE_DIMENSION` | `8000` | Decoded image dimension ceiling |
 | `APP_CORS_ORIGINS` | `["http://localhost:3000"]` | JSON list of allowed browser origins |
 | `APP_AUTH_SECRET` | dev-only value | HS256 secret for access/MFA tokens and OTP hashing; production requires ≥32 chars and refuses the dev default |
 | `APP_AUTH_*_TTL_*` / limits | see `core/config.py` | Access/refresh/MFA/OTP lifetimes, OTP and lockout limits |
@@ -79,11 +93,64 @@ that are not chosen; production OTP delivery fails closed. Passwords use stdlib
 `scrypt` rather than Argon2id to avoid an unapproved dependency. D10 (retention) and
 D11 (on-behalf/offline sessions) remain open.
 
+## Chat (spec 08 §5.7)
+
+`app/modules/conversations/` serves the persisted chat slice: conversation list,
+thread, message send, retry and expert-review request. Routes are
+`/v1/conversations*` and `/v1/uploads*`; unlike identity, this state survives a
+restart.
+
+1. `POST /v1/uploads` decodes the image, enforces `APP_MAX_UPLOAD_BYTES` and
+   `APP_MAX_IMAGE_DIMENSION`, stores it under `APP_MEDIA_ROOT` and returns an
+   `upload_id`. The chat message references that id — it never carries image
+   bytes.
+2. `POST /v1/conversations/{id}/messages` runs the demo quality gate, then the
+   pluggable `AssessmentEngine`. `APP_CHAT_ENGINE=demo` serves the labelled
+   `demo-chat-0.1` engine; `APP_CHAT_ENGINE=openai_compatible` calls a vision
+   model; any other value returns `model_not_configured` instead of guessing.
+3. Replies are structured assessment cards (`state`, reason, candidates,
+   confidence band, model version, `generated_at`, `is_demo`). Photo assessment is
+   never merged with area outlook, and abstention is a first-class state.
+4. `chat-safety-0.1` validates reply text before storage. A blocked reply is
+   stored as `failed` with `unsafe_content_blocked`, no candidates and
+   `next_steps=["request_review"]`; the text is withheld, not softened.
+5. `POST /v1/conversations/{id}/messages/{message_id}/review` writes to
+   `chat_review_requests`, deliberately separate from the observation
+   `review_requests` table.
+
+Sends are idempotent per `Idempotency-Key`, so a retried request replays the
+stored turn. `DELETE /v1/conversations/{id}` is a soft delete (`deleted_at`);
+image files are not reclaimed yet because no retention job exists. The slice is
+unauthenticated and demo-only: `plant_presence` is a green-pixel heuristic, not a
+detector, and no real model is connected.
+
+### Real provider (OpenAI-compatible)
+
+Set `APP_CHAT_ENGINE=openai_compatible` plus `APP_CHAT_API_KEY`,
+`APP_CHAT_MODEL` and `APP_CHAT_LABELS` in the untracked `.env`. The adapter
+posts a downscaled JPEG and the allowed label list to
+`{APP_CHAT_BASE_URL}/chat/completions` and accepts JSON-only candidates. It does
+not serve free-form model text: the server renders the reply from fixed
+templates, and `chat-safety-0.1` still runs before storage. Unknown labels are
+dropped; a model abstention becomes `abstained`/`model_abstained`; timeouts,
+HTTP failures and malformed output become explicit `failed` states with no
+candidates.
+
+`APP_CHAT_LABELS` is the approved taxonomy, not a code default (D1/D2 are open).
+Until it is the approved set and `APP_CHAT_LABELS_APPROVED=true`, every result
+keeps `is_demo=true` and says so in the reason text. The adapter is verified with
+a mock transport and a live uvicorn run against a local OpenAI-compatible stub;
+no real vendor call has been made from this repository.
+
 ## Migrations
 
 `0001_baseline` is intentionally empty: it exists so later feature tables are
-additive revisions with a parent. Review every autogenerated revision; production
-is forward-only and each migration carries a rollback note.
+additive revisions with a parent. `0002_chat_persistence` adds the five chat
+tables (`conversations`, `messages`, `message_events`, `image_uploads`,
+`chat_review_requests`); it is the only revision with schema so far, and the
+collaborator domain tables in `app/db/models.py` are not yet migrated. Review
+every autogenerated revision; production is forward-only and each migration
+carries a rollback note.
 
 ```bash
 .venv\Scripts\python -m alembic revision --autogenerate -m "add observations"
