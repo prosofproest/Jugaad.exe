@@ -21,11 +21,12 @@ An explainable, offline-tolerant decision-support platform with two separate out
 | **Area outlook** | How likely is *this threat* in *this area* over *this window*? | Crop × target × geography × horizon |
 
 Neither output is a laboratory confirmation and neither is a confirmed outbreak.
-The platform is deliberately narrow in v1: one crop, one agro-climatic zone, a small
-target list, a rules-based weather risk model, assistive image triage, extension-worker
-verification, and SMS/WhatsApp delivery. These are the intended shape, not settled scope —
-crop, targets, zone, horizon and channel are fixed by decisions D1, D2 and D4 in
-`progress-tracker.md` §4. See `project-overview.md`.
+The platform is deliberately narrow in v1: an open crop catalogue with a small validated
+target allowlist, one agro-climatic zone, a rules-based weather nowcast over the last 10
+days, assistive image triage with abstention, extension-worker verification, English +
+Kannada, and in-app/email alerts with optional SMS. These are the settled shape; the first
+concrete allowlist (D1a), the pilot zone/institution (D4) and the verifier SLA (D3b) are
+recorded in `progress-tracker.md` §4 and `phase-0-decisions.md`. See `project-overview.md`.
 
 ---
 
@@ -126,8 +127,12 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 
 ---
 
-## 4. Target repository layout
+## 4. Repository layout
 
+Documentation lives under `final/`; application code lives at the repository root.
+
+```
+/
 ```
 /
 ├── AGENTS.md                     # pointer to docs-context/AGENTS.md
@@ -143,8 +148,9 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 ```
 
 `frontend/` is the web app: the folder predates this scaffold and the naming
-reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds no schema
-of its own — SQLAlchemy models and Alembic migrations in `backend/` are the
+reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds reference
+artifacts, governance registers, Alembic migrations plan, storage rules, and backup
+design — SQLAlchemy models and Alembic migrations in `backend/` are the
 single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
 Nothing beyond the Phase 2 §5.1 foundation and the demo-backed web chat surface
@@ -276,8 +282,8 @@ Refuse and escalate (do not implement) if asked to:
 | **Abstention / no assessment** | Model declined to answer because evidence is insufficient. |
 | **Coverage** | Completeness, freshness and representativeness of inputs for an area. |
 | **Verification** | Human decision on a report: confirmed, probable, rejected, duplicate, needs visit, unresolved. |
-| **Target** | A supported pest/disease condition on the supported crop list. |
-| **Supported** | Explicitly in the approved crop/target/geography list for the current release. |
+| **Target** | A pest/disease condition in the open catalogue; only allowlisted targets are assessed. |
+| **Supported** | Explicitly in the current release's validated crop × target allowlist (ADR-011). |
 | **Stale** | Past its validity window; must be visually distinct from fresh data. |
 
 ---

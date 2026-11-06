@@ -1,80 +1,162 @@
-"""Chat routes.
+"""Conversation routes for web and mobile chat."""
 
-Scaffold scope: in-memory conversations and a labelled demo reply. The real
-implementation adds authentication, ownership checks, presigned media and the
-inference pipeline; see ``final/feature-specs/08-conversational-capture.md``.
-"""
+from __future__ import annotations
 
-from fastapi import APIRouter, Header, HTTPException, status
+from fastapi import APIRouter, Depends, Query, Response, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
-from app.modules.conversations import service
-from app.modules.conversations.models import (
-    Conversation,
-    ConversationCreate,
-    Message,
-    MessageCreate,
-    SendResult,
+from app.core.dependencies import (
+    get_current_user,
+    require_idempotency_key,
 )
+from app.db.models import User
+from app.db.session import get_db
+from app.modules.conversations import service
 
 router = APIRouter(prefix="/conversations", tags=["conversations"])
 
 
-@router.get("", response_model=list[Conversation])
-def list_conversations() -> list[Conversation]:
-    return service.list_conversations()
+class ConversationCreate(BaseModel):
+    title: str | None = Field(default=None, max_length=300)
+    crop_code: str | None = Field(default=None, max_length=60)
+    area_code: str | None = Field(default=None, max_length=64)
 
 
-@router.post("", response_model=Conversation, status_code=status.HTTP_201_CREATED)
-def create_conversation(payload: ConversationCreate) -> Conversation:
-    return service.create_conversation(payload.title)
+class MessageCreate(BaseModel):
+    client_message_id: str = Field(min_length=8, max_length=128)
+    text: str | None = Field(default=None, max_length=2000)
+    observation_id: str | None = None
+    image_id: str | None = None
+    crop_code: str | None = None
+    area_code: str | None = None
 
 
-@router.get("/{conversation_id}", response_model=Conversation)
-def get_conversation(conversation_id: str) -> Conversation:
-    try:
-        return service.get_conversation(conversation_id)
-    except service.ConversationNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Conversation not found") from error
+@router.get("")
+def list_conversations(
+    limit: int = Query(default=50, ge=1, le=100),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return service.list_conversations(db, user=user, limit=limit)
+
+
+@router.post("", status_code=status.HTTP_201_CREATED)
+def create_conversation(
+    payload: ConversationCreate,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    conversation = service.create_conversation(
+        db,
+        user=user,
+        title=payload.title,
+        crop_code=payload.crop_code,
+        area_code=payload.area_code,
+    )
+    db.commit()
+    return service.serialize_conversation(db, conversation)
+
+
+@router.get("/{conversation_id}")
+def get_conversation(
+    conversation_id: str,
+    reason: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return service.get_conversation(
+        db, user=user, conversation_id=conversation_id, reason=reason
+    )
 
 
 @router.delete("/{conversation_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_conversation(conversation_id: str) -> None:
-    try:
-        service.delete_conversation(conversation_id)
-    except service.ConversationNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Conversation not found") from error
+def delete_conversation(
+    conversation_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    service.delete_conversation(db, user=user, conversation_id=conversation_id)
+    db.commit()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
-@router.get("/{conversation_id}/messages", response_model=list[Message])
-def list_messages(conversation_id: str) -> list[Message]:
-    try:
-        return service.list_messages(conversation_id)
-    except service.ConversationNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Conversation not found") from error
+@router.get("/{conversation_id}/messages")
+def list_messages(
+    conversation_id: str,
+    reason: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    result = service.list_messages(
+        db, user=user, conversation_id=conversation_id, reason=reason
+    )
+    db.commit()
+    return result
 
 
-@router.post("/{conversation_id}/messages", response_model=SendResult)
+@router.post("/{conversation_id}/messages", status_code=status.HTTP_201_CREATED)
 def send_message(
     conversation_id: str,
     payload: MessageCreate,
-    idempotency_key: str = Header(..., alias="Idempotency-Key", min_length=1),
-) -> SendResult:
-    if idempotency_key != payload.client_message_id:
-        raise HTTPException(
-            status_code=400,
-            detail="Idempotency-Key must match client_message_id",
-        )
-    try:
-        return service.send_message(conversation_id, payload, idempotency_key)
-    except service.ConversationNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Conversation not found") from error
+    response: Response,
+    idempotency_key: str = Depends(require_idempotency_key),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    result = service.send_message(
+        db,
+        user=user,
+        conversation_id=conversation_id,
+        idempotency_key=idempotency_key,
+        client_message_id=payload.client_message_id,
+        text=payload.text,
+        observation_id=payload.observation_id,
+        image_id=payload.image_id,
+        crop_code=payload.crop_code,
+        area_code=payload.area_code,
+    )
+    db.commit()
+    if result.get("idempotent_replay"):
+        response.status_code = status.HTTP_200_OK
+    return result
 
 
-@router.post("/{conversation_id}/messages/{message_id}/retry", response_model=Message)
-def retry_message(conversation_id: str, message_id: str) -> Message:
-    try:
-        return service.retry_message(conversation_id, message_id)
-    except service.ConversationNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Conversation not found") from error
-    except service.MessageNotFoundError as error:
-        raise HTTPException(status_code=404, detail="Message not found") from error
+@router.post("/{conversation_id}/messages/{message_id}/retry")
+def retry_message(
+    conversation_id: str,
+    message_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    result = service.retry_message(
+        db, user=user, conversation_id=conversation_id, message_id=message_id
+    )
+    db.commit()
+    return result
+
+
+@router.post("/{conversation_id}/messages/{message_id}/review-request")
+def request_review(
+    conversation_id: str,
+    message_id: str,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    result = service.request_review(
+        db, user=user, conversation_id=conversation_id, message_id=message_id
+    )
+    db.commit()
+    return result
+
+
+@router.get("/{conversation_id}/events")
+def list_events(
+    conversation_id: str,
+    reason: str | None = None,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    return service.list_events(
+        db, user=user, conversation_id=conversation_id, reason=reason
+    )

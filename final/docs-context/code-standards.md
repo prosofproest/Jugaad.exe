@@ -115,22 +115,20 @@ Component rules:
 
 ---
 
-## 4. Dart / Flutter (mobile)
+## 4. TypeScript / React Native (mobile)
 
-*Applies once ADR-006 is Accepted. While it is Proposed, treat the Flutter tooling below as
-provisional and do not scaffold `mobile/` (see `progress-tracker.md` §5).*
+**Tooling:** TypeScript strict, ESLint + Prettier, Zod for runtime schemas, Expo SQLite or
+WatermelonDB, Expo Router or React Navigation, Zustand or Redux Toolkit, React Native
+Testing Library, Detox or Maestro.
 
-**Tooling:** `flutter_lints`, `dart format`, `freezed` + `json_serializable`, `drift`,
-`go_router`, `riverpod`.
-
-- Null safety, no `dynamic` in domain models.
-- Immutable state; `freezed` for models and unions (loading/loaded/stale/offline/error).
+- `strict: true`; no `any` in domain models.
+- Discriminated unions for loading/loaded/stale/offline/error.
 - Local DB schema versioned with migrations; never drop unsent observations on upgrade.
-- All user-facing strings in ARB files; no hard-coded copy in widgets.
-- Repository layer abstracts API + local DB; widgets never call HTTP directly.
+- All user-facing strings in i18n catalogues (English + Kannada); no hard-coded copy.
+- Repository layer abstracts API + local DB; components never call HTTP directly.
 - Images: compress before queueing, retain diagnostic detail, record original dimensions.
 - Queue operations are idempotent and resumable; persist retry count and last error.
-- Golden tests for the result cards, quality feedback and stale banner.
+- Component tests for the result cards, quality feedback and stale banner.
 - Test on a low-end Android device profile and with airplane mode.
 
 ---
@@ -145,7 +143,7 @@ provisional and do not scaffold `mobile/` (see `progress-tracker.md` §5).*
 | JSON field | snake_case | `valid_from` |
 | DB table | plural snake_case | `feature_snapshots` |
 | TS component | PascalCase file | `RiskBadge.tsx` |
-| Flutter widget | PascalCase | `AssessmentCard` |
+| React Native component | PascalCase | `AssessmentCard` |
 | Enum value | snake_case string | `needs_visit` |
 | Env var | SCREAMING_SNAKE | `WEATHER_API_KEY` |
 | Feature flag | `feature.<area>.<name>` | `feature.forecast.nowcast` |
@@ -181,7 +179,7 @@ RFC 7807-style, one shape everywhere:
 - `Idempotency-Key` header on any create that can be retried.
 - Cursor pagination: `?cursor=&limit=`; response `{items, next_cursor}`.
 - Filtering is explicit and whitelisted; no arbitrary query passthrough.
-- Uploads: presigned URL, content-type and size validated on completion.
+- Uploads: signed Cloudinary upload, content-type and size validated on completion.
 - Rate limits per user and per IP on auth and upload endpoints.
 - Timestamps are UTC ISO-8601 with `Z`.
 
@@ -203,7 +201,8 @@ RFC 7807-style, one shape everywhere:
 - Passwords (staff): Argon2id. Farmer accounts: phone OTP, rate-limited, no password.
 - Uploads: validate magic bytes, size, dimensions; strip EXIF location unless explicitly
   needed and consented; never trust client MIME.
-- Object storage: private by default; presigned URLs with short TTL; no public buckets.
+- Image storage: Cloudinary, private by default; signed URLs with short TTL; no public
+  delivery URLs.
 - Audit: append-only events for review decisions, role changes, exports, config changes
   and sensitive record access.
 - Dependencies: pinned, scanned; no unmaintained packages in the request path.

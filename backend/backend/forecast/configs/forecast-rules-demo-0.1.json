@@ -1,0 +1,125 @@
+{
+  "model_version": "forecast-rules-demo-0.1",
+  "status": "demo",
+  "is_demo": true,
+  "provisional": true,
+  "approval_note": "Engineering demonstration only. The rules, weights and band thresholds are provisional and have not been reviewed or approved by an agronomist. Operational alerts are blocked while status is 'demo'.",
+  "approved_by": "demo-seed (not an agronomist)",
+  "approved_at": "2026-11-06T00:00:00Z",
+  "review_date": null,
+  "spatial_level": "block",
+  "boundary_version": "demo-boundary-2026.1",
+  "horizon_days": 10,
+  "issue_cadence": "daily",
+  "event_definition": {
+    "event": "first_verified_case",
+    "negative": "verified_absence_from_sentinel_panel_visit",
+    "eligible_tiers": ["confirmed", "probable"],
+    "never_eligible": ["unverified", "needs_visit", "duplicate", "unresolved", "rejected"],
+    "as_of_rule": "verified_at <= issue_time AND event_date <= issue_time",
+    "note": "No report and no visit are never negatives. Positives-only evaluation is labelled positive-unlabelled, never PR-AUC."
+  },
+  "gates": {
+    "weather_freshness_hours": 24.0,
+    "min_active_reporters": 3,
+    "min_verified_reports": 1,
+    "min_weather_completeness": 0.8,
+    "coverage_window_days": 14
+  },
+  "coverage": {
+    "weights": {
+      "active_reporters": 0.5,
+      "weather_completeness": 0.3,
+      "verified_reports": 0.2
+    },
+    "good_threshold": 0.75,
+    "partial_threshold": 0.5
+  },
+  "bands": {
+    "moderate": 0.30,
+    "high": 0.55,
+    "urgent": 0.80,
+    "approval_status": "demo_provisional"
+  },
+  "suppression": {
+    "min_count": 5
+  },
+  "targets": {
+    "tomato_late_blight": {
+      "display_name": "Tomato late blight",
+      "forecast_eligible": true,
+      "rules_version": "late-blight-demo-0.1",
+      "temperature_optimum_c": [15.0, 22.0],
+      "temperature_tolerance_c": 5.0,
+      "humidity_threshold_pct": 85.0,
+      "wet_day_rainfall_mm": 2.0,
+      "wet_day_humidity_pct": 85.0,
+      "consecutive_wet_days_target": 2.0,
+      "susceptible_stages": ["vegetative", "flowering", "fruiting"],
+      "weights": {
+        "wetness": 0.35,
+        "temperature": 0.20,
+        "humidity": 0.20,
+        "crop_stage": 0.10,
+        "local_evidence": 0.15
+      }
+    },
+    "tomato_early_blight": {
+      "display_name": "Tomato early blight",
+      "forecast_eligible": true,
+      "rules_version": "early-blight-demo-0.1",
+      "temperature_optimum_c": [24.0, 29.0],
+      "temperature_tolerance_c": 5.0,
+      "humidity_threshold_pct": 80.0,
+      "wet_day_rainfall_mm": 2.0,
+      "wet_day_humidity_pct": 80.0,
+      "consecutive_wet_days_target": 1.0,
+      "susceptible_stages": ["vegetative", "flowering", "fruiting"],
+      "weights": {
+        "wetness": 0.25,
+        "temperature": 0.25,
+        "humidity": 0.20,
+        "crop_stage": 0.10,
+        "local_evidence": 0.20
+      }
+    },
+    "tomato_septoria_leaf_spot": {
+      "display_name": "Tomato Septoria leaf spot",
+      "forecast_eligible": true,
+      "rules_version": "septoria-demo-0.1",
+      "temperature_optimum_c": [20.0, 25.0],
+      "temperature_tolerance_c": 5.0,
+      "humidity_threshold_pct": 85.0,
+      "wet_day_rainfall_mm": 1.0,
+      "wet_day_humidity_pct": 85.0,
+      "consecutive_wet_days_target": 2.0,
+      "susceptible_stages": ["vegetative", "flowering", "fruiting"],
+      "weights": {
+        "wetness": 0.30,
+        "temperature": 0.20,
+        "humidity": 0.25,
+        "crop_stage": 0.10,
+        "local_evidence": 0.15
+      }
+    },
+    "tomato_leaf_curl": {
+      "display_name": "Tomato leaf curl symptom complex",
+      "forecast_eligible": false,
+      "rules_version": "not-forecast-eligible",
+      "temperature_optimum_c": [25.0, 30.0],
+      "temperature_tolerance_c": 6.0,
+      "humidity_threshold_pct": 70.0,
+      "wet_day_rainfall_mm": 2.0,
+      "wet_day_humidity_pct": 80.0,
+      "consecutive_wet_days_target": 1.0,
+      "susceptible_stages": ["vegetative", "flowering", "fruiting"],
+      "weights": {
+        "wetness": 0.2,
+        "temperature": 0.3,
+        "humidity": 0.2,
+        "crop_stage": 0.1,
+        "local_evidence": 0.2
+      }
+    }
+  }
+}

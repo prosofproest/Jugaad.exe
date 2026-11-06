@@ -1,4 +1,4 @@
-"""Declarative base and naming conventions.
+"""Declarative base, shared column types and identifier helpers.
 
 Schema authority: SQLAlchemy models + Alembic migrations in ``backend/``.
 No second ORM, no manual production DDL (``final/feature-specs/05-data-layer.md``).
@@ -6,10 +6,12 @@ No second ORM, no manual production DDL (``final/feature-specs/05-data-layer.md`
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
+from uuid import uuid4
 
-from sqlalchemy import MetaData, func
+from sqlalchemy import DateTime, MetaData, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+from sqlalchemy.types import TypeDecorator
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -20,14 +22,47 @@ NAMING_CONVENTION = {
 }
 
 
+class UTCDateTime(TypeDecorator[datetime]):
+    """Store naive UTC, return timezone-aware UTC on every backend."""
+
+    impl = DateTime
+    cache_ok = True
+
+    def process_bind_param(self, value: datetime | None, dialect) -> datetime | None:  # type: ignore[no-untyped-def]
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+
+    def process_result_value(self, value: datetime | None, dialect) -> datetime | None:  # type: ignore[no-untyped-def]
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+
+def utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def new_id(prefix: str) -> str:
+    return f"{prefix}_{uuid4().hex}"
+
+
 class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
 class TimestampMixin:
-    """UTC timestamps for every mutable row."""
-
-    created_at: Mapped[datetime] = mapped_column(server_default=func.now(), nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(
-        server_default=func.now(), onupdate=func.now(), nullable=False
+    created_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=utc_now, server_default=func.now(), nullable=False
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        UTCDateTime, default=utc_now, server_default=func.now(), onupdate=utc_now, nullable=False
+    )
+
+
+class UUIDPrimaryKeyMixin:
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("row"))

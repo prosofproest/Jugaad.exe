@@ -13,9 +13,8 @@ requests.
 Ensure that only the right people can see or change the right records, that consent is
 explicit and auditable, and that no farmer can ever read another farmer's case.
 
-Five roles in v1. `agronomist` was added by decision D13 so that advisory content and risk
-bands can be approved by a named qualified person, without inventing a second permission
-system. It carries no verification rights. More granular permissions are deferred until an
+Three roles only in v1 (ADR-010). Confirmation is gated by the scoped `can_confirm`
+permission rather than a fourth role. More granular permissions are deferred until an
 operational need is demonstrated.
 
 ---
@@ -26,24 +25,24 @@ operational need is demonstrated.
 |---|---|---|
 | `farmer` | Field user who submits reports and reads advisories | Mobile |
 | `extension_worker` | Verifies reports, captures on behalf of farmers, shares advisories | Mobile + expert portal |
-| `pathologist` | Escalation reviewer, taxonomy owner, label correction, advisory approval | Expert portal |
-| `agronomist` | Advisory author and second approver, risk-band approval, read-only area visibility. **Cannot** verify cases. | Expert portal |
 | `admin` | Configuration, users, thresholds, exports, audit | District dashboard |
+
+Two **scoped permissions** replace the former `pathologist` role:
+
+| Permission | Grants | Granted by |
+|---|---|---|
+| `can_confirm` | Set verification state `confirmed`; correct labels | Admin, audited |
+| `can_approve_advisory` | Approve advisory content (second approver for high-risk content) | Admin, audited |
 
 Rules:
 
-- One user may hold multiple roles (e.g. extension worker + pathologist), but the active
-  role is explicit in the session and shown in the UI.
-- There is **no public self-registration** for `extension_worker`, `pathologist`,
-  `agronomist` or `admin`. They are provisioned by an admin or partner onboarding.
+- One user may hold multiple roles (e.g. extension worker + admin), but the active role is
+  explicit in the session and shown in the UI.
+- There is **no public self-registration** for `extension_worker` or `admin`. They are
+  provisioned by an admin or partner onboarding.
 - `farmer` accounts may self-register via phone OTP.
-- `agronomist` exists separately from `pathologist` so that author ≠ approver is achievable
-  with two people. One person may hold both roles, but a single account can never both
-  author and approve the same advisory (`07-advisory-and-alerts.md` §3).
-- `agronomist` cannot set verification status. Confirmation stays pathologist-only, which
-  preserves the separation of duties in §3.
-- Role changes are audited and take effect on the next token refresh, not silently
-  mid-session.
+- Role and permission changes are audited and take effect on the next token refresh, not
+  silently mid-session.
 
 ---
 
@@ -52,41 +51,35 @@ Rules:
 `own` = records the user created; `area` = records within assigned administrative units;
 `all` = all records.
 
-| Capability | farmer | extension_worker | pathologist | agronomist | admin |
-|---|---|---|---|---|---|
-| Create observation | own | own + on-behalf | no | no | no |
-| Read observation | own | area | area + escalated | area (read-only) | all (audited) |
-| Upload image | own | own + on-behalf | no | no | no |
-| Request review | own | area | no | no | no |
-| Record sentinel visit | no | area (scheduled) | area (scheduled) | no | no (manages panel) |
-| Read own assessment | own | own | — | — | — |
-| Read queue | no | area | area + escalations | area (read-only) | all |
-| Assign case | no | self only | area | no | all |
-| Set verification status | no | area (probable/needs_visit/duplicate) | area (all states incl. confirmed) | no | no |
-| Correct label | no | no | yes | no | no |
-| Author advisory | no | no | yes | yes | no |
-| Approve advisory | no | no | yes (if not author) | yes (if not author) | no |
-| Approve risk bands/thresholds | no | no | no | yes (second approver) | no (proposes only) |
-| Manage crops/targets/areas | no | no | no | no | yes |
-| Manage users/roles | no | no | no | no | yes |
-| Configure thresholds/alert policy | no | no | no | no | yes (requires second approver) |
-| View map layers | own area summary | area | area | area | all |
-| Export aggregates | no | no | no | no | yes (audited) |
-| Read audit log | no | no | no | no | yes |
-| Delete own account | yes | yes | yes | yes | yes (via admin) |
+| Capability | farmer | extension_worker | admin |
+|---|---|---|---|
+| Create observation | own | own + on-behalf | no |
+| Read observation | own | area | all (audited) |
+| Upload image | own | own + on-behalf | no |
+| Request review | own | area | no |
+| Read own assessment | own | own | — |
+| Read queue | no | area | all |
+| Assign case | no | self only | all |
+| Set verification status | no | area (probable/needs_visit/duplicate/unresolved); `can_confirm` required for confirmed | no |
+| Correct label | no | `can_confirm` only | no |
+| Approve advisory | no | `can_approve_advisory` only | no |
+| Manage crops/targets/areas | no | no | yes |
+| Manage users/roles | no | no | yes |
+| Configure thresholds/alert policy | no | no | yes (requires second approver) |
+| Grant `can_confirm` / `can_approve_advisory` | no | no | yes (audited) |
+| View map layers | own area summary | area | all |
+| Export aggregates | no | no | yes (audited) |
+| Read audit log | no | no | yes |
+| Delete own account | yes | yes | yes (via admin) |
 
 Notes:
 
-- `confirmed` requires the `pathologist` role. Extension workers can record `probable`,
-  `needs_visit`, `duplicate` and `unresolved`; they escalate for confirmation.
+- `confirmed` requires the `can_confirm` permission **and** at least one evidence item.
+- Extension workers can record `probable`, `needs_visit`, `duplicate` and `unresolved`
+  without the permission; they escalate for confirmation.
 - Admin cannot verify cases (separation of duties).
-- `agronomist` cannot verify cases or correct labels. Its write surface is limited to
-  advisory content and risk-band approval, which keeps it separate from the evidence path.
-- Author ≠ approver is enforced per advisory and per risk-band change, not per role. A user
-  holding both `pathologist` and `agronomist` is still blocked from approving their own
-  submission; the check is `author_id != approver_id` on the record.
-- Admin may propose threshold values but cannot approve its own proposal; the second
-  approver must hold `agronomist`.
+- `can_confirm` and `can_approve_advisory` are permissions, not roles; every grant and every
+  use is audited.
 - Export requires a written purpose field and is audited.
 
 ---
@@ -120,8 +113,8 @@ POST /v1/auth/login {email, password}
 ```
 
 - Passwords hashed with Argon2id.
-- MFA (TOTP) is **required** for `pathologist`, `agronomist` and `admin`; strongly
-  recommended for `extension_worker`.
+- MFA (TOTP) is **required** for `admin` and strongly recommended for `can_confirm`
+  holders; recommended for all `extension_worker` accounts.
 - Lockout after 10 failed attempts in 15 minutes; unlock via admin.
 - Password reset via emailed single-use token (30 min TTL), never reveals account existence.
 
@@ -191,7 +184,7 @@ Retention:
 
 - Images and case records: per programme policy (set with legal; not fixed here).
 - Audit events: longer than case data, immutable.
-- OTP codes, sessions, presigned URLs: short TTL.
+- OTP codes, sessions, signed URLs: short TTL.
 - Backups: documented rotation; deletion propagates on the next restore cycle.
 
 ---
@@ -239,13 +232,10 @@ Error codes: `invalid_credentials`, `mfa_required`, `otp_expired`, `otp_rate_lim
 
 - [ ] A farmer can register and log in with phone OTP; codes expire and are rate-limited.
 - [ ] A farmer cannot read another farmer's observation (403/404) — tested.
-- [ ] An extension worker cannot set `confirmed`; a pathologist can — tested.
+- [ ] An extension worker without `can_confirm` cannot set `confirmed`; one with it can —
+      tested.
 - [ ] An admin cannot set verification status — tested.
-- [ ] An agronomist cannot set verification status or correct a label — tested.
-- [ ] A single account holding both `pathologist` and `agronomist` cannot author and approve
-      the same advisory — tested.
-- [ ] Risk-band and threshold changes cannot be approved by their proposer — tested.
-- [ ] MFA is enforced for pathologist, agronomist and admin accounts.
+- [ ] MFA is enforced for `admin` accounts and for `can_confirm` holders.
 - [ ] Refresh-token reuse revokes the family and forces re-login.
 - [ ] Consent is required before the first report and after a version change.
 - [ ] Withdrawing optional research consent does not block reporting.

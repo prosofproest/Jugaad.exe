@@ -40,7 +40,7 @@ displayed.
 
 v1 is narrow on purpose: one crop, one agro-climatic zone, a small target list, a
 rules-based weather-risk model, assistive image triage, extension-worker verification, and
-SMS/WhatsApp delivery. Breadth is added only when data, expert labels, approved advisory
+in-app/email delivery (SMS optional). Breadth is added only when data, expert labels, approved advisory
 content and evaluation evidence exist.
 
 **Delivery surfaces.** v1 is a full-stack product, not a document set. It ships three
@@ -50,7 +50,7 @@ coordinated deliverables:
 |---|---|
 | **Backend API** (FastAPI) | Owns cases, media, inference, review, forecasts, advisories, alerts, audit |
 | **Web frontend** (Next.js) | Conversational capture for any signed-in user, expert review portal, district dashboard, admin |
-| **Mobile frontend** (Flutter, Android-first) | Conversational capture plus offline field capture, queue and history |
+| **Mobile frontend** (React Native + TypeScript, Android-first) | Conversational capture plus offline field capture, queue and history |
 
 The **chat** is the shared entry point on web and mobile: the user attaches or takes an
 image, adds optional context and sends it, and the system replies with a structured photo
@@ -140,30 +140,34 @@ Model accuracy alone is not success.
 
 | Persona | Core need | Primary surface |
 |---|---|---|
-| **Smallholder farmer** | Short, local-language, low-data flow with a clear next action; no probability jargon | Mobile, SMS/WhatsApp |
+| **Smallholder farmer** | Short, local-language, low-data flow with a clear next action; no probability jargon | Mobile, in-app alerts (SMS optional) |
 | **Progressive farmer / farm manager** | Crop-cycle history, multiple fields, trends, exportable records | Mobile |
 | **Extension worker** | Fast case review, location and crop context, verification capture, approved advice | Mobile + expert portal |
-| **Plant pathologist / agronomist** | Original evidence, metadata, alternatives, provenance, label correction, advisory approval | Expert portal |
+| **Plant pathologist / agronomist** (external, not an app role) | Original evidence, metadata, alternatives, provenance, label correction, advisory approval | Expert portal via a `can_confirm` / `can_approve_advisory` account |
 | **District administrator** | Aggregated map, filters, coverage, verified trends, alert audit | Dashboard |
 | **Programme administrator** | Roles, configuration, thresholds, exports, service oversight | Admin console |
 
 ### 4.2 v1 roles
 
-Five roles exist in v1. `agronomist` was added by decision D13 so that advisory
-content and risk bands can be approved by a named qualified person, without inventing a
-second permission system. It carries no verification rights.
+Only **three** roles exist in v1 (ADR-010):
 
 | Role | Purpose |
 |---|---|
 | `farmer` | Submits reports, reads advisories |
 | `extension_worker` | Verifies reports, captures on behalf of farmers, shares advisories |
-| `pathologist` | Escalation reviewer, taxonomy owner, label correction, advisory approval |
-| `agronomist` | Advisory author and second approver, risk-band approval, read-only area visibility; cannot verify cases |
 | `admin` | Configuration, users, thresholds, exports, audit |
 
+Two scoped permissions replace the former `pathologist` role:
+
+- `can_confirm` — required to set verification state `confirmed`; held by designated senior
+  extension workers and granted by an admin.
+- `can_approve_advisory` — required to approve advisory content; held by a designated
+  agronomist or senior extension worker.
+
 A user may hold multiple roles, but the active role is explicit in the session. There is no
-public self-registration for `extension_worker`, `pathologist`, `agronomist` or `admin`.
-MFA is required for `pathologist`, `agronomist` and `admin`.
+public self-registration for `extension_worker` or `admin`. MFA is required for `admin` and
+strongly recommended for `can_confirm` holders. The `admin` role does not verify cases
+(separation of duties).
 
 ### 4.3 Stakeholders
 
@@ -177,17 +181,17 @@ institution, the technology team, funders and the data-protection/legal owner.
 ### 5.1 Defended configuration
 
 ```
-Crop:         one crop (candidate: potato or tomato — D1 pending)
-Zone:         one agro-climatic zone / district cluster
-Targets:      3–5 conditions + healthy + abiotic look-alike + unknown
+Crop:         open catalogue; assessment only for the validated allowlist (D1a)
+Zone:         one agro-climatic zone / district cluster for the pilot
+Targets:      validated allowlist + healthy + abiotic look-alike + unknown
 Image AI:     lightweight CNN fine-tuned on field data, quality gate,
               abstention, top-3 candidates
-Forecast:     validated agronomic weather-risk model (rules first),
-              ML overlay only when data supports it
-Product:      Flutter mobile app + Next.js web app, both with conversational
-              capture; SMS/WhatsApp alerts; expert portal and dashboard
-Verification: extension-worker-first; pathologist for escalations only
+Forecast:     nowcast (last 10 days), rules first; ML only when data supports it
+Product:      React Native mobile app + Next.js web app, both with conversational
+              capture; in-app + email + optional SMS alerts; expert portal and dashboard
+Verification: extension-worker-first; `can_confirm` permission for confirmed cases
 Geography:    block/mandal level, never farm level
+Languages:    English + Kannada
 Timeline:     18 months to limited operational alerts (planning assumption)
 Team:         7–9 people
 ```
@@ -206,7 +210,7 @@ Team:         7–9 people
 - Expert review queue with triage, verification states, evidence notes and audit.
 - Separate map layers for verified reports, unverified reports, modelled risk and coverage.
 - Approved non-chemical advisory retrieval with version and expiry.
-- Alerts over SMS/WhatsApp with deduplication, cooldown and feedback.
+- Alerts over in-app/email/SMS with deduplication, cooldown and feedback (SMS optional).
 - Admin configuration of crops, targets, geographies, thresholds and alert policy.
 - Audit, basic monitoring, model registry and export controls.
 
@@ -218,9 +222,9 @@ Team:         7–9 people
 | Drone / satellite analytics | Autonomous chemical guidance |
 | On-device inference beyond the quality pre-check | Free-form generative diagnosis chat |
 | Multi-language beyond one | Farm-level risk precision |
-| Multi-crop | Universal all-crop diagnosis |
+| Multi-crop without validation | Universal all-crop diagnosis |
 | IoT sensors | Confirmed-outbreak claims |
-| RBAC beyond the five roles | Public exact farm coordinates |
+| RBAC beyond the three roles | Public exact farm coordinates |
 | Automated retraining | Automated model promotion |
 | Group chat / voice notes | Yield-impact claims without a study design |
 
@@ -295,14 +299,14 @@ Default sort: urgency → uncertainty → age, with stable tie-breaking.
 model version, forecast context at report time, prior reviews and privacy-scoped history.
 
 **Verification states** — confirmed, probable, rejected, duplicate, needs-visit, unresolved.
-`confirmed` requires the pathologist role. Every decision writes an immutable review event
-and an audit event.
+`confirmed` requires the `can_confirm` permission. Every decision writes an immutable review
+event and an audit event.
 
 **Evidence** — required by decision type; label correction records previous label, new label,
 reviewer and reason; lab confirmation is a separate optional tier.
 
-**Reviewer actions** — claim/unclaim, request a better image or field detail, escalate to
-pathologist, record severity using crop-specific criteria, link duplicates.
+**Reviewer actions** — claim/unclaim, request a better image or field detail, escalate to a
+`can_confirm` holder, record severity using crop-specific criteria, link duplicates.
 
 ### 6.3 District dashboard and map
 
@@ -363,7 +367,7 @@ wraps the same observation and photo-assessment pipeline used by the structured 
 | Reply kind | What the user sees | Primary action |
 |---|---|---|
 | `assessment` | Top candidates, confidence band, model version, generation time, "assistive, not a diagnosis" | Add context, request review, open advisory |
-| `abstained` | Specific machine reason rendered in plain language (`below_class_threshold`, `low_margin`, `high_entropy`, `out_of_distribution`, `unsupported_crop`, `quality_gate_failed` with the quality flag) | Retake, request review |
+| `abstained` | Specific reason (blur, exposure, no plant, unsupported crop, out of domain) | Retake |
 | `unsupported_crop` | Explanation and supported-crop list | Change crop, escalate |
 | `queued` | "Will assess when connected" | View queue |
 | `failed` | Stable error code and whether retry helps | Retry |
@@ -395,7 +399,7 @@ capability and the spec that owns it.
 
 | ID | Capability | Requirement summary | Owner spec |
 |---|---|---|---|
-| PRD-F-01 | Identity and access | Phone-OTP farmers; provisioned staff accounts; five roles; MFA for privileged roles; deny by default; object-level access | `03-auth-and-roles.md` |
+| PRD-F-01 | Identity and access | Phone-OTP farmers; provisioned staff accounts; three roles + `can_confirm` / `can_approve_advisory`; MFA for privileged accounts; deny by default; object-level access | `03-auth-and-roles.md` |
 | PRD-F-02 | Consent and privacy | Plain-language consent; versioned and auditable; privacy requests; retention and deletion | `03-auth-and-roles.md` |
 | PRD-F-03 | Crop and area context | Supported-crop list; approximate area; optional variety/stage; unknown allowed | `02-reporting-and-capture.md` |
 | PRD-F-04 | Capture and quality | Camera/gallery; guidance; on-device pre-check; retake; metadata; compression | `02-reporting-and-capture.md` |
@@ -511,45 +515,34 @@ capability and the spec that owns it.
 
 - **Formulation:** cautious visual triage of visible symptoms, not pathogen identification.
 - **Input:** field image plus optional crop and plant-part context.
-- **Output:** candidate scores, quality flags, confidence band, abstention state, abstain
-  reason, model version and the decision thresholds used.
+- **Output:** candidate scores, quality flags, confidence band, abstention state and model
+  version.
 - **Classes:** supported conditions + healthy + abiotic look-alike + unknown/other.
 - **Quality gate:** separate check for blur, resolution, exposure, plant presence and
   distance; failure returns `abstained` with a reason and never blocks submission.
-- **Abstention (D8):** after the quality gate passes, abstain when the calibrated top
-  candidate is below its class threshold `τ_c`, the top-1/top-2 margin is too small,
-  normalised entropy is too high, the OOD score exceeds `ood_max`, or the crop is
-  unsupported. `τ_c`, margin, entropy and `ood_max` are stored per prediction. Safety-first:
-  per-class recall floors take precedence over coverage.
 - **Architecture:** start with transfer learning (MobileNet/EfficientNet class); compare
   larger models only when data and compute justify it.
 - **Preprocessing:** identical in training and inference; match the pretrained backbone.
-- **Evaluation:** macro F1, per-class precision/recall, confusion, top-k, calibration
-  (temperature-scaled on a dedicated split), abstention rate, OOD on held-out classes,
-  subgroup breakdowns and error analysis on the frozen field test set. Numeric floors are
-  pre-registered before the test set is opened (D8).
+- **Evaluation:** macro F1, per-class precision/recall, confusion, top-k, calibration,
+  abstention rate, subgroup breakdowns and error analysis on the frozen field test set.
 - **Explainability:** Grad-CAM-style outputs are debugging aids, not proof of causal
   reasoning; user-facing wording explains likely visual match, uncertainty, quality and next
   step.
 - **Confidence:** show a percentage only when calibration is validated and approved;
-  otherwise use qualitative bands and `not_calibrated`.
-- **No override:** there is no user-facing control that changes a model output. Manual review
-  is a separate audited decision and never rewrites the prediction.
+  otherwise use qualitative bands.
 - **Prohibited:** presenting a ranked class as a diagnosis; unsupported percentage
-  confidence; forced classification of unknown inputs; overriding an abstention in the UI.
+  confidence; forced classification of unknown inputs.
 
 ### 10.2 Area outlook
 
 - **Prediction unit:** target × crop × geography × issue time × horizon.
 - **Event definition:** written before feature engineering; different event types are
   separate tasks.
-- **Negatives:** verified absence from pre-registered sentinel-panel visits (D7), never a
-  missing report or a missing visit.
+- **Negatives:** verified absence within coverage, never "no report".
 - **Model ladder:** documented expert rules → logistic regression → gradient boosting →
   spatiotemporal models only with dense longitudinal data.
-- **Features:** weather windows, crop/crop stage, seasonality, lagged eligible labels
-  (`confirmed`, or `probable` with evidence tier, as-of cutoff), nearby verified reports,
-  prior-season occurrence and coverage.
+- **Features:** weather windows, crop/crop stage, seasonality, lagged verified reports,
+  nearby verified reports, prior-season occurrence and coverage.
 - **Leakage rule:** every feature must be computable at issue time; persist an immutable
   feature snapshot.
 - **No-score gate:** weather freshness, minimum coverage, calendar/stage availability,
@@ -617,7 +610,7 @@ committed in this PRD.
 
 | Level | Metrics |
 |---|---|
-| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier score, calibration on sentinel-panel negatives only (underpowered below the D8 minimum); latency |
+| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier score, calibration; latency |
 | Operational | Report-to-review time, backlog, verified case rate, notification delivery, sync success |
 | User | Task completion, comprehension of uncertainty wording, repeat use, alert usefulness, opt-out rate |
 | Agricultural | Lead time, field-inspection prioritisation, credible outcome indicators |
@@ -669,7 +662,7 @@ Detailed work per phase is in `docs-context/phase-plan.md`; live status is in
 - Partner access to field sites, plant-clinic archives and expert reviewers.
 - A weather data source with adequate history, resolution and licence.
 - A versioned boundary dataset for the pilot geography.
-- SMS/WhatsApp provider with per-message cost agreed.
+- SMS gateway (optional) with per-message cost agreed.
 - An owning/paying institution for post-pilot operations.
 - Legal review of advisory content.
 
@@ -716,18 +709,22 @@ The live register with owners and status is in `docs-context/progress-tracker.md
 
 ---
 
-## 16. Open decisions (blocking)
+## 16. Decision status (blocking)
 
-| ID | Decision | Recommended default | Owner |
-|---|---|---|---|
-| D1 | Crop + 3–5 targets + zone | Potato late blight, one zone, plus healthy + abiotic + unknown | Product lead + agronomist |
-| D2 | Nowcast or 7-day outlook | Nowcast for v1; add outlook after a season of outcomes | Agronomist + ML lead |
-| D3 | Verifier, capacity, SLA | Extension-first, pathologist escalation, published SLA and workload cap | Programme lead + partner |
-| D4 | Owning/paying institution | Grant/NGO pilot → cooperative or insurer operations | Product lead |
-| D5 | Primary outcome metric | Median lead time to verified confirmation, pre-registered | Product lead + evaluator |
-| D6 | Legal position on advisory | Non-chemical + escalation, legal review before pilot | Programme lead + legal |
+The live register with owners and status is `docs-context/progress-tracker.md` §4; the Phase
+0 working record is `docs-context/phase-0-decisions.md`.
 
-No code that depends on an unresolved decision may start.
+| ID | Decision | Status | Decision / next step | Owner |
+|---|---|---|---|---|
+| D1 | Crop + targets + zone | Decided | Open catalogue + validated-target allowlist (ADR-011); first allowlist = D1a | Product lead + agronomist |
+| D2 | Nowcast or 7-day outlook | Decided | Nowcast (last 10 days); outlook deferred | Agronomist + ML lead |
+| D3 | Verifier, capacity, SLA | Partial | Extension-first + `can_confirm`; SLA/capacity open | Programme lead + partner |
+| D4 | Owning/paying institution | Open | Grant/NGO pilot → cooperative or insurer operations (proposed) | Product lead |
+| D5 | Primary outcome metric | Open | Median lead time to verified confirmation, pre-registered (proposed) | Product lead + evaluator |
+| D6 | Legal position on advisory | Decided | Non-chemical only; legal review before pilot | Programme lead + legal |
+
+No code that depends on an unresolved decision may start. Gate 0 remains open on D1a, D3b,
+D4, D5 and D7–D12.
 
 ---
 

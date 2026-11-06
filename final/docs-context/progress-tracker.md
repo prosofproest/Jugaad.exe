@@ -4,8 +4,9 @@
 Update this file in the same change as any scope, schema, API or decision change.
 
 **Last updated:** 2026-11-06
-**Current phase:** Phase 0 — Discovery (documentation complete, decisions open; Phase 2 §5.1
-engineering foundation present under a recorded Gate-1 exception, no feature work)
+**Current phase:** Phase 0 — Discovery (architecture decided in ADR-009/010/011; 5 of 12
+blocking decisions answered; documentation reconciliation in progress; Phase 1 data platform
+reference implementation verified in `database/` under recorded Gate-1 exception; no feature code)
 
 ---
 
@@ -34,20 +35,29 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [x] Full 55-chapter blueprint and Appendices A–H mapped to repository files (`../README.md`).
 - [x] Realism audit applied; v1 scope narrowed.
 - [x] Architecture baseline and feature specs drafted.
-- [ ] **D1** Crop + 3–5 targets + agro-climatic zone selected with local experts.
-- [ ] **D2** Nowcast vs 7-day outlook decided.
-- [ ] **D3** Verifier role, capacity and SLA agreed with partner.
+- [x] **Architecture** reconciled to PostgreSQL/PostGIS + Cloudinary + Next.js/React Native
+      (`adr/0009-data-platform.md`, `adr/0010-v1-roles.md`, `adr/0011-open-crop-catalogue.md`).
+- [x] **D1** Crop + targets policy decided: open catalogue + validated-target allowlist
+      (ADR-011). The first concrete allowlist is split out as **D1a** (open).
+- [x] **D2** Nowcast (last 10 days) decided; 7-day outlook deferred.
+- [~] **D3** Verifier role decided (extension-first, `can_confirm` permission); capacity
+      and SLA still open.
 - [ ] **D4** Owning/paying institution identified.
 - [ ] **D5** Primary outcome metric pre-registered.
-- [ ] **D6** Legal position on advisory content confirmed.
+- [x] **D6** Advisory policy decided: non-chemical only (R5 unchanged).
 - [ ] **D7–D12** Scientific-integrity decisions recorded (see §4).
-- [x] **D13** Agronomist role model recorded (see §4).
+- [x] **D13** v1 languages decided: English + Kannada.
+- [x] **D14** Output semantics decided: confidence band + abstention; severity is an
+      expert-review field.
+- [x] **D15** Notification channels decided: in-app mandatory; email for staff; SMS optional;
+      WhatsApp/push/IVR deferred.
 - [ ] Crop calendar and epidemic window documented for the pilot area.
 
-**Gate 0:** D1–D13 answered and recorded in §4, each with a recorded date and one named
-accountable owner (D7 and D13 are already accepted). Gate 0 carries a calendar target
-(proposed: **2026-11-20**, confirmed at the decision workshop) so that it cannot close by
-definition. No code that depends on them.
+**Gate 0:** D1–D12 answered and recorded in §4, each with a recorded date and one named
+accountable owner. Gate 0 carries a calendar target (proposed: **2026-11-20**, confirmed at
+the decision workshop) so that it cannot close by definition. No code that depends on them.
+Working record: `phase-0-decisions.md`. **Gate 0 is currently OPEN** — D1a, D3b, D4 and
+D5, D7–D12 remain.
 
 ### Phase 1 — Data foundation `[~]`
 
@@ -61,7 +71,7 @@ definition. No code that depends on them.
 - [x] Quarantine path for suspicious records (`database/governance/06-quarantine-policy.md`).
 
 **Gate 1:** documented permissions for every dataset; reproducible ingestion; label
-handbook approved by a pathologist.
+handbook approved by a `can_confirm` holder and an agronomist.
 
 ### Phase 2 — Platform MVP `[ ]`
 
@@ -72,7 +82,7 @@ handbook approved by a pathologist.
       recorded 2026-11-06 and adds no schema or feature behaviour.
 - [ ] Auth, roles, consent (`03-auth-and-roles.md`).
 - [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
-- [ ] Observation API with idempotency and presigned uploads.
+- [ ] Observation API with idempotency and signed Cloudinary uploads.
 - [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
 - [~] Conversational capture: `conversations` module + chat on web and mobile
       (`08-conversational-capture.md`). **Web surface built** against the
@@ -96,8 +106,8 @@ required; any demo reply is labelled.
 - [ ] Quality gate model (blur, exposure, resolution, no-plant).
 - [ ] Field-image baseline; public data used for pretraining only.
 - [ ] Group-held-out field test set frozen before model selection.
-- [ ] Calibration on a dedicated split (temperature scaling) and the D8 abstention decision function (`τ_c`, margin, entropy, OOD) chosen on validation.
-- [ ] Evaluation report: macro F1, per-class recall, ECE/Brier, abstention rate, OOD on held-out classes, subgroups; D8 floors pre-registered before the test set is opened.
+- [ ] Calibration + abstention thresholds chosen on validation.
+- [ ] Evaluation report: macro F1, per-class recall, ECE, abstention rate, subgroups.
 - [ ] ONNX export, registry entry, versioned serving.
 - [ ] Result card with top-3, confidence band, quality flags, escalation.
 
@@ -118,12 +128,10 @@ clear the pre-registered floor fails the gate.
 - [ ] Temporal holdout evaluation; calibration report.
 - [ ] Alert trigger, dedupe, cooldown, delivery status.
 
-**Gate 4:** the D7 event definition, label eligibility rule, sentinel-panel membership and
-visit schedule are fixed and frozen before the test season; the D8 forecast floors are
-pre-registered and **met** on sentinel-panel negatives; the D9 coverage, freshness and
-suppression values are recorded and approved; the forecast is reproducible from a stored
-snapshot; the no-score path is verified against those values; the map never merges reports and
-predictions.
+**Gate 4:** the D7 event definition and label maturity rule are fixed and frozen before the
+test season; the D9 coverage, freshness and suppression values are recorded and approved;
+the forecast is reproducible from a stored snapshot; the no-score path is verified against
+those values; the map never merges reports and predictions.
 
 ### Phase 5 — Pilot `[ ]`
 
@@ -157,20 +165,21 @@ epidemic season.
 
 | Workstream | Status | Next action |
 |---|---|---|
-| Documentation | `[x]` | Keep in sync with decisions |
+| Documentation | `[~]` | Reconcile remaining specs to ADR-009/010/011 |
 | Blueprint coverage | `[x]` | Chapter map maintained in `../README.md` |
-| Decisions | `[?]` | Resolve D1–D6 with local experts |
+| Architecture | `[x]` | ADR-009/010/011 accepted; propagate to specs |
+| Decisions | `[~]` | Close D1a, D3b, D4, D5, D7–D12 |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
-| Labelling | `[ ]` | Draft handbook after D1 |
-| Data platform | `[~]` | Reference schema, migration/storage/backup/seed designs in `database/`; `backend/` Alembic remains the schema authority; no live database applied |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; identity + observations next (needs Gate 1 exception) |
-| Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
-| Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass (2026-11-06) |
+| Labelling | `[ ]` | Draft handbook after D1a |
+| Data platform | `[x]` | Reference schema (39 tables), migration, storage rules, backup design, and demo seeds verified in `database/`; `backend/` remains schema authority |
+| Backend | `[~]` | FastAPI health scaffold, error handling, session/models, and v1 API router scaffolds |
+| Mobile | `[~]` | Flutter shell committed; CI analyze/test job defined |
+| Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass |
 | Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
-| Forecast | `[ ]` | Implement rules baseline after D1/D2 |
-| MLOps | `[~]` | `model_registry` schema, triggers, checksum verification, and demo entries implemented |
-| Security/privacy | `[~]` | S3 presigned rules (TTL ≤ 10m) & RBAC matrix implemented; DPIA drafted |
+| Forecast | `[ ]` | Implement rules baseline after D1a/D2 |
+| MLOps | `[~]` | `model_registry` schema, triggers, checksum verification, and demo entries implemented in `database/` |
+| Security/privacy | `[~]` | Object storage rules (TTL ≤ 10m) & RBAC matrix implemented; DPIA drafted |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
 
 ---
@@ -185,37 +194,44 @@ close while any remain open. Where a decision needs a number that the repository
 entitled to invent (R6), the decision must still define *who sets the number, from what
 measurement, before which gate* — the rule for setting the value is itself the decision.
 
-### D1 — Crop + targets + zone `[?]`
+### D1 — Crop + targets + zone `[x]`
+
+**Decision (2026-11-06):** Open, crop-agnostic catalogue with a **validated-target
+allowlist** (ADR-011). Any crop may be submitted; an assessment is returned only for a
+`crop × target` pair on the release allowlist; everything else returns an explicit
+abstention (`unsupported_crop`, `unsupported_target`, `insufficient_quality`). The first
+concrete allowlist is tracked as **D1a** and must be fixed before Gate 3.
+**Owner:** Project owner + agronomist. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
 
 | Option | Consequence |
 |---|---|
 | Potato late blight | Validated weather model exists (BLITECAST/SimCast); forecast credible on day one; narrow advisory |
 | Tomato late blight / early blight / leaf curl | More targets, more public data, weaker forecast baseline for non-blight targets |
 | Rice blast / BLB / brown spot | Large farmer base, harder image data, blast weather models exist |
+| Open catalogue + allowlist (chosen) | Crop-agnostic schema; claims limited to validated entries; abstains elsewhere |
 
-Recommended default: **potato late blight**, one zone, plus healthy + abiotic look-alike +
-unknown. Final choice requires local economic and partner input.
-**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (target 2026-11-20).
+### D2 — Nowcast or 7-day outlook `[x]`
 
-### D2 — Nowcast or 7-day outlook `[?]`
+**Decision (2026-11-06):** **Nowcast over the last 10 days** for v1. A 7-day outlook is
+deferred until at least one season of verified outcomes exists.
+**Owner:** Agronomist + ML lead. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
 
 | Option | Consequence |
 |---|---|
-| Nowcast (last 10 days) | No historical outcome data needed; more accurate; still actionable |
+| Nowcast (last 10 days) (chosen) | No historical outcome data needed; more accurate; still actionable |
 | 7-day outlook | Needs validation against outcomes; risk of overclaiming in year one |
 
-Recommended default: **nowcast for v1**, add outlook when a season of verified outcomes
-exists. **Owner:** Agronomist + ML lead. **Needs by:** Gate 0.
+### D3 — Verifier, capacity, SLA `[~]`
 
-### D3 — Verifier, capacity, SLA `[?]`
+**Decision (2026-11-06):** Extension-first verification, with `confirmed` requiring the
+scoped `can_confirm` permission; `admin` does not verify (ADR-010). **Still open:** review
+SLA, capacity per area, escalation path and the minimum number of `can_confirm` holders.
+**Owner:** Programme lead + partner. **Needs by:** Gate 0 for SLA/capacity.
 
 | Option | Consequence |
 |---|---|
-| Extension-worker-first | Scales; needs training and triage rules; pathologist for escalation |
+| Extension-worker-first (chosen) | Scales; needs training and triage rules; senior reviewer confirms |
 | Pathologist-first | Higher label quality; immediate backlog; not viable at volume |
-
-Recommended default: **extension-first**, pathologist escalation, published SLA and
-workload cap. **Owner:** Programme lead + partner. **Needs by:** Gate 0.
 
 ### D4 — Owning/paying institution `[?]`
 
@@ -231,163 +247,51 @@ confirmation**, versus the existing advisory baseline, pre-registered. Secondary
 prioritisation accuracy, false-alert burden.
 **Owner:** Product lead + evaluator. **Needs by:** Gate 0.
 
-### D6 — Legal position on advisory content `[?]`
+### D6 — Legal position on advisory content `[x]`
 
-Options: non-chemical only (recommended), approved chemical content with legal sign-off
-(not recommended for v1), no advisory in v1 (weakens product).
-Recommended default: **non-chemical + escalation**, legal review before pilot.
-**Owner:** Programme lead + legal. **Needs by:** Gate 0 (legal sign-off before Gate 5).
+**Decision (2026-11-06):** **Non-chemical only.** Advisory content is expert-approved,
+versioned and limited to scouting, monitoring, sanitation, crop management and escalation.
+No pesticide, herbicide, fungicide, dosage, mixture or pre-harvest-interval content. R5 is
+unchanged. Legal review is still required before Gate 5.
+**Owner:** Programme lead + legal. **Decided:** 2026-11-06. **Needs by:** Gate 0 (met).
 
-### D7 — Forecast event, negative class and label eligibility `[x]`
+| Option | Consequence |
+|---|---|
+| Non-chemical only (chosen) | Lowest liability; matches R5; no chemical content |
+| Approved chemical content with legal sign-off | Would require weakening R5 and a formal liability review |
+| No advisory in v1 | Weakens the product; alerts only |
 
-**Accepted 2026-11-06.** Sentinel-panel absence sampling; `probable` is eligible with an
-evidence tier.
+### D7 — Forecast event, negative class and label eligibility `[?]`
 
-**Negative class.** A fixed sentinel panel of monitored field points is defined per supported
-area before the season and visited on a pre-registered schedule by extension workers or
-partners. At each visit the visitor records observed presence or absence of the supported
-target using the same diagnostic criteria as case verification. A visit yields a **verified
-negative** only if all of these hold: the visit falls inside the label window; the point is on
-the supported crop in the supported area; the visit was scheduled in advance, not triggered
-by a report; and the D9 coverage gate passed for that area and window. `no visit`, `no
-report`, `unresolved` and `needs_visit` are never negatives.
+The forecast track currently has no observable negative class, and `probable` may or may not
+count as verified — two readings are both valid today.
 
-**Event.** First evidence-eligible case of the target in the spatial unit within the event
-window. The event date is the earliest observed/onset date recorded. The exact outcome (first
-case, incidence threshold or escalation) still follows D1/D5, but the eligibility rule is
-fixed: a case enters features only if `verified_at <= cutoff` and its event date is
-`<= cutoff`. `confirmed` and `probable` are eligible; `probable` carries its evidence tier as
-a lower-confidence flag. `unverified`, `needs_visit`, `duplicate`, `unresolved` and `rejected`
-are never eligible.
+| Option | Consequence |
+|---|---|
+| Presence / first-verified-case event | No denominator needed; cannot report PR-AUC or Brier honestly; must be framed as positive-unlabelled |
+| Scheduled absence sampling (scouting rounds record verified negatives) | Enables real discrimination metrics; needs field capacity per D3 |
 
-**Training versus evaluation.** Features may be trained on presence-only data, but that is a
-positive-unlabelled design: PR-AUC, precision/recall, Brier and ECE are reported **only** on
-the sentinel panel, which supplies real negatives. If the panel is below the D8 minimum
-sample for a stratum, the metric is reported as underpowered and is not used for a gate. No
-metric is ever computed by treating an unvisited area as negative.
+Must also decide: whether `probable` is eligible for forecast features (recommended: yes,
+with an evidence tier, and `unverified` never eligible); the as-of label rule
+(`verified_at <= cutoff`, event date <= cutoff); and the label-maturity embargo before a
+season is frozen as test data.
+**Owner:** ML lead + agronomist + pathologist. **Needs by:** Gate 0; frozen before Gate 4.
+**Blocks:** `06-forecast-and-risk-map.md` §6, `04-expert-review.md` §16 Q2, `05-data-layer.md`
+`observation_verification`.
 
-**Blinding.** The primary review records the label before seeing model candidates or the
-forecast at report time; both are revealed only after the decision is stored. A double-read
-subset is labelled independently and inter-rater agreement is reported; its size and threshold
-are set under D8.
+### D8 — Abstention rule and numeric acceptance floors `[?]`
 
-**Label maturity.** A season is not frozen as test data until its label window has closed and
-the review backlog for that window is cleared. Right-censored recent cases are excluded from
-the frozen set, never labelled negative.
+Decision function (e.g. calibrated max-probability below τ, plus margin/entropy and an
+out-of-distribution distance), per-class τ, risk–coverage target, and the override policy
+with audit fields — **plus the numeric floors** for Gates 3–5: minimum per-class recall,
+maximum abstention rate, minimum share of area-days scored, and minimum lift over a
+climatology/naive baseline.
 
-**Consequence — capacity:** the panel and its visit schedule are a D3 commitment. Without
-them the forecast track has no negative class and must fall back to presence-only, in which
-case discrimination and calibration are not reported at all.
-
-**Owner:** ML lead + agronomist + pathologist + field ops. **Recorded:** 2026-11-06;
-frozen before Gate 4.
-**Blocks:** `06-forecast-and-risk-map.md` §2/§9/§11, `04-expert-review.md` §3/§6,
-`05-data-layer.md` §4.4, `phase-plan.md` §7.1.
-
-### D8 — Abstention rule and numeric acceptance floors `[x]`
-
-**Accepted 2026-11-06: the decision function, the operating posture, the calibration and OOD
-requirements, the override policy and the floor-setting process. The floor *values* are not
-invented here — they are measured and pre-registered before the frozen test set is opened, as
-described below.**
-
-#### Decision function — image assessment
-
-Applied only after the server quality gate passes:
-
-1. Calibrated class probabilities (or the raw decision score when calibration is not
-   approved for display).
-2. Top-1/top-2 margin and normalised entropy.
-3. An explicit out-of-distribution score computed on embeddings or energy, with its threshold
-   fitted on held-out classes.
-
-Abstain with a machine reason code if **any** of these holds: the top candidate's calibrated
-probability is below its class threshold `τ_c`; the margin is below `m`; entropy is above
-`h`; the OOD score is above `ood_max`; the crop is unsupported; the quality gate fails (a
-separate upstream state). Return up to three candidates only when none hold.
-
-`τ_c`, `m`, `h` and `ood_max` are stored per prediction with the model version. Per-class
-`τ_c` is required; a single global threshold is not sufficient for classes of unequal
-prevalence.
-
-#### Operating posture
-
-**Safety-first.** Per-class recall floors take precedence over coverage. Among operating
-points that satisfy the recall and OOD constraints, choose the one that maximises the share
-of images assessed. Never trade a recall floor for coverage. A model that abstains on
-everything fails Gate 3 — the coverage floor exists precisely to prevent that.
-
-#### Calibration
-
-Probabilities used by the decision function are calibrated with **temperature scaling** on a
-dedicated calibration split, separate from the validation split used for model selection and
-from the frozen test set. Isotonic calibration is permitted only where the sample size
-supports it. ECE is a diagnostic, not a fitting method. Report reliability diagram, Brier
-score and ECE on the frozen test set.
-
-If the data cannot support a separate calibration split, calibration is **not approved**:
-the UI shows qualitative bands only, no percentage, and no probability-derived claim. The
-model may still abstain on its raw score.
-
-#### Out-of-distribution
-
-A supervised `unknown` class is not open-set detection: it only recognises unknowns present
-in training. D8 therefore requires a separate OOD score evaluated on **held-out classes** —
-unknown-vs-known AUROC and false-accept rate at the shipped threshold. Both are gate
-metrics, not diagnostics.
-
-#### Numeric floors — measured, never invented
-
-Two floor sets, each pre-registered in this section, timestamped and committed **before** the
-frozen test set is opened:
-
-**Image floors**
-- Minimum per-class recall at the shipped threshold.
-- Maximum overall and per-class abstention rate.
-- Minimum share of quality-passing images assessed.
-- Maximum ECE (only if calibration is approved).
-- Maximum OOD false-accept rate on held-out classes.
-- Minimum top-3 containment for supported classes.
-
-**Forecast floors**
-- Minimum share of area-days carrying a scored band (not `insufficient_data`).
-- Maximum `insufficient_data` rate.
-- Minimum lift over the climatology / naive baseline on the D7 evaluation.
-- Maximum Brier and calibration error on sentinel-panel negatives.
-- Results broken down by coverage stratum.
-
-Procedure:
-1. Freeze dataset, split and model versions.
-2. On validation/calibration data only, measure risk–coverage curves per class and subgroup
-   and the baseline lift.
-3. The evaluator and product lead write the floors and the chosen operating point into this
-   section, with a timestamp and commit, under D7's anti-leakage rules.
-4. Open the frozen test set once and report at the shipped threshold.
-5. Any floor that is not met means the model is **not approved** and Gate 3 (or Gate 4 for
-   forecast) fails. Thresholds may not be retuned after the test set is opened; a retrain
-   requires a new pre-registration.
-
-Floors set after seeing test results are void.
-
-#### Override policy
-
-- There is **no user-facing control that changes a model output**. An abstained prediction
-  stays abstained in the record.
-- A reviewer may still verify a report manually through the normal review flow. That decision
-  is separate, audited, and never rewrites the prediction row or counts as an assessed image
-  in coverage.
-- `confirmed` remains pathologist-only. Extension workers may escalate; agronomists and
-  admins cannot verify.
-- Every manual decision records actor, role, timestamp, reason and the model state it
-  replaced, and appears in the audit log.
-- Manual labels are not fed back as ground truth for model evaluation without D7's labelling
-  protocol and evidence tier; doing so would import confirmation bias into the test set.
-
-**Owner:** ML lead + product lead + evaluator. **Recorded:** 2026-11-06.
-**Floor values:** not yet recorded — Gate 3 and Gate 4 cannot close until the relevant set is
-pre-registered and met.
-**Blocks:** Gate 3, Gate 4, `ml-models.md` §6, `01-design-system.md` confidence bands,
-`02-reporting-and-capture.md` FR-02-25, `05-data-layer.md` `image_predictions`.
+R6 forbids inventing these numbers. The decision is therefore the *rule*: measure the
+Phase-3 baseline, then pre-register the floors in this section before the frozen test set is
+opened. Floors set after seeing test results are void.
+**Owner:** ML lead + product lead + evaluator. **Needs by:** before Gate 3 exit.
+**Blocks:** Gate 3, Gate 4, `ml-models.md` §abstention, `01-design-system.md` confidence bands.
 
 ### D9 — Coverage, freshness and suppression values `[?]`
 
@@ -429,33 +333,33 @@ offline user sees between capture and sync.
 saving or submitting a report (R8), and the server quality gate remains authoritative for
 assessment (FR-02-12).
 
-### D13 — `agronomist` as a fifth role `[x]`
+### D13 — v1 languages `[x]`
 
-**Accepted 2026-11-06.** `agronomist` is a fifth RBAC role, not an attribute on
-`pathologist` and not an external approver who never logs in.
+**Decision (2026-11-06):** **English + Kannada** in v1, with a language switcher and
+persisted choice. All user-facing strings are externalized, including backend-generated
+error and alert text.
+**Owner:** Product lead. **Decided:** 2026-11-06. **Needs by:** Gate 2.
 
-**Why:** advisory approval was impossible to perform as specified — the role matrix had no
-agronomist column, yet `07-advisory-and-alerts.md` required a named agronomist as author and
-a second qualified approver, and `06-forecast-and-risk-map.md` required agronomist threshold
-approval. `update.md:38` also makes expert capacity the binding constraint, so a design that
-needed two pathologists (one to author, one to approve) was unstaffable.
+### D14 — Confidence and severity semantics `[x]`
 
-**What `agronomist` can do:** author and approve advisory content; approve risk bands and
-threshold changes as second approver; read area queue, case evidence and map layers
-read-only.
+**Decision (2026-11-06):** Display a **qualitative confidence band plus abstention** by
+default. A numeric probability is shown only when calibration has been measured and passed
+for that allowlist entry. **Severity is an expert-review field**, not a model claim. Photo
+assessment and area outlook remain separate (R1).
+**Owner:** ML lead + product lead. **Decided:** 2026-11-06. **Needs by:** Gate 3.
 
-**What it cannot do:** set verification status, correct labels, create or upload
-observations, manage users, export, or read the audit log. Author ≠ approver is enforced per
-record (`author_id != approver_id`), so one account holding both roles still cannot
-self-approve.
+### D15 — Notification channels `[x]`
 
-**Consequence — capacity:** the programme must staff at least **two** qualified accounts
-(any mix of `agronomist` and `pathologist`) before any advisory can be published. With one,
-publication is blocked. This is tracked under D3 and R-03, not resolved by relaxing the rule.
+**Decision (2026-11-06):** **In-app is mandatory** on web and mobile. **Email** is used for
+staff and institutional recipients. **SMS is optional** per pilot partner and sits behind
+an adapter interface. **WhatsApp, push and IVR are deferred** beyond v1.
+**Owner:** Product lead + programme lead. **Decided:** 2026-11-06. **Needs by:** Gate 5.
 
-**Owner:** Product lead + programme lead. **Recorded:** 2026-11-06.
-**Implemented in:** `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `04-expert-review.md`
-§2; `05-data-layer.md` §4.1; `07-advisory-and-alerts.md` §2–§3; `phase-plan.md` §5.2.
+| Option | Consequence |
+|---|---|
+| In-app mandatory; email staff; SMS optional (chosen) | No dependency on a messaging provider to launch; adapter keeps SMS switchable |
+| SMS/WhatsApp primary | Requires a Business API contract and template approval before launch |
+| In-app only | Simplest, but excludes feature-phone farmers |
 
 ---
 
@@ -468,10 +372,12 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 | ADR-003 | Web portals are API-only clients | Accepted | 2026-11-06 |
 | ADR-004 | Rules-based forecast before ML | Accepted | 2026-11-06 |
 | ADR-005 | ONNX Runtime CPU inference for pilot | Proposed | 2026-11-06 |
-| ADR-006 | Flutter capture + SMS/WhatsApp delivery | Proposed | 2026-11-06 |
+| ADR-006 | Flutter capture + SMS/WhatsApp delivery | Superseded by ADR-009/010 | 2026-11-06 |
 | ADR-007 | Full-stack delivery: one API, web app and mobile app are all in scope | Accepted | 2026-11-06 |
 | ADR-008 | Chat is a `conversations` wrapper over photo assessment, not a new model or generative diagnosis | Accepted | 2026-11-06 |
-| ADR-009 | The Next.js web app lives in `frontend/` (source documents say `web/`); the folder name follows the existing repository layout | Accepted | 2026-11-06 |
+| ADR-009 | PostgreSQL/PostGIS + Cloudinary as the v1 data platform | Accepted | 2026-11-06 |
+| ADR-010 | v1 roles: farmer, extension_worker, admin; `can_confirm` for confirmation | Accepted | 2026-11-06 |
+| ADR-011 | Open crop catalogue with a validated-target allowlist | Accepted | 2026-11-06 |
 
 ---
 
@@ -513,24 +419,19 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added `final/PRD.md` and `final/TRD.md`: consolidated product and technical requirements distilled from the operating docs, feature specs and phase plan. No gate, scope or decision changed. |
 | 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
 | 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
-| 2026-11-06 | **D13 accepted:** `agronomist` added as a fifth role (advisory author/approver, risk-band approval, read-only area; cannot verify cases). Updated the RBAC matrix, MFA list and acceptance criteria in `03-auth-and-roles.md`; role lists in `PRD.md`, `phase-plan.md` and `05-data-layer.md`; review-role table in `04-expert-review.md`; advisory author/approver rules in `07-advisory-and-alerts.md`. Publication now requires two qualified accounts (D3 capacity). |
-| 2026-11-06 | **D7 accepted:** forecast negatives come from a pre-registered sentinel panel, not from missing reports; `probable` is eligible with an evidence tier; as-of cutoffs, label-maturity embargo and blinded primary review are mandatory. Updated forecast task/evaluation/edge cases, review flow and requirements, sentinel tables, label-eligibility invariants in TRD/architecture/workflow rules, and Phase 4 plan. Discrimination/calibration are reported only on sentinel negatives; panel below the D8 minimum is marked underpowered. |
-| 2026-11-06 | **D8 accepted:** safety-first abstention function (per-class `τ_c`, margin, entropy, explicit OOD, quality/crop gates), temperature scaling on a dedicated calibration split, OOD evaluated on held-out classes, and no user-facing override of a model output. Image and forecast floors are pre-registered before the frozen test set is opened; floors set after opening are void. Updated `ml-models.md`, `phase-plan.md` §6.4–6.5 and Gate 3, design-system confidence/abstain states, reporting requirements and acceptance, `image_predictions` schema/constraints (`decision_thresholds`, `ood_score`, `calibration_version`), TRD invariants and forecast evaluation/acceptance. Floor values remain unrecorded pending measurement. |
-| 2026-11-06 | Reconciled the partner-added `database/` Phase-1 artifacts with D7/D8/D10/D13: forecast negatives come only from sentinel visits (image healthy/hard negatives are not forecast negatives); added the D8 prediction-decision table and D7 sentinel site/visit fields; verification rows now name the pathologist, not the agronomist; retention/controller references now point to D10. |
-| 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
-| 2026-11-06 | Added Phase 1 §4.5 reference artifacts in `database/`: a schema proposed against `05-data-layer.md`, Alembic migration plan, storage/presigned-URL rules, backup design, demo-seed policy and schema invariant tests. `backend/` remains the single schema authority; no live database was migrated and no test was run against PostgreSQL. |
+| 2026-11-06 | **Phase 0 architecture reconciliation.** Accepted ADR-009 (PostgreSQL/PostGIS + Cloudinary), ADR-010 (three roles: farmer, extension_worker, admin; `can_confirm` permission), ADR-011 (open crop catalogue + validated-target allowlist). Answered D1, D2, D6, D13 (English + Kannada) and D14 (confidence band + abstention; severity is an expert field). Added D15 (in-app/email/SMS channels). Added `phase-0-decisions.md`. Gate 0 remains open on D1a, D3b, D4, D5 and D7–D12. |
+| 2026-11-06 | Added Phase 1 reference artifacts in `database/`: complete schema slices (39 tables) against `05-data-layer.md`, Alembic migrations, object storage / presigned rules, backup and recovery design, demo-seed policy (`is_demo = true`, R5 non-chemical compliance), and 14 schema/storage tests passing. |
+| 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: updated work log for Phase 1 data platform, backend foundations, API router scaffolds, and test evidence. |
 
 ---
 
 ## 8. Next five actions
 
-1. Run a decision workshop for D1–D6; record outcomes in §4.
-2. Draft the data acquisition plan (partner MoUs, archive access, collection targets).
-3. Draft the labelling handbook for the chosen crop and target list.
-4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Verify the committed mobile scaffold (`flutter analyze`, `flutter test`, an APK) and
-   build both container images; then expand only after Gate 0, starting with identity +
-   observations + audit + `conversations`.
+1. Fix **D1a** (first validated crop/target allowlist) and **D3b** (verifier capacity + SLA).
+2. Record **D4** (owning institution) and **D5** (primary metric) with named owners.
+3. Propagate ADR-009/010/011 into `architecture-context.md`, `feature-specs/03`, `feature-specs/05`, `PRD.md` and `TRD.md`.
+4. Close D7–D12 or record explicit interim rules with owners and dates.
+5. Draft data acquisition plan, partner MoUs, and labelling handbook after D1a.
 
 ---
 
@@ -583,7 +484,7 @@ baseline is measured; no target numbers are committed here.
 
 | Level | Metrics |
 |---|---|
-| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier, calibration on sentinel-panel negatives only (underpowered below the D8 minimum); latency |
+| Technical | Image macro F1, per-class recall, calibration, abstention rate; forecast PR-AUC, Brier, calibration; latency |
 | Operational | Report-to-review time, backlog, verified case rate, delivery, sync success |
 | User | Task completion, comprehension, repeat use, alert usefulness, opt-out |
 | Agricultural | Lead time, visit prioritisation, credible outcome indicators |

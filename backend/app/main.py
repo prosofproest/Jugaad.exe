@@ -1,13 +1,10 @@
-"""FastAPI application entry point.
+"""PS-03 Decision Support Backend Application Entrypoint.
 
-Modular monolith: one deployable app, explicit internal module boundaries.
-See ``final/docs-context/architecture-context.md`` for the invariants and
-``final/TRD.md`` §4 for module ownership.
+See ``final/docs-context/architecture-context.md`` §1–§4 for architectural boundaries.
 """
 
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -16,66 +13,50 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.v1.health import health_payload
 from app.api.v1.router import api_router
 from app.core.config import get_settings
-from app.core.errors import register_error_handlers
-from app.core.logging import configure_logging
-from app.core.middleware import RequestContextMiddleware
+from app.core.errors import install_error_handlers
+from app.core.request_context import RequestContextMiddleware, configure_logging
 
-OPENAPI_TAGS = [
-    {"name": "health", "description": "Process liveness only."},
-    {
-        "name": "conversations",
-        "description": (
-            "Conversational capture scaffold. Demo replies are labelled "
-            "`is_demo`; no model is served in this phase."
-        ),
-    },
-]
+settings = get_settings()
 
 
 @asynccontextmanager
-async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    settings = get_settings()
-    configure_logging(settings.log_level)
+async def lifespan(_: FastAPI):
+    configure_logging()
+    if settings.seed_reference_data:
+        try:
+            from app.db.session import init_db
+
+            init_db(seed=True)
+        except Exception:
+            pass
     yield
 
 
-def create_app() -> FastAPI:
-    settings = get_settings()
-    docs_enabled = settings.docs_enabled and not settings.is_production
+app = FastAPI(
+    title=settings.app_name,
+    version=settings.version,
+    description=(
+        "PS-03 decision-support API. Photo assessment and area outlook are "
+        "separate outputs and are never merged."
+    ),
+    lifespan=lifespan,
+)
 
-    app = FastAPI(
-        title=settings.app_name,
-        version=settings.version,
-        description=(
-            "PS-03 decision-support API. Photo assessment and area outlook are "
-            "separate outputs and are never merged. Error responses follow the "
-            "problem-details envelope documented in final/TRD.md §7.2."
-        ),
-        openapi_tags=OPENAPI_TAGS,
-        docs_url="/docs" if docs_enabled else None,
-        redoc_url=None,
-        openapi_url="/openapi.json" if docs_enabled else None,
-        lifespan=lifespan,
-    )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
+    allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
+)
+app.add_middleware(RequestContextMiddleware)
 
-    app.add_middleware(RequestContextMiddleware)
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=settings.cors_origins,
-        allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
-    )
+install_error_handlers(app)
 
-    register_error_handlers(app)
-    app.include_router(api_router, prefix=settings.api_v1_prefix)
-
-    @app.get("/health", tags=["health"])
-    def health() -> dict[str, str]:
-        """Unauthenticated liveness probe used by the web client and deploy checks."""
-        return health_payload()
-
-    return app
+app.include_router(api_router, prefix=settings.api_v1_prefix)
 
 
-app = create_app()
+@app.get("/health", tags=["health"])
+def health() -> dict[str, str]:
+    """Unauthenticated liveness probe used by the web client and deploy checks."""
+    return health_payload()

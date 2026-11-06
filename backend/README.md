@@ -33,8 +33,8 @@ Run from `backend/` (Windows paths shown; POSIX uses `.venv/bin/python`):
 | Task | Command |
 |---|---|
 | Create venv | `python -m venv .venv` |
-| Install | `.venv\Scripts\python -m pip install -r requirements.txt` |
-| Tests | `.venv\Scripts\python -m pytest` — **16 passed** |
+| Install | `.venv\Scripts\python -m pip install -r requirements.txt` (pinned: `requirements.lock`) |
+| Tests | `.venv\Scripts\python -m pytest` |
 | Lint | `.venv\Scripts\python -m ruff check app tests` — clean |
 | Format check | `.venv\Scripts\python -m ruff format --check app tests` — clean |
 | Migration history | `.venv\Scripts\python -m alembic history` |

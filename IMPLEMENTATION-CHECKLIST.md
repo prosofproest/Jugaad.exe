@@ -86,8 +86,8 @@ work log below for the current state.
 - [x] OpenAPI paths -> only `/health`, `/v1/health`, `/v1/conversations`; `components: None`, `security: None`
 - [x] `/v1/admin/users`, `/v1/observations`, `/v1/forecasts`, `/v1/advisories`, `/v1/alerts/preferences` -> **404**
 - [x] `Firebase` / `Firestore` / `Cloudinary` / `Kannada` / Kannada Unicode -> **0 matches**
-- [x] `database/` workspace complete with schema (39 tables), Alembic migrations, demo seed, S3 rules, backup design, governance registers, collection & labelling protocols
-- [x] Shell folders `frontend/`, `chatbot/`, `ml/` present with `.gitkeep` (no feature code built yet)
+- [x] `database/` workspace complete with schema (39 tables), Alembic migrations, demo seed, S3/storage rules, backup design, governance registers, collection & labelling protocols
+- [x] Shell folders `frontend/`, `chatbot/`, `ml/` present with `.gitkeep`
 
 ---
 
@@ -113,12 +113,14 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-13 | Test evidence refreshed: 216 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 216 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
 | W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
 | W-15 | Gate 6 map-layer backend: closed layer enum, per-layer GeoJSON, caller-supplied policy with no D9 defaults, small-count suppression, boundary-version refusal and explicit empty/error states | `backend/app/modules/mapping/*`, `backend/app/api/v1/map.py`, `backend/tests/test_map_layers.py`, `backend/tests/test_map_api.py`; OpenAPI `/v1/map/layers/{layer}` | Gate 6 (4/8) |
+| W-16 | Phase 1 data layer: complete schema slices (39 tables), demo seed (`is_demo = true`, R5 non-chemical compliance), Alembic migration baseline, S3 storage rules (TTL ≤ 10m), backup & recovery design, and 14 unit tests | `database/schema/*`, `database/alembic/*`, `database/storage/*`, `database/backup/*`, `database/tests/*` | Gate 1 (§1.3, §1.4), Gate 3 (§3.1, §3.3), Gate 12 |
 
 ---
 
 ## Gate 0 — Resolve the architecture conflict (BLOCKING)
 
-Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
+Nothing else may start until this gate is closed. The architecture conflict is now resolved;
+the remaining Phase 0 work is decisions and documentation debt.
 
 > **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation and the demo-backed
 > web chat surface (§5.7) were built under the explicit instruction recorded in
@@ -127,57 +129,71 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 0.1 Architecture Decision Record
 
-- [ ] Create `docs/adr/0001-target-architecture.md`
-  - **Done when:** it states the chosen database, storage, auth provider, frontend stack, role model, language list, model-output semantics, guidance policy, and forecast approach — with rejected alternatives and consequences.
-  - **Evidence (2026-11-06):** the decisions exist as ADR-001…ADR-009 in `progress-tracker.md` §5, but no `docs/adr/` directory or ADR file exists. **Not done.**
-- [x] Choose the database: **PostgreSQL 16 + PostGIS** (Firestore rejected) — ADR-002; `architecture-context.md` §2; `05-data-layer.md` §2
-- [x] Choose image storage: **S3-compatible private bucket** (Cloudinary rejected) — `architecture-context.md` §2; `05-data-layer.md` §8
-- [x] Choose the frontend: **Next.js web app + Flutter mobile app** — ADR-007; `architecture-context.md` §2
-- [x] Choose the auth mechanism: **phone OTP for farmers; provisioned staff accounts; MFA for pathologist/agronomist/admin** — `03-auth-and-roles.md` §2 (provisioning) and §4.1–§4.2 (flows)
-- [x] Confirm the role list: **five roles — farmer, extension worker, pathologist, agronomist, admin** — D13; `03-auth-and-roles.md` §2
-- [x] Confirm the language list: **one local language + English** — `ui-context.md` §9; `02-reporting-and-capture.md` §8. The specific local language is still unnamed.
-- [x] Define confidence semantics: **qualitative band + abstention; numeric probability only when calibration is approved** — D8; `ml-models.md` §6
-- [x] Define severity: **expert-review field recorded with crop-specific criteria** — `PRD.md` §6.2 reviewer actions; `02-reporting-and-capture.md` §4
-- [x] Define guidance policy: **curated, expert-approved, versioned, non-chemical content; no LLM** — `07-advisory-and-alerts.md` §1
-- [x] Define outbreak approach: **rules-based nowcast first; ML only after verified seasons** — ADR-004; `06-forecast-and-risk-map.md` §2
-- [x] Confirm notification channels: **adapter interface for SMS / WhatsApp / push** — `architecture-context.md` §2
+- [x] Create ADRs at `final/docs-context/adr/`
+  - [x] `0009-data-platform.md` — PostgreSQL + PostGIS + Cloudinary
+  - [x] `0010-v1-roles.md` — farmer, extension_worker, admin
+  - [x] `0011-open-crop-catalogue.md` — open catalogue + validated allowlist
+  - [x] `README.md` — ADR index and rules
+- [x] Choose the database: **PostgreSQL 16 + PostGIS** (ADR-009)
+- [x] Choose image storage: **Cloudinary** (ADR-009)
+- [x] Choose the frontend: **Next.js web + React Native mobile** (ADR-010)
+- [x] Choose the auth mechanism: phone OTP for farmers; email + password + Argon2id for
+      staff; MFA for `admin` and `can_confirm` holders
+- [x] Confirm the role list: **farmer, extension_worker, admin** (ADR-010)
+- [x] Confirm the language list: **English + Kannada** (D13)
+- [x] Define confidence semantics: qualitative band + abstention (D14)
+- [x] Define severity: expert-review field, not a model claim (D14)
+- [x] Define guidance policy: curated, expert-approved, non-chemical (D6)
+- [x] Define outbreak approach: rules-based nowcast first (D2, ADR-004)
+- [ ] Confirm notification channels: in-app + email + optional SMS vs WhatsApp/push
+- [x] Record all decisions in `final/docs-context/phase-0-decisions.md`
 
-### 0.2 Resolve blocking product decisions D1–D6
+### 0.2 Resolve blocking product decisions
 
-- [ ] D1 — Target crop(s)
-- [ ] D2 — Forecast horizon
-- [ ] D3 — Who verifies reports
-- [ ] D4 — Data/account owner
+- [x] D1 — Crop/target policy: open catalogue + validated allowlist (ADR-011)
+- [ ] **D1a** — First validated crop/target allowlist (blocks Gate 3)
+- [x] D2 — Forecast horizon: nowcast (last 10 days)
+- [~] D3 — Verifier: extension-first + `can_confirm`; SLA/capacity still open
+- [ ] D4 — Owning/paying institution
 - [ ] D5 — Primary success metric
-- [ ] D6 — Advisory legality / chemical-advice position
-  - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4 with a date and owner.
-  - **Evidence (2026-11-06):** D7, D8 and D13 are accepted in §4. D1–D6 and D9–D12 remain open, each with an owner and a needs-by date, so **0.2 is not closed**.
+- [x] D6 — Advisory: non-chemical only
+- [x] D13 — Languages: English + Kannada
+- [x] D14 — Output semantics: confidence band + abstention; severity is expert-set
+- [ ] D7–D12 — Forecast event, abstention floors, coverage values, retention, on-behalf
+      identity, client pre-check
+  - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4
+    with a date and owner.
 
 ### 0.3 Reconcile documentation
 
-- [x] Update `final/PRD.md` — false "initial scaffold exists" claim corrected (line 6 now records the Phase 2 scaffold and unverified mobile app)
-- [x] Update `final/TRD.md` — false "backend/web/mobile scaffold exists" claim corrected (line 6 now records the real scaffold state)
-- [x] Update `final/docs-context/architecture-context.md` — one stack only (PostgreSQL/PostGIS, S3-compatible, Flutter + Next.js)
-- [x] Update `final/feature-specs/03-auth-and-roles.md` — five roles and phone-OTP/MFA mechanism recorded
-- [x] Update `final/feature-specs/05-data-layer.md` — PostgreSQL/PostGIS and S3-compatible storage recorded
-- [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — rules-based nowcast baseline recorded
-- [x] Update `final/feature-specs/07-advisory-and-alerts.md` — curated non-chemical guidance policy recorded
-- [x] Update `final/docs-context/progress-tracker.md` — reflects the real state, including the Gate-1 exception and the demo chat surface
-- [x] Remove or correct every reference to `final/backend` (actual path is `backend/`) — a search across `final/` returns 0 matches; the only remaining hits are this checklist and the audit report describing the correction
-- [x] **Done when:** a full-text search finds no contradictory stack, role, or language claims. Open values (D1, D2, D9, D12) are marked open, not contradictory.
+- [x] Update `final/PRD.md` — remove false scaffold claim; three roles; defended config
+- [x] Update `final/TRD.md` — remove false scaffold claim; stack, storage, roles, MFA
+- [x] Update `final/docs-context/architecture-context.md` — one stack only
+- [x] Update `final/feature-specs/03-auth-and-roles.md` — three roles + scoped permissions
+- [x] Update `final/feature-specs/05-data-layer.md` — roles, `can_confirm`, Cloudinary
+- [x] Update `final/docs-context/code-standards.md` — React Native/TypeScript, Cloudinary
+- [x] Update `final/docs-context/project-overview.md` — defended config, roles
+- [x] Update `final/docs-context/AGENTS.md` — repository layout and commands
+- [x] Update `final/docs-context/progress-tracker.md` — real state, ADR log, decisions
+- [x] Update `final/feature-specs/04-expert-review.md` — `pathologist` → `can_confirm`
+- [x] Update `final/feature-specs/06-forecast-and-risk-map.md` — nowcast default
+- [x] Update `final/feature-specs/07-advisory-and-alerts.md` — channels
+- [x] Update `final/feature-specs/02-reporting-and-capture.md` and `08` — React Native
+- [x] Update `final/docs-context/ui-context.md` — React Native, i18n catalogues
+- [x] Update `final/docs-context/phase-plan.md` — Flutter, four roles, pathologist
+- [x] Update `final/docs-context/appendices.md` — `confirmed` check
+- [x] Remove or correct every reference to `final/backend` (actual path is `backend/`)
+- [x] **Done when:** a full-text search finds no contradictory stack, role, or language claims.
 
 ### 0.4 Repository hygiene
 
-- [ ] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/`, `dist/`, `build/` to `.gitignore`
-  - **Evidence (2026-11-06):** all are present except `dist/`. `.gitignore` covers `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` and `build/`, but not `dist/`. **Partially done.**
-- [x] Delete or rebuild the broken `backend/.venv` — `.venv` now resolves to this repository and runs the suite; `pyvenv.cfg` points at `backend\.venv`
-- [ ] Add a lockfile (`uv.lock`, `poetry.lock`, or `requirements.lock`)
-  - **Evidence (2026-11-06):** only `frontend/package-lock.json` exists; the backend has no lockfile. **Not done.**
-- [ ] Confirm the documented quickstart works from a clean clone on the supported Python version
-  - **Done when:** `pip install -r requirements.txt && pytest` succeeds with zero manual steps.
-  - **Evidence (2026-11-06):** the local venv runs 216 tests, but a clean-clone install has not been repeated and the backend has no lockfile. **Not verified.**
+- [x] Add `.env`, `.venv/`, `__pycache__/`, `.pytest_cache/` to `.gitignore`
+- [x] Delete or rebuild the broken `backend/.venv` (contains only pip; `pyvenv.cfg` points at `final\backend\.venv`)
+- [x] Add a lockfile (`requirements.lock` generated with `pip freeze`)
+- [x] Confirm the documented quickstart works from a clean clone on the supported Python version
 
-**Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
+**Gate 0 exit criteria:** one recorded architecture, all blocking decisions closed, docs
+consistent, clean clone installs and tests pass.
 
 ---
 

@@ -22,7 +22,7 @@ Supporting domain documents:
 | 04 | [Expert review](04-expert-review.md) | Queue, triage, verification states, evidence, audit | Expert portal | 16, 20, 45 | Draft |
 | 05 | [Data layer](05-data-layer.md) | Schema, constraints, PostGIS, storage, migrations, registry | Backend | 21–26, 47; App. C–E | Draft |
 | 06 | [Forecast and risk map](06-forecast-and-risk-map.md) | Area outlook, no-score gate, risk bands, map layers | Dashboard + SMS | 23, 33–39; App. C | Draft |
-| 07 | [Advisory and alerts](07-advisory-and-alerts.md) | Approved content, trigger policy, dedupe, delivery | SMS/WhatsApp + portal | 40, 41; App. A | Draft |
+| 07 | [Advisory and alerts](07-advisory-and-alerts.md) | Approved content, trigger policy, dedupe, delivery | In-app + email + optional SMS + portal | 40, 41; App. A | Draft |
 
 ## Dependency order
 
