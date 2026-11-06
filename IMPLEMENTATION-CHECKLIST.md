@@ -27,7 +27,49 @@
 | 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 216 backend tests pass; web typecheck, lint and build pass; no auth, readiness, domain tables or media |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
+| 6 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest tests/test_map_layers.py tests/test_map_api.py`; `python -m pytest`; `python -m compileall -q app` | 29 map tests pass; 216 total; COMPILE_OK. Service/API only; no production geometry, boundary dataset, map client or E2E. |
 | — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 and Gate 1 remain unmet |
+
+---
+
+## Progress snapshot (verified 2026-11-06)
+
+**Verdict:** NOT COMPLIANT. **Gates closed: 0 of 13.** **Gate boxes ticked: 52 / 217 (~24%).**
+
+Box counts measure recorded evidence, not readiness. A gate stays open until its P0/P1
+items and exit criteria are all met, so 24% of boxes does **not** mean the product is 24%
+operational — the safety-critical gates (0, 1, 2) are almost entirely open.
+
+| Gate | Ticked | Status | What the ticked items prove | What keeps the gate open |
+|---|---|---|---|---|
+| 0 | 22/32 | OPEN | Stack, roles, confidence semantics, guidance policy, forecast approach and docs reconciliation recorded; backend venv rebuilt | D1–D6 unresolved; no `docs/adr/`; `.gitignore` missing `dist/`; no backend lockfile; clean-clone not verified |
+| 1 | 1/32 | OPEN | Health payload exposes no secrets | No authentication, authorization, domain schema, media pipeline or readiness probe |
+| 2 | 0/18 | OPEN | — | No farmer vertical slice: capture, offline sync, review and E2E are absent |
+| 3 | 12/42 | OPEN | Image-triage machinery only: policy, quality gate, D8 decision, calibration, OOD, registry, inference, append-only records, API, safe explanation, evaluation harness | No trained artefact, field data, frozen test set, forecast pipeline or approved operating point |
+| 4 | 0/12 | OPEN | — | No weather ingestion, feature snapshot, forecast job, real geometry or no-score path |
+| 5 | 8/12 | OPEN | Advisory/alert machinery: trigger from forecasts, gates, dedupe, cooldown, persistence before dispatch, delivery status, retry, recipient selection, pause | No provider, no HTTP inbox/history/feedback, no auth, no pilot or field evidence |
+| 6 | 4/8 | OPEN | Separate map layers, layer non-merging, small-count suppression, boundary-version enforcement (29 map tests) | No real geometry/boundary dataset, map client, client empty/loading/error UI or E2E API test |
+| 7 | 0/11 | OPEN | — | No admin surface, user management, audit search or server-side admin enforcement |
+| 8 | 0/9 | OPEN | — | No externalized strings, locale catalogues or language switcher |
+| 9 | 3/9 | OPEN | Structured JSON logs, no PII/secrets in logs, RFC 7807 error envelope | No metrics, tracing, error tracking, dependency-failure alerts, timeouts/breakers or graceful shutdown |
+| 10 | 1/12 | OPEN | Frontend build, lint and typecheck | No real-DB integration, contract, security, E2E, model or load tests; no CI-run evidence, coverage gate or red-CI proof |
+| 11 | 1/12 | OPEN | API docs disabled when `APP_ENVIRONMENT=production` | No verified image build, prod profile, secret manager, TLS, rate limiting, backup/restore or rollback |
+| 12 | 0/8 | OPEN | — | No consent versioning, retention, export, deletion or immutable audit |
+
+**Current build reality (verified 2026-11-06):**
+
+- Backend: **216 tests pass**; `compileall` OK; triage/decision machinery, advisories/alerts,
+  conversations and map layers exist as service/API slices.
+- Frontend: chat list/thread, assessment card, metadata-only composer, and honest
+  `/outlook` and `/review` empty states are committed; the recorded build/lint/typecheck
+  result is pass (not re-run in this snapshot).
+- Data/governance: Phase-1 artifacts drafted under `database/` — documentation only.
+- **Not present:** authentication/authorization, domain schema, media pipeline, trained
+  model, weather ingestion, real geometry, delivery provider, admin surface, localization
+  and a production deploy.
+
+**Next gates to close:** Gate 0 (record D1–D6), then Gate 1 (auth, roles, schema, media,
+readiness). Do not start Gate 2+ until those are closed.
 
 ---
 
@@ -68,6 +110,7 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-12 | Deploy and CI scaffolding: API/web Dockerfiles, base + dev compose override, dev/staging env templates, CI jobs for backend/web/mobile/compose/image builds | `backend/Dockerfile`, `frontend/Dockerfile`, `deploy/*`, `.github/workflows/ci.yml` | Gate 11 (defined, not run) |
 | W-13 | Test evidence refreshed: 216 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 216 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
 | W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
+| W-15 | Gate 6 map-layer backend: closed layer enum, per-layer GeoJSON, caller-supplied policy with no D9 defaults, small-count suppression, boundary-version refusal and explicit empty/error states | `backend/app/modules/mapping/*`, `backend/app/api/v1/map.py`, `backend/tests/test_map_layers.py`, `backend/tests/test_map_api.py`; OpenAPI `/v1/map/layers/{layer}` | Gate 6 (4/8) |
 
 ---
 
