@@ -716,8 +716,6 @@ button:disabled {
 }
 
 input[type="text"],
-input[type="email"],
-input[type="password"],
 input[type="file"],
 textarea,
 select {
@@ -728,12 +726,6 @@ select {
   border: 1px solid var(--border-strong);
   background: var(--surface-default);
   color: var(--text-primary);
-}
-
-input[type="checkbox"] {
-  width: 1rem;
-  height: 1rem;
-  accent-color: var(--text-primary);
 }
 
 textarea {
@@ -1510,126 +1502,127 @@ label {
   }
 }
 
-/* ---------- Admin ---------- */
+/* ---------- Weather ---------- */
 
-.admin-form {
-  display: grid;
-  gap: var(--space-3);
-  align-content: start;
-  max-width: 36rem;
-}
-
-.admin-form h2,
-.admin-form h3 {
-  margin: 0;
-}
-
-.admin-field {
-  display: grid;
-  gap: var(--space-1);
-}
-
-.admin-field label {
-  margin: 0;
-  font-size: 0.875rem;
-}
-
-.admin-fieldset {
-  display: grid;
-  gap: var(--space-2);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  padding: var(--space-3) var(--space-4);
-  margin: 0;
-}
-
-.admin-fieldset legend {
-  font-weight: 600;
-  font-size: 0.875rem;
-  padding: 0 var(--space-1);
-}
-
-.admin-check {
-  display: flex;
-  gap: var(--space-2);
-  align-items: center;
-  font-weight: 400;
-  font-size: 0.875rem;
-  margin: 0;
-  cursor: pointer;
-}
-
-.admin-table-wrap {
-  overflow-x: auto;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  margin-top: var(--space-3);
-}
-
-.admin-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 0.875rem;
-}
-
-.admin-table th,
-.admin-table td {
-  text-align: left;
-  padding: var(--space-2) var(--space-3);
-  border-bottom: 1px solid var(--border-subtle);
-  vertical-align: top;
-  white-space: nowrap;
-}
-
-.admin-table th {
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.admin-table tr:last-child td {
-  border-bottom: none;
-}
-
-.admin-meta {
-  display: grid;
-  gap: var(--space-1);
-  margin: var(--space-3) 0 0;
-  padding: var(--space-3);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-control);
-  background: var(--surface-default);
-}
-
-.admin-meta div {
+.weather-search {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  justify-content: space-between;
-}
-
-.admin-meta dt {
-  font-weight: 600;
-  margin: 0;
-}
-
-.admin-meta dd {
-  margin: 0;
-  text-align: right;
-}
-
-.admin-result {
-  display: grid;
   gap: var(--space-2);
-  margin-top: var(--space-3);
-  padding: var(--space-4);
-  border: 1px solid var(--feedback-success);
-  border-radius: var(--radius-card);
-  background: var(--surface-default);
+  align-items: center;
 }
 
-.admin-result p {
+.weather-search input {
+  flex: 1 1 18rem;
+  width: auto;
+}
+
+.weather-search button {
+  flex: none;
+}
+
+.weather-results {
+  list-style: none;
+  margin: var(--space-3) 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.weather-selected {
+  margin-top: var(--space-3);
+}
+
+.weather-current-main {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: center;
+  margin-bottom: var(--space-4);
+}
+
+.weather-glyph {
+  display: inline-flex;
+  flex: none;
+  color: var(--text-secondary);
+}
+
+.weather-glyph svg {
+  display: block;
+}
+
+.weather-glyph-small svg {
+  width: 32px;
+  height: 32px;
+}
+
+.weather-temp {
   margin: 0;
-  overflow-wrap: anywhere;
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: 700;
+}
+
+.weather-condition {
+  margin: var(--space-1) 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.weather-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: var(--space-3);
+  margin: 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.weather-metric {
+  display: grid;
+  gap: 0.125rem;
+}
+
+.weather-metric dt {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.weather-metric dd {
+  margin: 0;
+  font-weight: 600;
+}
+
+.weather-days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: var(--space-3);
+}
+
+.weather-day {
+  display: grid;
+  gap: var(--space-1);
+  justify-items: start;
+  padding: var(--space-4);
+  background: var(--surface-raised);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+}
+
+.weather-day p {
+  margin: 0;
+}
+
+.weather-day-name {
+  font-weight: 700;
+}
+
+.weather-day-temp {
+  font-size: 0.9375rem;
 }

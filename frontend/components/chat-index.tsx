@@ -132,7 +132,10 @@ export function ChatIndex({
                 <strong>{conversation.title}</strong>
                 <span className="conversation-meta">
                   Last activity{" "}
-                  <time dateTime={conversation.last_message_at}>
+                  <time
+                    dateTime={conversation.last_message_at}
+                    suppressHydrationWarning
+                  >
                     {new Date(conversation.last_message_at).toLocaleString()}
                   </time>
                 </span>

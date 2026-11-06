@@ -28,7 +28,7 @@ pip install -r ml/agroai_pest_detection/requirements.txt
 ```python
 from ml.agroai_pest_detection import PestDetector
 
-detector = PestDetector()                        # downloads weights on first use
+detector = PestDetector()  # downloads weights on first use
 results = detector.predict("field_image.jpg", conf=0.25, imgsz=640)
 for r in results:
     for box in r.boxes:

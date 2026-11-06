@@ -28,8 +28,17 @@ tracker, per-frame assessments, non-diagnostic summary, Alembic
 MFA, five roles, consent, privacy, audit — in memory). No real model is connected by
 default, the shipped video detector is a heuristic rather than a pest detector, and
 identity state is not durable; the web app builds and its chat flow passed a live
-upload → assessment → review smoke test, while the mobile shell passes
-`flutter analyze` and `flutter test` (no device or APK run yet). Gate 1 is not met.
+upload → assessment → review smoke test, while the mobile client adds photo capture
+and a persisted offline queue, with `flutter analyze` clean and 14 tests passing
+(platform runners committed, debug APK built and an emulator smoke passed; real-device
+camera and iOS unverified). A synthetic-only
+ML scaffold in `ml/` proves the manifest → grouped split → train → evaluate →
+promotion plumbing (23 tests) but ships no trained image model, real dataset or
+operating point. A deterministic forecast rules harness in
+`backend/app/modules/forecast/rules.py` is covered by 21 synthetic-fixture tests
+(input sensitivity, snapshot reproducibility, no-score refusal), but it uses demo
+points/thresholds and has no real weather provider, approved operating point or
+field evaluation. Gate 1, Gate 3 and Gate 4 are not met.
 
 The full 55-chapter blueprint and Appendices A–H are mapped to repository files in
 [README.md](README.md). Coverage is documentation, not scope approval: v1 scope is set by

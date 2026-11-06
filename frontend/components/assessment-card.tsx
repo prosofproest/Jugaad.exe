@@ -148,7 +148,7 @@ export function AssessmentCard({
         <p className="small">
           <span className="chip chip-muted">Review {reviewRequest.status}</span>{" "}
           Expert review requested{" "}
-          <time dateTime={reviewRequest.submitted_at}>
+          <time dateTime={reviewRequest.submitted_at} suppressHydrationWarning>
             {new Date(reviewRequest.submitted_at).toLocaleString()}
           </time>
           . The original assessment is unchanged.
@@ -177,7 +177,7 @@ export function AssessmentCard({
         <span className="mono">Model: {assessment.model_version}</span>
         <span>
           Generated{" "}
-          <time dateTime={assessment.generated_at}>
+          <time dateTime={assessment.generated_at} suppressHydrationWarning>
             {new Date(assessment.generated_at).toLocaleString()}
           </time>
         </span>

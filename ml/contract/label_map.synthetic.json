@@ -1,0 +1,22 @@
+{
+  "schema_version": "1.0",
+  "taxonomy_version": "synthetic-taxonomy-1",
+  "fixture_kind": "synthetic_unit_test",
+  "is_demo": true,
+  "supported_crops": ["synthetic_crop"],
+  "classes": [
+    {
+      "label": "lesion_like",
+      "display_name": "synthetic lesion-like pattern"
+    },
+    {
+      "label": "healthy_like",
+      "display_name": "synthetic healthy-like pattern"
+    },
+    {
+      "label": "other_like",
+      "display_name": "synthetic other pattern"
+    }
+  ],
+  "note": "Synthetic labels for the pipeline fixture only. Not a production crop list or class taxonomy; D1/D2 remain open."
+}

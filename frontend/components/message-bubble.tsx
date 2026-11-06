@@ -68,7 +68,9 @@ export function MessageBubble({
       <div className={failed ? "bubble message-failed" : "bubble"}>
         <div className="message-meta">
           <strong>{isUser ? "You" : "Assistant"}</strong>
-          <time dateTime={message.created_at}>{formatTime(message.created_at)}</time>
+          <time dateTime={message.created_at} suppressHydrationWarning>
+            {formatTime(message.created_at)}
+          </time>
           {message.is_demo ? (
             <span className="badge badge-muted">demo</span>
           ) : null}

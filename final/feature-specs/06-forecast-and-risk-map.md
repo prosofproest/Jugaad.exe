@@ -18,6 +18,21 @@ honest coverage and freshness, and present it separately from observed reports.
 rules model is the baseline; ML is an overlay only after at least two seasons of verified
 outcomes.
 
+**Implementation note (2026-11-06):** the deterministic rules step now lives in
+`backend/app/modules/forecast/rules.py` as a pure `score_weather` function returning a
+`RuleResult` with per-driver contributions, called from
+`backend/app/modules/forecast/service.py`. The result is stored in
+`FeatureSnapshot.features` so a forecast can be re-derived from its snapshot.
+`backend/tests/test_forecast_rules.py` and `backend/tests/test_forecast_service.py`
+prove on **synthetic fixtures** that dry vs wet weather changes the score and band, a
+verified report changes the score with weather held constant, identical inputs
+reproduce the stored result, and the gate failures return `insufficient_data` with
+`probability = null`. The points and band thresholds in `DEFAULT_THRESHOLDS` are
+**demo configuration, not an approved operating point**; D8 forecast floors, D9
+coverage/freshness/suppression values and D1b pilot zone/boundary version remain
+unrecorded, and no field accuracy, calibration or outbreak result is claimed. See
+`../../IMPLEMENTATION-CHECKLIST.md` Gate 4.
+
 ---
 
 ## 2. Task definition (must be completed before implementation)
@@ -85,7 +100,10 @@ Rules:
 
 Rules:
 
-- Band thresholds live in config with an approval record; no inline numbers.
+- Band thresholds must live in config with an approval record; no inline numbers.
+  *Current state: the demo points and band cut-offs are constants in
+  `rules.DEFAULT_THRESHOLDS`, not an approved operating point. They must move behind
+  an approved, versioned config record before any operational use (D9/D8).*
 - `low` never means "no disease present".
 - Probability is displayed only when calibration is validated and approved; otherwise
   `probability: null` and a qualitative band.
@@ -241,18 +259,32 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
 ## 12. Acceptance criteria
 
 - [ ] Task definition table is complete and approved before implementation.
-- [ ] Rules baseline implemented, versioned and approved by an agronomist.
-- [ ] Feature snapshot persisted for every scored forecast.
-- [ ] Re-running a forecast from its snapshot reproduces the same band.
-- [ ] No-score gate returns `insufficient_data` for each of the five failure conditions.
-- [ ] Unverified reports are excluded from features (test with an inserted unverified row).
-- [ ] `probability` is null unless calibration is approved.
-- [ ] Forecast response includes issue/validity, coverage, drivers, model version.
-- [ ] Map layers are independently toggleable and never merged server-side.
+- [~] Rules baseline implemented, versioned and approved by an agronomist — *implemented
+  as deterministic demo rules (`rules.py`); agronomist approval and an approved
+  operating point are outstanding.*
+- [x] Feature snapshot persisted for every scored forecast.
+- [x] Re-running a forecast from its snapshot reproduces the same band — *proven on
+  synthetic fixtures; no field data.*
+- [~] No-score gate returns `insufficient_data` for each of the five failure conditions —
+  *missing/stale weather, low coverage, missing calendar and boundary mismatch are
+  tested; an unapproved model refuses generation with `model_not_approved` (409) and
+  no forecast row, by design.*
+- [x] Unverified reports are excluded from features (test with an inserted unverified row).
+- [x] `probability` is null unless calibration is approved.
+- [x] Forecast response includes issue/validity, coverage, drivers, model version.
+- [~] Map layers are independently toggleable and never merged server-side — *five
+  separate `/v1/map/layers/*` endpoints exist and are read separately; boundary
+  geometry is not served yet.*
 - [ ] Small counts suppressed at the configured threshold (test).
 - [ ] Expired forecasts are marked stale in API and UI.
-- [ ] Demo forecasts are labelled and excluded from operational alerts.
+- [~] Demo forecasts are labelled and excluded from operational alerts — *labelled;
+  operational alert delivery is Gate 5.*
 - [ ] Evaluation report includes temporal + spatial holdout, calibration and sample counts.
+
+> **Status (2026-11-06):** 21 synthetic-fixture tests cover the checked and partial
+> rows above. Gate 4 remains **not met**: there is no real weather provider or
+> scheduled runner, no D8/D9/D1b approval, no expert-approved operating point and no
+> field evaluation.
 
 ---
 
@@ -275,7 +307,10 @@ every forecast carries `risk_band`, `coverage`, `issue_time`, `valid_to`, `targe
    potato late blight; Mills table is apple-specific and not transferable.)
 4. Is daily issue cadence supportable by the weather provider's update frequency?
 5. What is the minimum coverage threshold that still permits a scored outlook? (D9)
-6. Does the partner need a 7-day outlook for operational planning even if only a nowcast is
+6. What are the pre-registered forecast performance floors, and on which sentinel-panel
+   negatives are they measured? (D8)
+7. Which pilot zone and boundary version is the forecast issued against? (D1b)
+8. Does the partner need a 7-day outlook for operational planning even if only a nowcast is
    defensible? If so, label it as experimental and out of v1.
 
 ---

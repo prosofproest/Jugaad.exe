@@ -16,12 +16,17 @@ from app.api.v1 import (
     conversations,
     forecast,
     health,
+    hexagons,
+    hotspots,
     map,
     me,
     observations,
+    regional_overview,
     review,
+    tasks,
     uploads,
     videos,
+    weather,
 )
 
 api_router = APIRouter()
@@ -63,3 +68,18 @@ api_router.include_router(assessments.router)
 # Map
 api_router.include_router(map.router)
 api_router.include_router(videos.router)
+
+# H3 hexagonal grid
+api_router.include_router(hexagons.router)
+
+# Hotspot intelligence
+api_router.include_router(hotspots.router)
+
+# Inspection tasks (Uber-style distribution)
+api_router.include_router(tasks.router)
+
+# Weather intelligence
+api_router.include_router(weather.router)
+
+# Regional overview
+api_router.include_router(regional_overview.router)
