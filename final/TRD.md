@@ -520,9 +520,9 @@ GET    /v1/admin/exports/{id}
   "observation_id": "obs_demo_001",
   "state": "assessed",
   "candidates": [
-    {"label": "late_blight", "score": 0.71},
-    {"label": "abiotic_lookalike", "score": 0.12},
-    {"label": "unknown", "score": 0.08}
+    {"label": "late_blight", "band": "medium"},
+    {"label": "abiotic_lookalike", "band": "low"},
+    {"label": "unknown", "band": "low"}
   ],
   "confidence_band": "medium",
   "calibrated": false,
@@ -532,6 +532,11 @@ GET    /v1/admin/exports/{id}
   "is_demo": true
 }
 ```
+
+No numeric score or percentage is returned to a client before calibration is validated and
+approved for display (see `docs-context/architecture-context.md` §9 and
+`feature-specs/01-design-system.md` §3.4). Raw scores stay server-side and appear only in
+append-only prediction rows for audit.
 
 **Abstained assessment**
 

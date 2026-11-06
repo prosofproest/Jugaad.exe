@@ -117,6 +117,9 @@ Component rules:
 
 ## 4. Dart / Flutter (mobile)
 
+*Applies once ADR-006 is Accepted. While it is Proposed, treat the Flutter tooling below as
+provisional and do not scaffold `mobile/` (see `progress-tracker.md` §5).*
+
 **Tooling:** `flutter_lints`, `dart format`, `freezed` + `json_serializable`, `drift`,
 `go_router`, `riverpod`.
 

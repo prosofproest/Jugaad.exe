@@ -73,7 +73,7 @@ this mean, how sure is it, and what do I do next?*
 **Photo assessment (result):**
 > **Possible symptom match: late blight**
 > This is an automated visual comparison, not a diagnosis. Photo quality: good.
-> Confidence: medium (calibrated on field data).
+> Confidence: medium (not yet calibrated; shown as a band, not a percentage).
 > Also considered: early blight, nutrient deficiency.
 > **Next step:** inspect 10 plants across the field and compare with the approved
 > advisory. If symptoms are spreading, request expert review.
@@ -115,7 +115,7 @@ Single source of truth: `design/tokens.json` (created at scaffold), consumed by 
 | `risk.high` | High risk | |
 | `risk.urgent` | Urgent risk | |
 | `risk.insufficient` | No score / insufficient data | Neutral grey, never red |
-| `status.pending` / `status.verified` / `status.rejected` | Case state | Distinct from risk |
+| `status.pending_review` / `status.confirmed` / `status.rejected` | Case state | Distinct from risk; full list in the design system §2 |
 | `feedback.error` / `feedback.warning` / `feedback.success` | System messages | |
 
 Rules:
@@ -173,7 +173,7 @@ Shared web components live in `/components`; Flutter equivalents in
 | `OfflineBanner` | Connectivity | offline, reconnecting, queued |
 | `EmptyState` | No content | with action |
 | `ErrorState` | Recoverable failure | message, retry, support path |
-| `AssessmentCard` | Photo assessment | result, abstained, pending, unsupported_crop |
+| `AssessmentCard` | Photo assessment | pending, assessed, abstained, unsupported_crop, failed |
 | `OutlookCard` | Area outlook | scored, insufficient_data, stale |
 | `ReviewDecisionForm` | Expert decision | edit, submitting, error, locked |
 | `QueueRow` | Review queue item | unassigned, assigned, escalated, overdue |
