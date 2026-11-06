@@ -17,6 +17,7 @@ from alembic.config import Config
 from alembic.script import ScriptDirectory
 from app.db import models  # noqa: F401
 from app.db.base import Base
+from app.geo import models as _geo_models  # noqa: F401  (registers H3 tables)
 from sqlalchemy import create_engine, inspect
 
 BACKEND = Path(__file__).resolve().parents[1]
@@ -30,17 +31,18 @@ def _expected_revision() -> str:
 
 
 def test_head_revision_exists() -> None:
-    assert _expected_revision() == "0004_domain_persistence"
+    assert _expected_revision() == "0005_h3_hexagonal_grid"
 
 
 def test_offline_sql_creates_every_orm_table() -> None:
-    # File-level proof: every ORM table is created in 0002/0003/0004.
+    # File-level proof: every ORM table is created in 0002/0003/0004/0005.
     text = "\n".join(
         Path(f"{BACKEND}/app/db/migrations/versions/{name}").read_text(encoding="utf-8")
         for name in (
             "0002_chat_persistence.py",
             "0003_video_persistence.py",
             "0004_domain_persistence.py",
+            "0005_h3_hexagonal_grid.py",
         )
     )
     for table in Base.metadata.tables:

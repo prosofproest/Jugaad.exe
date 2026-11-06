@@ -16,6 +16,23 @@ from app.db.base import Base
 OUT = Path(__file__).resolve().parents[2] / "docs" / "database" / "POSTGRESQL_MAPPING_MATRIX.md"
 
 REVISION = {
+    "h3_cells": "0005_h3_hexagonal_grid",
+    "farm_hexagon_assignments": "0005_h3_hexagonal_grid",
+    "geo_observations": "0005_h3_hexagonal_grid",
+    "disease_reports": "0005_h3_hexagonal_grid",
+    "pest_reports": "0005_h3_hexagonal_grid",
+    "hotspot_clusters": "0005_h3_hexagonal_grid",
+    "hotspot_history": "0005_h3_hexagonal_grid",
+    "regional_risk_scores": "0005_h3_hexagonal_grid",
+    "weather_cell_records": "0005_h3_hexagonal_grid",
+    "inspection_tasks": "0005_h3_hexagonal_grid",
+    "task_assignments": "0005_h3_hexagonal_grid",
+    "field_agent_profiles": "0005_h3_hexagonal_grid",
+    "inspection_results": "0005_h3_hexagonal_grid",
+    "expert_verifications": "0005_h3_hexagonal_grid",
+    "recovery_monitoring_records": "0005_h3_hexagonal_grid",
+    "task_status_history": "0005_h3_hexagonal_grid",
+    "user_task_availability": "0005_h3_hexagonal_grid",
     "conversations": "0002_chat_persistence",
     "messages": "0002_chat_persistence",
     "message_events": "0002_chat_persistence",
@@ -85,8 +102,8 @@ def main() -> None:
     lines.append(f"- ORM models discovered: **{len(tables)}**")
     lines.append(f"- Unique ORM tables: **{len(tables)}** (one table per model, no")
     lines.append("  duplicates, no association-only tables)")
-    lines.append("- Migrated PostgreSQL tables: **50** (5 in 0002, 2 in 0003, 43 in 0004;")
-    lines.append("  `alembic upgrade head --sql` emits 51 `CREATE TABLE` including")
+    lines.append("- Migrated PostgreSQL tables: **67** (5 in 0002, 2 in 0003, 43 in 0004, 17 in 0005;")
+    lines.append("  `alembic upgrade head --sql` emits 68 `CREATE TABLE` including")
     lines.append("  `alembic_version`)")
     lines.append(f"- Foreign keys: **{fk_total}**")
     lines.append(f"- Unique constraints: **{uq_total}** (plus per-column `UNIQUE` on")

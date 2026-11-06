@@ -97,6 +97,7 @@ def init_db(*, seed: bool = True) -> None:
     """Create all tables for local dev/test and seed reference data."""
     from app.db import models  # noqa: F401  (registers mappers)
     from app.db.base import Base
+    from app.geo import models as _geo_models  # noqa: F401  (registers H3 tables)
 
     Base.metadata.create_all(bind=get_engine())
     if seed:

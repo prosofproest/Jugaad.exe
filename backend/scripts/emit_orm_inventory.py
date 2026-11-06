@@ -69,6 +69,23 @@ SOURCE = {
     "chat_review_requests": "backend/app/modules/conversations/orm.py :: ReviewRequestRow (chat)",
     "video_uploads": "backend/app/modules/video/orm.py :: VideoUploadRow",
     "video_readings": "backend/app/modules/video/orm.py :: VideoReadingRow",
+    "h3_cells": "backend/app/geo/models.py :: H3Cell",
+    "farm_hexagon_assignments": "backend/app/geo/models.py :: FarmHexagonAssignment",
+    "geo_observations": "backend/app/geo/models.py :: GeoObservation",
+    "disease_reports": "backend/app/geo/models.py :: DiseaseReport",
+    "pest_reports": "backend/app/geo/models.py :: PestReport",
+    "hotspot_clusters": "backend/app/geo/models.py :: HotspotCluster",
+    "hotspot_history": "backend/app/geo/models.py :: HotspotHistory",
+    "regional_risk_scores": "backend/app/geo/models.py :: RegionalRiskScore",
+    "weather_cell_records": "backend/app/geo/models.py :: WeatherCellRecord",
+    "inspection_tasks": "backend/app/geo/models.py :: InspectionTask",
+    "task_assignments": "backend/app/geo/models.py :: TaskAssignment",
+    "field_agent_profiles": "backend/app/geo/models.py :: FieldAgentProfile",
+    "inspection_results": "backend/app/geo/models.py :: InspectionResult",
+    "expert_verifications": "backend/app/geo/models.py :: ExpertVerification",
+    "recovery_monitoring_records": "backend/app/geo/models.py :: RecoveryMonitoringRecord",
+    "task_status_history": "backend/app/geo/models.py :: TaskStatusHistory",
+    "user_task_availability": "backend/app/geo/models.py :: UserTaskAvailability",
 }
 
 
@@ -104,7 +121,13 @@ def main() -> None:
     lines.append(f"- Unique constraints: **{uq_total}**")
     ix_total = sum(len(t.indexes) for t in tables.values())
     lines.append(f"- B-tree indexes (declared): **{ix_total}**")
-    lines.append("- CHECK constraints in ORM metadata: **0**")
+    ck_total = sum(
+        1
+        for t in tables.values()
+        for c in t.constraints
+        if c.__class__.__name__ == "CheckConstraint"
+    )
+    lines.append(f"- CHECK constraints in ORM metadata: **{ck_total}**")
     lines.append("- Native ENUM types: **0** (closed sets are `VARCHAR` + service checks)")
     lines.append("- Geometry/geography columns: **0** (see §3)")
     lines.append("- ORM `relationship()` declarations: **0** (all associations are FK columns)")

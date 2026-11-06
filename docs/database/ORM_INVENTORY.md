@@ -4,11 +4,11 @@ Generated from live `Base.metadata` by `backend/scripts/emit_orm_inventory.py`.
 Source of truth for every table below is the Python model; schema SQL
 is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 
-- ORM models/tables discovered: **50**
-- Foreign keys (column-level): **51**
-- Unique constraints: **13**
-- B-tree indexes (declared): **55**
-- CHECK constraints in ORM metadata: **0**
+- ORM models/tables discovered: **67**
+- Foreign keys (column-level): **54**
+- Unique constraints: **14**
+- B-tree indexes (declared): **122**
+- CHECK constraints in ORM metadata: **46**
 - Native ENUM types: **0** (closed sets are `VARCHAR` + service checks)
 - Geometry/geography columns: **0** (see §3)
 - ORM `relationship()` declarations: **0** (all associations are FK columns)
@@ -317,6 +317,60 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `last_seen_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
 
+### `disease_reports` — backend/app/geo/models.py :: DiseaseReport
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_disease_reports_crop_code` (crop_code)
+  - `ix_disease_reports_event_date` (event_date)
+  - `ix_disease_reports_h3_cell_id` (h3_cell_id)
+  - `ix_disease_reports_target_code` (target_code)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `crop_code` | VARCHAR(60) | NOT NULL | indexed |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `event_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | indexed |
+| `report_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `report_source` | VARCHAR(50) | NOT NULL |  |
+| `case_count` | Integer | NOT NULL | python default |
+| `unique_farms` | Integer | NOT NULL | python default |
+| `verified_farms` | Integer | NOT NULL | python default |
+| `severity_distribution` | JSON | NOT NULL | python default |
+| `avg_ai_confidence` | Numeric | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `expert_verifications` — backend/app/geo/models.py :: ExpertVerification
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_expert_verifications_inspection_result_id` (inspection_result_id)
+  - `ix_expert_verifications_observation_id` (observation_id)
+  - `ix_expert_verifications_verification_status` (verification_status)
+  - `ix_expert_verifications_verified_by` (verified_by)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `observation_id` | VARCHAR(64) | NULL | indexed |
+| `inspection_result_id` | VARCHAR(64) | NULL | indexed |
+| `verified_by` | VARCHAR(64) | NOT NULL | indexed |
+| `verification_status` | VARCHAR(30) | NOT NULL | indexed |
+| `corrected_target_code` | VARCHAR(80) | NULL |  |
+| `corrected_severity` | VARCHAR(30) | NULL |  |
+| `notes` | Text | NULL |  |
+| `verified_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
 ### `export_jobs` — backend/app/db/models.py :: ExportJob
 
 - Primary key: `id`
@@ -332,6 +386,29 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `status` | VARCHAR(20) | NOT NULL | python default |
 | `row_count` | Integer | NOT NULL | python default |
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+
+### `farm_hexagon_assignments` — backend/app/geo/models.py :: FarmHexagonAssignment
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_farm_hexagon_assignments_farm_id` (farm_id)
+  - `ix_farm_hexagon_assignments_geo_code` (geo_code)
+  - `ix_farm_hexagon_assignments_h3_cell_id` (h3_cell_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `farm_id` | VARCHAR(64) | NOT NULL | indexed |
+| `geo_code` | VARCHAR(64) | NOT NULL | indexed |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `overlap_area_m2` | Numeric | NULL |  |
+| `overlap_percentage` | Numeric | NULL |  |
+| `is_primary` | Boolean | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
 ### `feature_snapshots` — backend/app/db/models.py :: FeatureSnapshot
 
@@ -350,6 +427,33 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `source_refs` | JSON | NOT NULL | python default |
 | `is_demo` | Boolean | NOT NULL | python default |
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+
+### `field_agent_profiles` — backend/app/geo/models.py :: FieldAgentProfile
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_field_agent_profiles_primary_geo_code` (primary_geo_code)
+  - `ix_field_agent_profiles_user_id` (user_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `user_id` | VARCHAR(64) | NOT NULL | UNIQUE; indexed |
+| `primary_geo_code` | VARCHAR(64) | NULL | indexed |
+| `expertise_areas` | JSON | NOT NULL | python default |
+| `crop_experience` | JSON | NOT NULL | python default |
+| `max_distance_km` | Numeric | NOT NULL | python default |
+| `is_available` | Boolean | NOT NULL | python default |
+| `current_lat` | Numeric | NULL |  |
+| `current_lng` | Numeric | NULL |  |
+| `location_updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+| `current_workload` | Integer | NOT NULL | python default |
+| `max_concurrent_tasks` | Integer | NOT NULL | python default |
+| `completion_rate` | Numeric | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
 ### `forecast_runs` — backend/app/db/models.py :: ForecastRun
 
@@ -399,6 +503,39 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `is_demo` | Boolean | NOT NULL | python default |
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
 
+### `geo_observations` — backend/app/geo/models.py :: GeoObservation
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_geo_observations_crop_code` (crop_code)
+  - `ix_geo_observations_event_date` (event_date)
+  - `ix_geo_observations_geo_code` (geo_code)
+  - `ix_geo_observations_h3_cell_id` (h3_cell_id)
+  - `ix_geo_observations_observation_id` (observation_id)
+  - `ix_geo_observations_target_code` (target_code)
+  - `ix_geo_observations_verification_status` (verification_status)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `observation_id` | VARCHAR(64) | NULL | indexed |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `geo_code` | VARCHAR(64) | NOT NULL | indexed |
+| `crop_code` | VARCHAR(60) | NOT NULL | indexed |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `event_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | indexed |
+| `reported_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `reporter_type` | VARCHAR(30) | NOT NULL |  |
+| `verification_status` | VARCHAR(30) | NOT NULL | indexed; python default |
+| `severity` | VARCHAR(30) | NULL |  |
+| `ai_confidence` | Numeric | NULL |  |
+| `ai_model_version` | VARCHAR(80) | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
 ### `geographies` — backend/app/db/models.py :: Geography
 
 - Primary key: `id`
@@ -434,6 +571,95 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `precision` | VARCHAR(20) | NOT NULL | python default |
 | `label` | VARCHAR(200) | NULL |  |
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+
+### `h3_cells` — backend/app/geo/models.py :: H3Cell
+
+- Primary key: `id`
+- Foreign keys: none
+- Unique constraints:
+  - `uq_h3_cells_cell_id` (cell_id)
+- Indexes:
+  - `ix_h3_cells_cell_id` (cell_id)
+  - `ix_h3_cells_parent_cell_id` (parent_cell_id)
+  - `ix_h3_cells_resolution` (resolution)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `cell_id` | VARCHAR(32) | NOT NULL | UNIQUE; indexed |
+| `resolution` | Integer | NOT NULL | indexed |
+| `center_lat` | Numeric | NOT NULL |  |
+| `center_lng` | Numeric | NOT NULL |  |
+| `area_m2` | Numeric | NOT NULL |  |
+| `boundary_geojson` | JSON | NOT NULL |  |
+| `parent_cell_id` | VARCHAR(32) | NULL | indexed |
+| `is_active` | Boolean | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `hotspot_clusters` — backend/app/geo/models.py :: HotspotCluster
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_hotspot_clusters_classification` (classification)
+  - `ix_hotspot_clusters_crop_code` (crop_code)
+  - `ix_hotspot_clusters_h3_cell_id` (h3_cell_id)
+  - `ix_hotspot_clusters_target_code` (target_code)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `target_type` | VARCHAR(30) | NOT NULL |  |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `crop_code` | VARCHAR(60) | NULL | indexed |
+| `classification` | VARCHAR(20) | NOT NULL | indexed; python default |
+| `score` | Numeric | NOT NULL | python default |
+| `total_reports` | Integer | NOT NULL | python default |
+| `unique_affected_farms` | Integer | NOT NULL | python default |
+| `verified_farms` | Integer | NOT NULL | python default |
+| `unverified_reports` | Integer | NOT NULL | python default |
+| `pending_reviews` | Integer | NOT NULL | python default |
+| `severity_distribution` | JSON | NOT NULL | python default |
+| `first_reported` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+| `most_recent_report` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+| `historical_frequency` | Numeric | NOT NULL | python default |
+| `weather_risk_factor` | Numeric | NULL |  |
+| `neighbor_cells` | JSON | NOT NULL | python default |
+| `calculated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `hotspot_history` — backend/app/geo/models.py :: HotspotHistory
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_hotspot_hist_cell` (h3_cell_id)
+  - `ix_hotspot_hist_date` (snapshot_date)
+  - `ix_hotspot_hist_target` (target_code)
+  - `ix_hotspot_history_h3_cell_id` (h3_cell_id)
+  - `ix_hotspot_history_snapshot_date` (snapshot_date)
+  - `ix_hotspot_history_target_code` (target_code)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `target_type` | VARCHAR(30) | NOT NULL |  |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `snapshot_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | indexed |
+| `classification` | VARCHAR(20) | NOT NULL |  |
+| `score` | Numeric | NOT NULL | python default |
+| `unique_affected_farms` | Integer | NOT NULL | python default |
+| `weather_risk_factor` | Numeric | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
 ### `idempotency_records` — backend/app/db/models.py :: IdempotencyRecord
 
@@ -545,6 +771,76 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `quality_flags` | JSON | NULL |  |
 | `quality_gate_version` | VARCHAR(80) | NOT NULL |  |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL | server_default=now() |
+
+### `inspection_results` — backend/app/geo/models.py :: InspectionResult
+
+- Primary key: `id`
+- Foreign keys:
+  - `task_id` → `inspection_tasks.id` ON DELETE CASCADE
+- Indexes:
+  - `ix_inspection_cell` (h3_cell_id)
+  - `ix_inspection_results_h3_cell_id` (h3_cell_id)
+  - `ix_inspection_results_task_id` (task_id)
+  - `ix_inspection_task` (task_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `task_id` | VARCHAR(64) | NOT NULL | indexed |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `inspected_by` | VARCHAR(64) | NOT NULL |  |
+| `inspection_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `crop_code` | VARCHAR(60) | NOT NULL |  |
+| `target_code` | VARCHAR(80) | NOT NULL |  |
+| `found_issue` | Boolean | NOT NULL | python default |
+| `severity` | VARCHAR(30) | NULL |  |
+| `ai_confidence` | Numeric | NULL |  |
+| `symptoms_observed` | Text | NULL |  |
+| `photos_taken` | Integer | NOT NULL | python default |
+| `videos_taken` | Integer | NOT NULL | python default |
+| `farmer_notified` | Boolean | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `inspection_tasks` — backend/app/geo/models.py :: InspectionTask
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_inspection_tasks_assigned_to` (assigned_to)
+  - `ix_inspection_tasks_crop_code` (crop_code)
+  - `ix_inspection_tasks_deadline` (deadline)
+  - `ix_inspection_tasks_expires_at` (expires_at)
+  - `ix_inspection_tasks_h3_cell_id` (h3_cell_id)
+  - `ix_inspection_tasks_priority` (priority)
+  - `ix_inspection_tasks_status` (status)
+  - `ix_inspection_tasks_target_code` (target_code)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `crop_code` | VARCHAR(60) | NOT NULL | indexed |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `task_type` | VARCHAR(30) | NOT NULL |  |
+| `priority` | VARCHAR(20) | NOT NULL | indexed; python default |
+| `status` | VARCHAR(30) | NOT NULL | indexed; python default |
+| `assigned_to` | VARCHAR(64) | NULL | indexed |
+| `assigned_by` | VARCHAR(64) | NULL |  |
+| `assignment_type` | VARCHAR(20) | NOT NULL | python default |
+| `deadline` | TIMESTAMP (naive UTC via UTCDateTime) | NULL | indexed |
+| `expires_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL | indexed |
+| `suspected_issue` | Text | NULL |  |
+| `crop_growth_stage` | VARCHAR(50) | NULL |  |
+| `inspection_instructions` | Text | NULL |  |
+| `max_distance_km` | Numeric | NULL |  |
+| `required_expertise` | JSON | NOT NULL | python default |
+| `created_by` | VARCHAR(64) | NOT NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
 ### `message_attachments` — backend/app/db/models.py :: MessageAttachment
 
@@ -720,6 +1016,89 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `consumed_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
 
+### `pest_reports` — backend/app/geo/models.py :: PestReport
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_pest_reports_crop_code` (crop_code)
+  - `ix_pest_reports_event_date` (event_date)
+  - `ix_pest_reports_h3_cell_id` (h3_cell_id)
+  - `ix_pest_reports_target_code` (target_code)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `crop_code` | VARCHAR(60) | NOT NULL | indexed |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `event_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | indexed |
+| `report_date` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `report_source` | VARCHAR(50) | NOT NULL |  |
+| `case_count` | Integer | NOT NULL | python default |
+| `unique_farms` | Integer | NOT NULL | python default |
+| `verified_farms` | Integer | NOT NULL | python default |
+| `severity_distribution` | JSON | NOT NULL | python default |
+| `avg_ai_confidence` | Numeric | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `recovery_monitoring_records` — backend/app/geo/models.py :: RecoveryMonitoringRecord
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_recovery_monitoring_records_farm_id` (farm_id)
+  - `ix_recovery_monitoring_records_follow_up_date` (follow_up_date)
+  - `ix_recovery_monitoring_records_h3_cell_id` (h3_cell_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `farm_id` | VARCHAR(64) | NOT NULL | indexed |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `crop_code` | VARCHAR(60) | NOT NULL |  |
+| `target_code` | VARCHAR(80) | NOT NULL |  |
+| `previous_severity` | VARCHAR(30) | NOT NULL |  |
+| `current_severity` | VARCHAR(30) | NOT NULL |  |
+| `recovery_percentage` | Numeric | NOT NULL | python default |
+| `recovery_status` | VARCHAR(30) | NOT NULL | python default |
+| `follow_up_date` | TIMESTAMP (naive UTC via UTCDateTime) | NULL | indexed |
+| `notes` | Text | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `regional_risk_scores` — backend/app/geo/models.py :: RegionalRiskScore
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_regional_risk_scores_crop_code` (crop_code)
+  - `ix_regional_risk_scores_h3_cell_id` (h3_cell_id)
+  - `ix_regional_risk_scores_target_code` (target_code)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `crop_code` | VARCHAR(60) | NOT NULL | indexed |
+| `target_code` | VARCHAR(80) | NOT NULL | indexed |
+| `valid_from` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL |  |
+| `valid_to` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL |  |
+| `risk_score` | Numeric | NOT NULL | python default |
+| `weather_risk` | Numeric | NOT NULL | python default |
+| `biological_risk` | Numeric | NOT NULL | python default |
+| `historical_risk` | Numeric | NOT NULL | python default |
+| `risk_label` | VARCHAR(20) | NOT NULL | python default |
+| `contributing_factors` | JSON | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
 ### `review_assignments` — backend/app/db/models.py :: ReviewAssignment
 
 - Primary key: `id`
@@ -884,6 +1263,56 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 | `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
+### `task_assignments` — backend/app/geo/models.py :: TaskAssignment
+
+- Primary key: `id`
+- Foreign keys:
+  - `task_id` → `inspection_tasks.id` ON DELETE CASCADE
+- Indexes:
+  - `ix_task_assign_at` (assigned_at)
+  - `ix_task_assign_task` (task_id)
+  - `ix_task_assign_user` (user_id)
+  - `ix_task_assignments_task_id` (task_id)
+  - `ix_task_assignments_user_id` (user_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `task_id` | VARCHAR(64) | NOT NULL | indexed |
+| `user_id` | VARCHAR(64) | NOT NULL | indexed |
+| `assigned_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `assigned_by` | VARCHAR(64) | NOT NULL |  |
+| `assignment_type` | VARCHAR(20) | NOT NULL |  |
+| `accepted_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+| `declined_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+| `completed_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+| `distance_km` | Numeric | NULL |  |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
+### `task_status_history` — backend/app/geo/models.py :: TaskStatusHistory
+
+- Primary key: `id`
+- Foreign keys:
+  - `task_id` → `inspection_tasks.id` ON DELETE CASCADE
+- Indexes:
+  - `ix_task_hist_at` (created_at)
+  - `ix_task_hist_task` (task_id)
+  - `ix_task_status_history_task_id` (task_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `task_id` | VARCHAR(64) | NOT NULL | indexed |
+| `from_status` | VARCHAR(30) | NULL |  |
+| `to_status` | VARCHAR(30) | NOT NULL |  |
+| `changed_by` | VARCHAR(64) | NOT NULL |  |
+| `reason` | Text | NULL |  |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+
 ### `user_area_assignments` — backend/app/db/models.py :: UserAreaAssignment
 
 - Primary key: `id`
@@ -938,6 +1367,27 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `granted_by` | VARCHAR(64) | NULL |  |
 | `granted_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
 | `revoked_at` | TIMESTAMP (naive UTC via UTCDateTime) | NULL |  |
+
+### `user_task_availability` — backend/app/geo/models.py :: UserTaskAvailability
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_user_task_availability_user_id` (user_id)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `user_id` | VARCHAR(64) | NOT NULL | indexed |
+| `available_from` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL |  |
+| `available_to` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL |  |
+| `max_distance_km` | Numeric | NULL |  |
+| `preferred_crop_codes` | JSON | NOT NULL | python default |
+| `preferred_target_codes` | JSON | NOT NULL | python default |
+| `is_active` | Boolean | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
 ### `users` — backend/app/db/models.py :: User
 
@@ -1017,6 +1467,31 @@ is derived from it (see POSTGRESQL_MAPPING_MATRIX.md).
 | `frame_count` | Integer | NOT NULL |  |
 | `created_at` | TIMESTAMP WITH TIME ZONE | NOT NULL | server_default=now() |
 | `deleted_at` | TIMESTAMP WITH TIME ZONE | NULL |  |
+
+### `weather_cell_records` — backend/app/geo/models.py :: WeatherCellRecord
+
+- Primary key: `id`
+- Foreign keys: none
+- Indexes:
+  - `ix_weather_cell_records_expires_at` (expires_at)
+  - `ix_weather_cell_records_h3_cell_id` (h3_cell_id)
+  - `ix_weather_cell_records_source_timestamp` (source_timestamp)
+
+| Column | Type | Null | Notes |
+|---|---|---|---|
+| `id` | VARCHAR(64) | NOT NULL | PK; python default |
+| `h3_cell_id` | VARCHAR(32) | NOT NULL | indexed |
+| `resolution` | Integer | NOT NULL |  |
+| `source` | VARCHAR(80) | NOT NULL |  |
+| `source_timestamp` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | indexed |
+| `fetched_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | python default |
+| `expires_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | indexed |
+| `variables` | JSON | NOT NULL | python default |
+| `completeness` | Numeric | NOT NULL | python default |
+| `is_stale` | Boolean | NOT NULL | python default |
+| `is_demo` | Boolean | NOT NULL | python default |
+| `created_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
+| `updated_at` | TIMESTAMP (naive UTC via UTCDateTime) | NOT NULL | server_default=now(); python default |
 
 ### `weather_snapshots` — backend/app/db/models.py :: WeatherSnapshot
 
