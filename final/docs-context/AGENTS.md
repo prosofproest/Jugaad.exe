@@ -5,11 +5,13 @@
 repository. It states what the system is, what must never be violated, and how work is
 planned, built, tested and documented.
 
-**Status:** documentation plus engineering scaffolds (Phase 2 §5.1), the web chat
-surface (§5.7, demo backend), and the §5.2 identity backend slice (in memory: OTP,
-staff MFA, five roles, consent, privacy, audit). No real model is connected; demo
-paths are labelled and identity state is lost on restart. The mobile client passes
-`flutter analyze` and `flutter test`; no APK or device run yet.
+**Status:** documentation plus engineering scaffolds (Phase 2 §5.1), the persisted
+demo chat slice (§5.7: image upload, demo quality gate, deterministic demo engine,
+review requests; Alembic `0002_chat_persistence`), and the §5.2 identity backend
+slice (in memory: OTP, staff MFA, five roles, consent, privacy, audit). No real
+model is connected; demo paths are labelled and identity state is lost on restart.
+The mobile client passes `flutter analyze` and `flutter test`; no APK or device run
+yet.
 **Last updated:** 2026-11-06
 
 ---
@@ -150,7 +152,7 @@ reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds no schema
 of its own — SQLAlchemy models and Alembic migrations in `backend/` are the
 single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
-Nothing beyond the Phase 2 §5.1 foundation, the demo-backed web chat surface
+Nothing beyond the Phase 2 §5.1 foundation, the persisted demo chat slice
 (§5.7) and the in-memory §5.2 identity backend slice exists in these folders. Do
 not create scaffolding that implies a decision has been made unless the decision
 is recorded in `progress-tracker.md`.
@@ -168,14 +170,14 @@ paths are in each agent's `README.md`.
 | Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 294 passed |
 | Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean for the identity slice; pre-existing failures remain elsewhere |
 | Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean for the identity slice; pre-existing differences remain elsewhere |
-| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline` |
+| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline`, `0002_chat_persistence` |
 | Review migration SQL offline | `cd backend && .venv\Scripts\python -m alembic upgrade head --sql` | SQL emitted |
 | Backend dev server | `cd backend && .venv\Scripts\python -m uvicorn app.main:app --reload --port 8000` | `/health` returned 200 |
 | Web install | `cd frontend && npm ci` | 346 packages |
 | Web typecheck | `cd frontend && npm run typecheck` | pass |
 | Web lint | `cd frontend && npm run lint` | pass |
 | Web build | `cd frontend && npm run build` | pass; 6 routes |
-| Web chat smoke | `uvicorn` + `next start`, then create/list/open/delete a conversation | pass; list, thread, demo badge, delete and empty state observed |
+| Web chat smoke | `uvicorn` + `next start`, then upload a photo, send it, request review, open the thread and delete | pass; upload → `demo-chat-0.1` assessment → persisted review → preview byte-match → 415 rejection; list, thread, demo badge, delete and empty state observed |
 | Compose parse | `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml config --quiet` | pass |
 | Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | pass — 30 packages resolved; analyze clean; 1 widget test passed (Flutter 3.47.9) |
 | Container builds | `docker build -t ps03-api:ci backend` and `docker build -t ps03-web:ci frontend` | **NOT RUN — daemon unavailable**; CI builds |

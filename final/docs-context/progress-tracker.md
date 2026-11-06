@@ -80,18 +80,24 @@ handbook approved by a pathologist.
 - [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
 - [ ] Observation API with idempotency and presigned uploads.
 - [ ] Web frontend shell + mobile app shell consuming the same `/v1` API.
-- [~] Conversational capture: `conversations` module + chat on web and mobile
-      (`08-conversational-capture.md`). **Web surface built** against the
-      in-memory demo backend: conversation list/thread, structured assessment
-      card, metadata-only image composer, idempotent retry and delete. Mobile,
-      upload/media, real inference, auth scoping and review-from-chat remain open.
-- [ ] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
-      `review_requested`) and chemical-content validator.
+- [~] Conversational capture: `conversations` module + chat on web
+      (`08-conversational-capture.md`). **Backend + web slice implemented and
+      persisted** (Alembic `0002_chat_persistence`): validated image upload and
+      owner-scoped preview, demo quality gate, pluggable assessment engine
+      (`demo` default; unknown values fail closed), idempotent turns, review
+      requests, and the web thread/composer/card. Mobile, real inference, auth
+      scoping, object storage and the presigned-URL pipeline remain open.
+- [~] Chat reply contract (`assessment`, `abstained`, `unsupported_crop`, `queued`, `failed`,
+      `review_requested`) and chemical-content validator. Implemented: `assessed`,
+      `abstained` and `failed` states plus persisted `review_requested`; `queued` and
+      `unsupported_crop` remain open, and the validator is not built.
 - [ ] Expert review queue and decision flow (`04-expert-review.md`).
 - [ ] Audit trail for reviews, roles, exports and chat events.
 - [ ] Admin config for crops, targets, geographies.
 - [ ] End-to-end test: report → upload → review, including airplane mode.
-- [ ] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
+- [~] End-to-end test: chat image → structured reply on web and mobile, retry idempotent.
+      Web + API path verified (14 backend tests and a live upload → demo assessment →
+      review smoke); mobile path and browser automation remain open.
 
 **Gate 2:** a report can be captured offline, synced once, reviewed, and audited, on a
 low-end device; chat image → assessment works on web and mobile. No predictive model
@@ -168,10 +174,10 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; §5.2 identity slice (OTP, staff MFA, roles, consent, privacy, audit) in memory. Next: SQLAlchemy/Alembic persistence and route auth (needs Gate 1 exception) |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo engine, review requests); §5.2 identity slice in memory. Next: durable identity persistence, route auth and real inference (needs the Gate 1 exception and D1/D8) |
 | Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
 | Web | `[~]` | Next.js desktop shell in `frontend/` with persistent section sidebar, dashboard and honest locked/not-available routes; typecheck, lint, build and live smoke pass (2026-11-06) |
-| Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
+| Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo engine → review); mobile shell only. Real assessment waits on Phase 3 and D8 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
 | MLOps | `[ ]` | Registry table design in data layer |
@@ -528,6 +534,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
 | 2026-11-06 | Verified the Flutter client locally after installing Flutter 3.47.9 (stable, Dart 3.13.7): `flutter pub get` resolved 30 packages, `flutter analyze` reported no issues, `flutter test` passed the single widget test. Updated `TEST-MATRIX.md` FND-11 to Verified (analyze + test), the mobile README, `AGENTS.md` §5, PRD/TRD status lines and `IMPLEMENTATION-CHECKLIST.md` W-11. Still open: `android/`/`ios/` runners, an APK build, a device/emulator smoke and a recorded CI run. No gate is claimed. |
 | 2026-11-06 | Phase 2 §5.2 identity backend slice: phone OTP for farmers, provisioned staff accounts, five-role deny-by-default dependencies, password+TOTP login, rotating refresh tokens with family revocation, versioned consent capture, privacy requests/self-export/soft deletion, credential-only retention job, and audited role changes, admin record views and exports. 64 new tests; full backend suite 294 passed. Deliberately **not** done: durable SQLAlchemy/Alembic persistence, authentication of the existing demo chat/assessment/advisory/map routes, real SMS/email providers, password reset, Argon2id (stdlib `scrypt` used instead), and D10/D11-dependent retention/on-behalf/offline behaviour. Gate 1 remains unmet and no gate is claimed. |
+| 2026-11-06 | Persisted chat slice (Phase 2 §5.7): Alembic `0002_chat_persistence` (`conversations`, `messages`, `message_events`, `image_uploads`, `review_requests`); `POST/GET /v1/uploads` with a JPEG/PNG/WebP allow-list, 10 MB ceiling, real decode, SHA-256 and a versioned demo quality gate; pluggable `AssessmentEngine` seam with a deterministic, labelled `DemoAssessmentEngine` (`demo-chat-0.1`) and fail-closed unknown configuration; idempotent turns; `POST …/messages/{id}/review`; web composer now uploads first and references `upload_id`, renders the stored preview, quality flags and review status. 14 new chat tests; full suite 294 passed. Live smoke (uvicorn + SQLite + `next start`) passed upload → assessed demo reply → persisted review → preview byte-match → 415 rejection. PostgreSQL/Alembic apply was not run (Docker daemon unavailable); real inference is still blocked on the API key and governance. |
 | 2026-11-06 | Reconciled a force-pushed `main`: a collaborator's line (`697944d`, diverged at `611aa48`) added a parallel backend, Phase-0 docs and ADRs. Merged it while keeping this line's tested backend for overlapping paths (`app/api`, `app/core`, `app/db`, conversations, identity). The collaborator's new Phase-0 documents, ADRs, `backend/backend/*` vertical slice and non-conflicting files are retained; its superseded `app/*` implementations remain in history but are not wired. Removed the committed `backend/var/ps03.db` artifact. Backend suite re-run after the merge: 294 passed. |
 
 ---
