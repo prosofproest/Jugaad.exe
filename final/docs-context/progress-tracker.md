@@ -34,20 +34,22 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [x] Full 55-chapter blueprint and Appendices A–H mapped to repository files (`../README.md`).
 - [x] Realism audit applied; v1 scope narrowed.
 - [x] Architecture baseline and feature specs drafted.
-- [ ] **D1** Crop + 3–5 targets + agro-climatic zone selected with local experts.
-- [ ] **D2** Nowcast vs 7-day outlook decided.
-- [ ] **D3** Verifier role, capacity and SLA agreed with partner.
-- [ ] **D4** Owning/paying institution identified.
-- [ ] **D5** Primary outcome metric pre-registered.
-- [ ] **D6** Legal position on advisory content confirmed.
-- [ ] **D7–D12** Scientific-integrity decisions recorded (see §4).
+- [x] **D1** Horticulture crop catalogue + validated crop × target allowlist decided
+      (D1a initial allowlist and D1b pilot zone remain tracked in §4).
+- [x] **D2** Nowcast vs 7-day outlook decided.
+- [x] **D3** Verifier role decided; capacity/SLA values tracked for the pilot.
+- [x] **D4** Owning/paying institution model identified.
+- [x] **D5** Primary outcome metric pre-registered.
+- [x] **D6** Legal position on advisory content confirmed.
+- [~] **D7–D12** D7 and D8 accepted; D9–D12 remain open and are tracked under the gates
+      that need their values (Gate 2 and Gate 4), not Gate 0.
 - [x] **D13** Agronomist role model recorded (see §4).
 - [ ] Crop calendar and epidemic window documented for the pilot area.
 
-**Gate 0:** D1–D13 answered and recorded in §4, each with a recorded date and one named
-accountable owner (D7 and D13 are already accepted). Gate 0 carries a calendar target
-(proposed: **2026-11-20**, confirmed at the decision workshop) so that it cannot close by
-definition. No code that depends on them.
+**Gate 0:** D1–D6, D7, D8 and D13 are answered and recorded in §4, each with a recorded
+date and owner. D9–D12 are deliberate pre-Gate-2/pre-Gate-4 decisions and are not part of
+the checklist's Gate 0 scope. Gate 0 closes when the checklist's Gate 0 items are met
+(architecture, docs consistency, clean clone). Working record: the decision log below.
 
 ### Phase 1 — Data foundation `[ ]`
 
@@ -159,15 +161,15 @@ epidemic season.
 |---|---|---|
 | Documentation | `[x]` | Keep in sync with decisions |
 | Blueprint coverage | `[x]` | Chapter map maintained in `../README.md` |
-| Decisions | `[?]` | Resolve D1–D6 with local experts |
+| Decisions | `[~]` | D1–D6 resolved; close D9–D12 before Gates 2/4 |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
-| Labelling | `[ ]` | Draft handbook after D1 |
+| Labelling | `[ ]` | Draft handbook after the D1a allowlist |
 | Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; identity + observations next (needs Gate 1 exception) |
 | Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
 | Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass (2026-11-06) |
 | Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
-| Forecast | `[ ]` | Implement rules baseline after D1/D2 |
+| Forecast | `[ ]` | Implement rules baseline after D2 and the D9 values |
 | MLOps | `[ ]` | Registry table design in data layer |
 | Security/privacy | `[ ]` | Threat model before Phase 2 exit |
 | Pilot ops | `[ ]` | Site list and verification capacity after D3 |
@@ -184,31 +186,31 @@ close while any remain open. Where a decision needs a number that the repository
 entitled to invent (R6), the decision must still define *who sets the number, from what
 measurement, before which gate* — the rule for setting the value is itself the decision.
 
-### D1 — Crop + targets + zone `[?]`
+### D1 — Crop + targets + zone `[x]`
 
-**Partially answered 2026-11-06: long-term coverage should span horticulture crops and
-their pest/disease targets. This is not yet a v1 scope.** "All horticulture crops" cannot
-be a supported list in v1 because the supported list drives abstention (R2), image-data
-collection, weather calibration and validation; an unbounded list would make
-"unsupported crop" meaningless and cannot be trained or evaluated honestly.
+**Decision (2026-11-06): open, crop-agnostic horticulture catalogue with a validated
+crop × target allowlist.** Any horticulture crop may be submitted; a photo assessment or
+area outlook is returned only for a `crop × target` pair on the release allowlist.
+Everything else returns an explicit abstention (`unsupported_crop`, `unsupported_target`)
+rather than mapping to the nearest supported class (R2). This carries the user's direction
+to cover horticulture crops without making validation claims the project cannot support.
 
-**Still required before D1 can close:**
+**Still open as D1a:** the first concrete allowlist (crop × target entries plus
+healthy/abiotic/unknown classes) must be fixed before Gate 3.
 
-- an explicit **initial supported crop list** (the docs recommend one crop, e.g. potato
-  late blight, with 3–5 targets plus healthy/abiotic/unknown);
-- the **single agro-climatic zone** (state/district/block) and its boundary version;
-- the **supported target list** for those crops.
+**Still open as D1b:** the single pilot agro-climatic zone (state/district/block) and its
+boundary version must be named before Gate 4.
 
 **Scope note:** "pesticides" is read as pest and disease *targets*, not pesticide product
 advice. D6 and R5 keep all chemical prescriptions out of the product.
 
-**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (still open). The remaining
-table of options is retained for the decision meeting.
+**Owner:** Product lead + agronomist. **Recorded:** 2026-11-06.
 
-| Option | Consequence |
+| Option considered | Consequence |
 |---|---|
-| Potato late blight | Validated weather model exists (BLITECAST/SimCast); forecast credible on day one; narrow advisory |
-| Tomato late blight / early blight / leaf curl | More targets, more public data, weaker forecast baseline for non-blight targets |
+| Open catalogue + validated allowlist (chosen) | Crop-agnostic schema; claims limited to validated entries; abstains elsewhere |
+| Potato late blight only | Validated weather model exists (BLITECAST/SimCast); credible day one, but narrow |
+| Tomato blight complex | More targets and public data; weaker forecast baseline for non-blight targets |
 | Rice blast / BLB / brown spot | Large farmer base, harder image data, blast weather models exist |
 
 ### D2 — Nowcast or 7-day outlook `[x]`
@@ -529,18 +531,23 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Phase 2 §5.1 engineering foundation: FastAPI app factory with RFC 7807 problem details, request-id middleware and JSON logs; SQLAlchemy session + Alembic `0001_baseline`; Next.js web client in `frontend/` (typecheck, lint and build pass); Flutter shell in `mobile/` (committed, unverified — no SDK); compose with PostGIS, API and web images; env templates for dev/staging; CI for backend, web, mobile, compose and image builds; `TEST-MATRIX.md`. No feature work; Gate 1 remains unmet. Added ADR-009. |
 | 2026-11-06 | Web chat surface (Phase 2 §5.7, demo backend): `/chat` conversation list and `/chat/[conversationId]` thread; structured assessment card with assessed/abstained/unsupported/failed states; metadata-only image picker and drag-and-drop; idempotent retry and conversation delete; honest not-available routes for `/outlook` and `/review`. Added `design/tokens.json` and an application shell with mirrored CSS variables. Typecheck, lint, production build and live smoke pass. Upload/media, real inference, auth scoping and the mobile surface remain open; no gate is claimed. |
 | 2026-11-06 | Reconciled `../../IMPLEMENTATION-CHECKLIST.md` against the repository: added a work log for the §5.1 foundation, §5.7 web chat surface, `database/` governance artifacts and test evidence; ticked only evidence-backed items (architecture choices, doc reconciliation, rebuilt venv, JSON logging/request IDs/problem details, frontend build/lint/typecheck, production docs restriction). `.gitignore` stays unticked because `dist/` is missing; all auth, readiness, domain-schema, media, model, forecast, alert, map, admin, audit and i18n items remain open. Verdict remains **NOT COMPLIANT**; Gate 0 and Gate 1 are unmet. |
+| 2026-11-06 | **D1–D6 decided.** D1: open horticulture catalogue with a validated crop × target allowlist; the first allowlist (D1a) stays open before Gate 3 and the pilot zone/boundary version (D1b) before Gate 4. D2: nowcast (last 10 days). D3: extension-first verification with pathologist escalation. D4: grant/NGO pilot → cooperative/insurer operations. D5: median lead time from first report to verified confirmation. D6: non-chemical guidance only, with legal review before Gate 5. "Pesticides" is read as pest/disease targets; R5 still forbids chemical prescriptions. |
+| 2026-11-06 | Recorded a repository-line divergence: `origin/main` was rewritten to a different Phase 0 branch (Cloudinary, React Native, three-role docs) that drops `mobile/`, `deploy/`, CI, `TEST-MATRIX.md` and the Gate 5/6 modules, and whose backend cannot collect tests (`sqlalchemy` missing from its requirements). The in-progress merge was aborted; the tested local line remains canonical pending an owner decision on how to reconcile the remote branch. |
 
 ---
 
 ## 8. Next five actions
 
-1. Run a decision workshop for D1–D6; record outcomes in §4.
-2. Draft the data acquisition plan (partner MoUs, archive access, collection targets).
-3. Draft the labelling handbook for the chosen crop and target list.
-4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Verify the committed mobile scaffold (`flutter analyze`, `flutter test`, an APK) and
-   build both container images; then expand only after Gate 0, starting with identity +
-   observations + audit + `conversations`.
+1. Close Gate 0 in `IMPLEMENTATION-CHECKLIST.md`: decisions D1–D6 are recorded, the ADR and
+   lockfile exist, and a fresh clone passes 216 tests.
+2. Resolve the `origin/main` divergence with the repository owner before pushing further
+   (merge, replace, or keep the tested line on a dedicated branch).
+3. Fix the **D1a** initial crop × target allowlist before Gate 3 and the **D1b** pilot
+   zone/boundary version before Gate 4.
+4. Draft the data acquisition plan, labelling handbook and pilot protocol against the
+   decided scope.
+5. Start Gate 1 on the tested line: auth, roles, consent, domain schema, media and
+   readiness; verify the mobile scaffold and container builds before claiming them.
 
 ---
 

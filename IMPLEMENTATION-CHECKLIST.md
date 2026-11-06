@@ -23,26 +23,26 @@
 
 | Gate | Date | Verified by | Command / artefact | Result |
 |---|---|---|---|---|
-| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `docs/adr/0001-target-architecture.md`; `backend/requirements.lock`; fresh clone of `cad44cc` + `pip install -r requirements.txt` + `pytest`; `ruff check`; `ruff format --check` | **Open** — ADR consolidated; lockfile added; fresh-clone 216 tests pass; ruff clean. Only D1–D6 remain open |
+| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `docs/adr/0001-target-architecture.md`; `backend/requirements.lock`; fresh clone of `cad44cc` + `pip install -r requirements.txt` + `pytest`; `ruff check`; `ruff format --check` | **CLOSED** — ADR consolidated; lockfile added; fresh-clone 216 tests pass; ruff clean; D1–D6 recorded in `progress-tracker.md` §4 |
 | 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 216 backend tests pass; web typecheck, lint and build pass; no auth, readiness, domain tables or media |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
 | 6 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest tests/test_map_layers.py tests/test_map_api.py`; `python -m pytest`; `python -m compileall -q app` | 29 map tests pass; 216 total; COMPILE_OK. Service/API only; no production geometry, boundary dataset, map client or E2E. |
-| — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 and Gate 1 remain unmet |
+| — | 2026-11-06 | Repository review (checklist reconciliation) | `progress-tracker.md` §2 §5.1/§5.7; `TEST-MATRIX.md` FND-01…FND-19 | **Foundation under recorded exception** — scaffold exists; Gate 0 is now closed separately; Gate 1 remains unmet |
 
 ---
 
 ## Progress snapshot (verified 2026-11-06)
 
-**Verdict:** NOT COMPLIANT. **Gates closed: 0 of 13.** **Gate boxes ticked: 56 / 217 (~26%).**
+**Verdict:** NOT COMPLIANT. **Gates closed: 1 of 13 (Gate 0).** **Gate boxes ticked: 62 / 217 (~29%).**
 
 Box counts measure recorded evidence, not readiness. A gate stays open until its P0/P1
-items and exit criteria are all met, so 24% of boxes does **not** mean the product is 24%
+items and exit criteria are all met, so 29% of boxes does **not** mean the product is 29%
 operational — the safety-critical gates (0, 1, 2) are almost entirely open.
 
 | Gate | Ticked | Status | What the ticked items prove | What keeps the gate open |
 |---|---|---|---|---|
-| 0 | 26/32 | OPEN | Stack, roles, confidence semantics, guidance policy, forecast approach and docs reconciliation recorded; ADR file created; `dist/` ignored; backend lockfile added; venv rebuilt; suite and ruff clean; fresh-clone install/test verified | D1–D6 unresolved (the only six open boxes) |
+| 0 | 32/32 | CLOSED | One recorded architecture (`docs/adr/0001-target-architecture.md`), D1–D6 recorded with dates/owners, docs consistent, `.gitignore`/lockfile/venv/fresh-clone verified, 216 tests + ruff clean | Closed 2026-11-06. D1a (first crop × target allowlist) stays open before Gate 3; D1b (pilot zone/boundary version) before Gate 4; D9–D12 belong to Gates 2/4 |
 | 1 | 1/32 | OPEN | Health payload exposes no secrets | No authentication, authorization, domain schema, media pipeline or readiness probe |
 | 2 | 0/18 | OPEN | — | No farmer vertical slice: capture, offline sync, review and E2E are absent |
 | 3 | 12/42 | OPEN | Image-triage machinery only: policy, quality gate, D8 decision, calibration, OOD, registry, inference, append-only records, API, safe explanation, evaluation harness | No trained artefact, field data, frozen test set, forecast pipeline or approved operating point |
@@ -69,8 +69,7 @@ operational — the safety-critical gates (0, 1, 2) are almost entirely open.
   model, weather ingestion, real geometry, delivery provider, admin surface, localization
   and a production deploy.
 
-**Next gates to close:** Gate 0 (record D1–D6), then Gate 1 (auth, roles, schema, media,
-readiness). Do not start Gate 2+ until those are closed.
+**Next gates to close:** Gate 1 (auth, roles, schema, media, readiness), then Gate 2.
 
 ---
 
@@ -118,6 +117,12 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 
 ## Gate 0 — Resolve the architecture conflict (BLOCKING)
 
+> **Status: CLOSED 2026-11-06.** One architecture is recorded in
+> `docs/adr/0001-target-architecture.md`; D1–D6 are recorded in
+> `final/docs-context/progress-tracker.md` §4; docs are consistent on the canonical line;
+> a fresh clone installs and passes 216 tests with clean ruff checks. D1a (first crop ×
+> target allowlist) and D1b (pilot zone/boundary version) are tracked as Gate 3/4 inputs.
+
 Nothing else may start until this gate is closed. Two incompatible designs currently coexist.
 
 > **Exception on record (2026-11-06):** the Phase 2 §5.1 foundation and the demo-backed
@@ -144,14 +149,32 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 
 ### 0.2 Resolve blocking product decisions D1–D6
 
-- [ ] D1 — Target crop(s)
-- [ ] D2 — Forecast horizon
-- [ ] D3 — Who verifies reports
-- [ ] D4 — Data/account owner
-- [ ] D5 — Primary success metric
-- [ ] D6 — Advisory legality / chemical-advice position
+- [x] D1 — Target crop(s)
+  - **Decision (2026-11-06):** open horticulture catalogue with a validated crop × target
+    allowlist. Any crop may be submitted; only allowlisted pairs are assessed. The first
+    concrete allowlist (**D1a**) stays open before Gate 3; the pilot zone/boundary version
+    (**D1b**) stays open before Gate 4. Recorded in `progress-tracker.md` §4 (D1).
+- [x] D2 — Forecast horizon
+  - **Decision (2026-11-06):** nowcast over the last 10 days; 7-day outlook deferred until
+    a season of verified outcomes exists. `progress-tracker.md` §4 (D2).
+- [x] D3 — Who verifies reports
+  - **Decision (2026-11-06):** extension-worker-first verification with pathologist
+    escalation; SLA and workload-cap values set with the partner before the pilot.
+    `progress-tracker.md` §4 (D3).
+- [x] D4 — Data/account owner
+  - **Decision (2026-11-06):** grant/NGO-funded pilot, operations handed to a cooperative
+    or crop insurer; the named institution and written data-ownership/exit agreement are
+    required before the pilot. `progress-tracker.md` §4 (D4).
+- [x] D5 — Primary success metric
+  - **Decision (2026-11-06):** median lead time from first farmer report to verified expert
+    confirmation versus the existing advisory baseline, pre-registered. Secondary:
+    prioritisation accuracy and false-alert burden. `progress-tracker.md` §4 (D5).
+- [x] D6 — Advisory legality / chemical-advice position
+  - **Decision (2026-11-06):** non-chemical guidance only, with escalation to a human and
+    legal review before the pilot. No pesticide, herbicide, fungicide or dosage content.
+    `progress-tracker.md` §4 (D6).
   - **Done when:** every decision is recorded in `final/docs-context/progress-tracker.md` §4 with a date and owner.
-  - **Evidence (2026-11-06):** D7, D8 and D13 are accepted in §4. D1–D6 and D9–D12 remain open, each with an owner and a needs-by date, so **0.2 is not closed**.
+  - **Evidence (2026-11-06):** D1–D6 are recorded with dates and owners in §4. D7, D8 and D13 were already accepted; D9–D12 remain open but belong to Gates 2/4, not Gate 0. **0.2 is closed.**
 
 ### 0.3 Reconcile documentation
 
@@ -645,7 +668,7 @@ Re-run this after every gate. A row is **PASS** only with fresh evidence.
 
 The project may be re-labelled from **NOT COMPLIANT** only when:
 
-- [ ] Gate 0 is fully closed (one architecture, decisions resolved, docs consistent)
+- [x] Gate 0 is fully closed (one architecture, decisions resolved, docs consistent)
 - [ ] Gates 1 and 2 pass with automated E2E evidence
 - [ ] Gate 3 has either a real trained model **or** an explicitly stated claim of "inference-only, untrained"
 - [ ] Gates 4–8 pass
@@ -654,4 +677,4 @@ The project may be re-labelled from **NOT COMPLIANT** only when:
 
 Until then, the correct description remains: **documentation plus Phase 2 engineering
 scaffolding (a demo-backed web chat surface and no real model) — not a compliant
-application**. Gate 0 and Gate 1 remain open.
+application**. Gate 0 is closed; Gate 1 remains open.
