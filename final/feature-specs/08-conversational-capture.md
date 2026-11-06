@@ -316,6 +316,29 @@ the following are hard requirements:
 | Cached conversation | Rendered with last-updated time and stale marker after validity |
 | Deleted conversation | Removed from list; deletion completes per privacy flow |
 
+### Implementation status (2026-11-06)
+
+- **Web:** image upload, structured card and idempotent retry are implemented; the
+  offline path is an in-page notice with manual retry, not a durable queue.
+- **Mobile:** the slice above is implemented in `mobile/lib/src/outbox.dart`,
+  `chat_sync.dart`, `api_client.dart` and `main.dart`. A turn is written to a
+  persisted outbox (`ps03.chat.outbox.v1`) before the first network call, shown as
+  `queued`, and flushed in order on manual retry, a 15-second page timer and app
+  resume. The upload id and conversation id are persisted so a retry reuses them
+  with the same `client_message_id`.
+- **Failure honesty:** non-retryable errors and a missing local image become a
+  visible `failed` turn with Retry/Delete; the client never renders a local
+  placeholder as an assistant reply.
+- **Verified:** `flutter analyze` clean and `flutter test` 14 passed. No device,
+  emulator or airplane-mode run has been performed, so this row is unit evidence
+  only until an APK exists.
+- **Known deviation:** v1 uses the demo multipart `POST /v1/uploads` described in
+  §6, not the presigned-URL flow in CHAT-NF-03. The signed-upload pipeline remains
+  open for the pilot-scale implementation.
+- **Known limit:** the picker's cache copy can be evicted by the OS before a
+  reconnect; that is surfaced as a failed turn rather than hidden. There is no
+  background worker or connectivity listener in this slice.
+
 ---
 
 ## 11. Non-functional requirements
