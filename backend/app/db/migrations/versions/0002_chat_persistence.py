@@ -144,7 +144,7 @@ def upgrade() -> None:
     op.create_index("ix_image_uploads_sha256", "image_uploads", ["sha256"])
 
     op.create_table(
-        "review_requests",
+        "chat_review_requests",
         sa.Column("id", sa.String(length=64), nullable=False),
         sa.Column("conversation_id", sa.String(length=64), nullable=False),
         sa.Column("message_id", sa.String(length=64), nullable=False),
@@ -160,28 +160,30 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(
             ["conversation_id"],
             ["conversations.id"],
-            name="fk_review_requests_conversation_id_conversations",
+            name="fk_chat_review_requests_conversation_id_conversations",
             ondelete="CASCADE",
         ),
         sa.ForeignKeyConstraint(
             ["message_id"],
             ["messages.id"],
-            name="fk_review_requests_message_id_messages",
+            name="fk_chat_review_requests_message_id_messages",
             ondelete="CASCADE",
         ),
-        sa.PrimaryKeyConstraint("id", name="pk_review_requests"),
-        sa.UniqueConstraint("message_id", name="uq_review_requests_message_id"),
+        sa.PrimaryKeyConstraint("id", name="pk_chat_review_requests"),
+        sa.UniqueConstraint("message_id", name="uq_chat_review_requests_message_id"),
     )
-    op.create_index("ix_review_requests_conversation_id", "review_requests", ["conversation_id"])
-    op.create_index("ix_review_requests_message_id", "review_requests", ["message_id"])
-    op.create_index("ix_review_requests_owner_id", "review_requests", ["owner_id"])
+    op.create_index(
+        "ix_chat_review_requests_conversation_id", "chat_review_requests", ["conversation_id"]
+    )
+    op.create_index("ix_chat_review_requests_message_id", "chat_review_requests", ["message_id"])
+    op.create_index("ix_chat_review_requests_owner_id", "chat_review_requests", ["owner_id"])
 
 
 def downgrade() -> None:
-    op.drop_index("ix_review_requests_owner_id", table_name="review_requests")
-    op.drop_index("ix_review_requests_message_id", table_name="review_requests")
-    op.drop_index("ix_review_requests_conversation_id", table_name="review_requests")
-    op.drop_table("review_requests")
+    op.drop_index("ix_chat_review_requests_owner_id", table_name="chat_review_requests")
+    op.drop_index("ix_chat_review_requests_message_id", table_name="chat_review_requests")
+    op.drop_index("ix_chat_review_requests_conversation_id", table_name="chat_review_requests")
+    op.drop_table("chat_review_requests")
 
     op.drop_index("ix_image_uploads_sha256", table_name="image_uploads")
     op.drop_index("ix_image_uploads_owner_id", table_name="image_uploads")

@@ -40,6 +40,7 @@ Flutter 3.47.9 / Dart 3.13.7.
 | FND-20 | §5.7; CHAT-02 | Upload a non-image and a corrupt image | `415 unsupported_media_type` and `422 invalid_image`; no file is stored | `backend/tests/test_chat_api.py::test_upload_rejects_a_non_image`, `test_upload_rejects_corrupt_bytes` | Verified |
 | FND-21 | CHAT-07 | Upload a dark or too-small image and send it | Reply is `abstained` with `quality_gate_failed`, the quality flag and a retake step; no candidates | `backend/tests/test_chat_api.py::test_dark_image_fails_the_demo_quality_gate`, `test_quality_failure_abstains_with_a_retake`, `test_small_image_is_low_resolution` | Verified (demo gate) |
 | FND-22 | CHAT-09; CHAT-18 | Request expert review twice on one assistant message | One persisted review request; replay returns the same id; the assessment is unchanged; a user message is rejected with `400` | `backend/tests/test_chat_api.py::test_review_request_is_persisted_and_idempotent`, `test_review_on_a_user_message_is_rejected` | Verified |
+| FND-23 | §5.1 schema authority; ADR-002 | Import the domain ORM and the chat ORM into one metadata, then create the schema on SQLite | Both modules import together; no duplicate-table error; `Base.metadata.create_all` creates 48 tables including `chat_review_requests`; the observation `review_requests` table is separate | `python -c "import app.db.models"`; `python -c "from app.db.base import Base; import app.db.models; ...create_all..."` on 2026-11-06 | Verified |
 
 ---
 

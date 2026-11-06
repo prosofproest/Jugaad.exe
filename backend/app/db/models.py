@@ -25,6 +25,16 @@ from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
 from app.db.base import Base, TimestampMixin, UTCDateTime, new_id, utc_now
+from app.modules.conversations import orm as _chat_orm
+
+# Re-export the chat models so ``app.db.models`` remains the single import
+# surface for ORM models. The chat schema is owned by the conversations module
+# and migrated by Alembic ``0002_chat_persistence``.
+Conversation = _chat_orm.ConversationRow
+Message = _chat_orm.MessageRow
+MessageEvent = _chat_orm.MessageEventRow
+ImageUpload = _chat_orm.ImageUploadRow
+ChatReviewRequest = _chat_orm.ReviewRequestRow
 
 
 # ---------------------------------------------------------------------------
@@ -158,7 +168,9 @@ class Geography(Base):
     level: Mapped[str] = mapped_column(String(30), nullable=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     parent_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    boundary_version: Mapped[str] = mapped_column(String(60), default="demo-2026-11", nullable=False)
+    boundary_version: Mapped[str] = mapped_column(
+        String(60), default="demo-2026-11", nullable=False
+    )
     valid_from: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
     valid_to: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
 
@@ -213,7 +225,9 @@ class CropCycle(Base):
     __tablename__ = "crop_cycles"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("cyc"))
-    growing_area_id: Mapped[str] = mapped_column(ForeignKey("growing_areas.id"), nullable=False, index=True)
+    growing_area_id: Mapped[str] = mapped_column(
+        ForeignKey("growing_areas.id"), nullable=False, index=True
+    )
     crop_code: Mapped[str] = mapped_column(ForeignKey("crops.code"), nullable=False)
     variety: Mapped[str | None] = mapped_column(String(120), nullable=True)
     planting_date: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
@@ -236,7 +250,9 @@ class Observation(Base, TimestampMixin):
     client_report_id: Mapped[str] = mapped_column(String(128), nullable=False)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     subject_user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
-    growing_area_id: Mapped[str | None] = mapped_column(ForeignKey("growing_areas.id"), nullable=True)
+    growing_area_id: Mapped[str | None] = mapped_column(
+        ForeignKey("growing_areas.id"), nullable=True
+    )
     area_code: Mapped[str] = mapped_column(String(64), nullable=False)
     crop_code: Mapped[str] = mapped_column(ForeignKey("crops.code"), nullable=False)
     variety: Mapped[str | None] = mapped_column(String(120), nullable=True)
@@ -254,7 +270,9 @@ class ImageAsset(Base):
     __table_args__ = (Index("ix_image_assets_hash", "content_hash"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("img"))
-    observation_id: Mapped[str] = mapped_column(ForeignKey("observations.id"), nullable=False, index=True)
+    observation_id: Mapped[str] = mapped_column(
+        ForeignKey("observations.id"), nullable=False, index=True
+    )
     storage_key: Mapped[str] = mapped_column(String(400), nullable=False)
     original_width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     original_height: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -300,7 +318,9 @@ class ReviewRequest(Base):
     __tablename__ = "review_requests"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("rrq"))
-    observation_id: Mapped[str] = mapped_column(ForeignKey("observations.id"), nullable=False, index=True)
+    observation_id: Mapped[str] = mapped_column(
+        ForeignKey("observations.id"), nullable=False, index=True
+    )
     requested_by: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
     status: Mapped[str] = mapped_column(String(30), default="open", nullable=False)
@@ -354,9 +374,7 @@ class ReviewEvent(Base):
 class ObservationVerification(Base):
     __tablename__ = "observation_verification"
 
-    observation_id: Mapped[str] = mapped_column(
-        ForeignKey("observations.id"), primary_key=True
-    )
+    observation_id: Mapped[str] = mapped_column(ForeignKey("observations.id"), primary_key=True)
     status: Mapped[str] = mapped_column(String(30), default="pending_review", nullable=False)
     evidence_tier: Mapped[str] = mapped_column(String(30), default="unverified", nullable=False)
     verified_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
@@ -369,7 +387,9 @@ class ReviewAssignment(Base):
     __tablename__ = "review_assignments"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("ras"))
-    observation_id: Mapped[str] = mapped_column(ForeignKey("observations.id"), nullable=False, index=True)
+    observation_id: Mapped[str] = mapped_column(
+        ForeignKey("observations.id"), nullable=False, index=True
+    )
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     area_code: Mapped[str] = mapped_column(String(64), nullable=False)
     assigned_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
@@ -425,7 +445,9 @@ class Forecast(Base):
     valid_to: Mapped[datetime] = mapped_column(UTCDateTime, nullable=False)
     risk_band: Mapped[str] = mapped_column(String(30), nullable=False)
     probability: Mapped[float | None] = mapped_column(Numeric(6, 5), nullable=True)
-    confidence_band: Mapped[str] = mapped_column(String(20), default="not_calibrated", nullable=False)
+    confidence_band: Mapped[str] = mapped_column(
+        String(20), default="not_calibrated", nullable=False
+    )
     coverage: Mapped[str] = mapped_column(String(20), default="unknown", nullable=False)
     coverage_detail: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     drivers: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
@@ -480,7 +502,9 @@ class AdvisoryVersion(Base):
     __table_args__ = (UniqueConstraint("advisory_id", "version", name="uq_advisory_version"),)
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("advv"))
-    advisory_id: Mapped[str] = mapped_column(ForeignKey("advisories.id"), nullable=False, index=True)
+    advisory_id: Mapped[str] = mapped_column(
+        ForeignKey("advisories.id"), nullable=False, index=True
+    )
     version: Mapped[int] = mapped_column(Integer, nullable=False)
     body_md: Mapped[str] = mapped_column(Text, nullable=False)
     action_types: Mapped[list] = mapped_column(JSON, default=list, nullable=False)
@@ -498,7 +522,9 @@ class AdvisoryApproval(Base):
     __tablename__ = "advisory_approvals"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("adva"))
-    version_id: Mapped[str] = mapped_column(ForeignKey("advisory_versions.id"), nullable=False, index=True)
+    version_id: Mapped[str] = mapped_column(
+        ForeignKey("advisory_versions.id"), nullable=False, index=True
+    )
     approver_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
     role: Mapped[str] = mapped_column(String(40), nullable=False)
     approved_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
@@ -559,7 +585,9 @@ class AlertFeedback(Base):
     __tablename__ = "alert_feedback"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("afb"))
-    delivery_id: Mapped[str] = mapped_column(ForeignKey("alert_deliveries.id"), nullable=False, index=True)
+    delivery_id: Mapped[str] = mapped_column(
+        ForeignKey("alert_deliveries.id"), nullable=False, index=True
+    )
     rating: Mapped[str] = mapped_column(String(30), nullable=False)
     reason: Mapped[str | None] = mapped_column(String(300), nullable=True)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
@@ -661,59 +689,24 @@ class SystemConfig(Base):
 # ---------------------------------------------------------------------------
 # Conversations
 # ---------------------------------------------------------------------------
-class Conversation(Base, TimestampMixin):
-    __tablename__ = "conversations"
-    __table_args__ = (Index("ix_conversations_owner_updated", "owner_id", "updated_at"),)
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("cnv"))
-    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id"), nullable=False)
-    title: Mapped[str | None] = mapped_column(String(300), nullable=True)
-    crop_code: Mapped[str | None] = mapped_column(String(60), nullable=True)
-    area_code: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    last_message_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
-    unread_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    deleted_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
-
-
-class Message(Base):
-    __tablename__ = "messages"
-    __table_args__ = (
-        UniqueConstraint("conversation_id", "client_message_id", name="uq_message_client"),
-        Index("ix_messages_conversation_created", "conversation_id", "created_at"),
-    )
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("msg"))
-    conversation_id: Mapped[str] = mapped_column(
-        ForeignKey("conversations.id"), nullable=False
-    )
-    role: Mapped[str] = mapped_column(String(20), nullable=False)
-    kind: Mapped[str] = mapped_column(String(30), nullable=False)
-    text: Mapped[str | None] = mapped_column(Text, nullable=True)
-    client_message_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
-    reply_to_message_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    observation_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    assessment_id: Mapped[str | None] = mapped_column(String(64), nullable=True)
-    model_version: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    generated_at: Mapped[datetime | None] = mapped_column(UTCDateTime, nullable=True)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
-    is_demo: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
-
-
+# The chat schema (``conversations``, ``messages``, ``message_events``,
+# ``image_uploads`` and ``chat_review_requests``) is owned by the
+# ``conversations`` module and migrated by Alembic ``0002_chat_persistence``.
+# It is re-exported above so ``app.db.models`` remains the single import
+# surface for ORM models. ``ReviewRequest`` earlier in this file is the
+# observation-review queue (``review_requests``); the chat request is a
+# separate table (``chat_review_requests``) so the two workflows cannot be
+# confused.
 class MessageAttachment(Base):
+    """Optional link from a chat message to a stored image asset.
+
+    Not used by the Phase 2 chat slice, which stores the image descriptor on
+    ``messages.image``; kept for the observation/image-asset integration.
+    """
+
     __tablename__ = "message_attachments"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("mat"))
     message_id: Mapped[str] = mapped_column(ForeignKey("messages.id"), nullable=False, index=True)
     image_id: Mapped[str] = mapped_column(ForeignKey("image_assets.id"), nullable=False)
-    created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
-
-
-class MessageEvent(Base):
-    __tablename__ = "message_events"
-
-    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("mev"))
-    message_id: Mapped[str] = mapped_column(ForeignKey("messages.id"), nullable=False, index=True)
-    type: Mapped[str] = mapped_column(String(60), nullable=False)
-    payload: Mapped[dict] = mapped_column(JSON, default=dict, nullable=False)
     created_at: Mapped[datetime] = mapped_column(UTCDateTime, default=utc_now, nullable=False)
