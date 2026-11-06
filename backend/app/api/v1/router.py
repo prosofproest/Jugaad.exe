@@ -14,14 +14,17 @@ from app.api.v1 import (
     assessments,
     auth,
     conversations,
+    expert_verification,
     forecast,
     health,
     hexagons,
     hotspots,
+    inspections,
     map,
     me,
     observations,
     regional_overview,
+    recovery,
     review,
     tasks,
     uploads,
@@ -83,3 +86,12 @@ api_router.include_router(weather.router)
 
 # Regional overview
 api_router.include_router(regional_overview.router)
+
+# Inspection results
+api_router.include_router(inspections.router)
+
+# Expert verification
+api_router.include_router(expert_verification.router)
+
+# Recovery monitoring
+api_router.include_router(recovery.router)
