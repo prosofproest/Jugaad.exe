@@ -34,8 +34,8 @@ liability surface or alert fatigue.
 | `title` | yes | Plain language, no alarmism |
 | `body` | yes | Structured sections, see below |
 | `action_types` | yes | From the allowed list |
-| `author_id` | yes | Named agronomist |
-| `approver_id` | yes | Second qualified person |
+| `author_id` | yes | Named agronomist or pathologist |
+| `approver_id` | yes | Second qualified person holding `agronomist` or `pathologist`; must differ from `author_id` |
 | `source` | yes | Institutional source / reference |
 | `version` | yes | Immutable version per edit |
 | `content_hash` | yes | Detects unauthorised edits |
@@ -91,7 +91,12 @@ draft (author)
 
 Rules:
 
-- Author cannot be the sole approver.
+- Author cannot be the sole approver. The approver must hold `agronomist` or
+  `pathologist` and must be a different person from the author.
+- The programme must maintain at least **two** qualified accounts (any mix of
+  `agronomist` and `pathologist`) before any advisory can be published. With only one, the
+  release is blocked; this is a staffing requirement carried under D3, not a reason to
+  relax the rule.
 - Every edit creates a new version; published versions are immutable.
 - Changing content requires re-approval and a new version.
 - Expiry is mandatory; the API never serves expired content.

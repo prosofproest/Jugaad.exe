@@ -149,18 +149,21 @@ Model accuracy alone is not success.
 
 ### 4.2 v1 roles
 
-Only four roles exist in v1:
+Five roles exist in v1. `agronomist` was added by decision D13 so that advisory
+content and risk bands can be approved by a named qualified person, without inventing a
+second permission system. It carries no verification rights.
 
 | Role | Purpose |
 |---|---|
 | `farmer` | Submits reports, reads advisories |
 | `extension_worker` | Verifies reports, captures on behalf of farmers, shares advisories |
 | `pathologist` | Escalation reviewer, taxonomy owner, label correction, advisory approval |
+| `agronomist` | Advisory author and second approver, risk-band approval, read-only area visibility; cannot verify cases |
 | `admin` | Configuration, users, thresholds, exports, audit |
 
 A user may hold multiple roles, but the active role is explicit in the session. There is no
-public self-registration for `extension_worker`, `pathologist` or `admin`. MFA is required
-for `pathologist` and `admin`.
+public self-registration for `extension_worker`, `pathologist`, `agronomist` or `admin`.
+MFA is required for `pathologist`, `agronomist` and `admin`.
 
 ### 4.3 Stakeholders
 
@@ -217,7 +220,7 @@ Team:         7–9 people
 | Multi-language beyond one | Farm-level risk precision |
 | Multi-crop | Universal all-crop diagnosis |
 | IoT sensors | Confirmed-outbreak claims |
-| RBAC beyond the four roles | Public exact farm coordinates |
+| RBAC beyond the five roles | Public exact farm coordinates |
 | Automated retraining | Automated model promotion |
 | Group chat / voice notes | Yield-impact claims without a study design |
 
@@ -392,7 +395,7 @@ capability and the spec that owns it.
 
 | ID | Capability | Requirement summary | Owner spec |
 |---|---|---|---|
-| PRD-F-01 | Identity and access | Phone-OTP farmers; provisioned staff accounts; four roles; MFA for privileged roles; deny by default; object-level access | `03-auth-and-roles.md` |
+| PRD-F-01 | Identity and access | Phone-OTP farmers; provisioned staff accounts; five roles; MFA for privileged roles; deny by default; object-level access | `03-auth-and-roles.md` |
 | PRD-F-02 | Consent and privacy | Plain-language consent; versioned and auditable; privacy requests; retention and deletion | `03-auth-and-roles.md` |
 | PRD-F-03 | Crop and area context | Supported-crop list; approximate area; optional variety/stage; unknown allowed | `02-reporting-and-capture.md` |
 | PRD-F-04 | Capture and quality | Camera/gallery; guidance; on-device pre-check; retake; metadata; compression | `02-reporting-and-capture.md` |

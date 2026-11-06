@@ -942,7 +942,7 @@ band. Late-arriving reports never rewrite a past forecast; they are used in the 
 
 | Control | Requirement |
 |---|---|
-| Authentication | Short-lived access token + rotating refresh token; phone OTP for farmers; Argon2id for staff passwords; MFA for pathologist/admin |
+| Authentication | Short-lived access token + rotating refresh token; phone OTP for farmers; Argon2id for staff passwords; MFA for pathologist/agronomist/admin |
 | Authorisation | Role dependency on every route; deny by default; object-level ownership; area scoping in the query |
 | Transport | TLS everywhere; HSTS |
 | Storage | Encrypted volumes at rest; private object storage; presigned URLs ≤ 10 min |

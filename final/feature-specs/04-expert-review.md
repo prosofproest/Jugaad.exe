@@ -25,6 +25,7 @@ in under two minutes, and escalate the rest with full context preserved.
 |---|---|
 | `extension_worker` | Work assigned area queue; set `probable`, `needs_visit`, `duplicate`, `unresolved`; request pathologist confirmation |
 | `pathologist` | All extension actions + `confirmed`, label correction, severity, lab evidence, taxonomy questions |
+| `agronomist` | Read-only area queue and case evidence for advisory and risk context; **cannot** set verification status or correct labels |
 | `admin` | Configure queue rules and SLA; reassign; **cannot** set verification status |
 
 ---

@@ -75,7 +75,7 @@ audit_events
 | Table | Key columns | Notes |
 |---|---|---|
 | `users` | id, phone_e164 (unique, nullable), email (unique, nullable), password_hash, status, locale, token_version, created_at, deleted_at | Farmer has phone; staff has email |
-| `roles` | code (`farmer`,`extension_worker`,`pathologist`,`admin`), description | Seeded |
+| `roles` | code (`farmer`,`extension_worker`,`pathologist`,`agronomist`,`admin`), description | Seeded |
 | `user_roles` | user_id, role_code, granted_by, granted_at, revoked_at | History preserved |
 | `devices` | id, user_id, platform, app_version, last_seen_at, push_token | No advertising IDs |
 | `consents` | id, user_id, type, version, granted, text_hash, channel, created_at | Append-only |

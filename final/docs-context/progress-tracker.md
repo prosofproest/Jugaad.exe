@@ -297,6 +297,34 @@ offline user sees between capture and sync.
 saving or submitting a report (R8), and the server quality gate remains authoritative for
 assessment (FR-02-12).
 
+### D13 — `agronomist` as a fifth role `[x]`
+
+**Accepted 2026-11-06.** `agronomist` is a fifth RBAC role, not an attribute on
+`pathologist` and not an external approver who never logs in.
+
+**Why:** advisory approval was impossible to perform as specified — the role matrix had no
+agronomist column, yet `07-advisory-and-alerts.md` required a named agronomist as author and
+a second qualified approver, and `06-forecast-and-risk-map.md` required agronomist threshold
+approval. `update.md:38` also makes expert capacity the binding constraint, so a design that
+needed two pathologists (one to author, one to approve) was unstaffable.
+
+**What `agronomist` can do:** author and approve advisory content; approve risk bands and
+threshold changes as second approver; read area queue, case evidence and map layers
+read-only.
+
+**What it cannot do:** set verification status, correct labels, create or upload
+observations, manage users, export, or read the audit log. Author ≠ approver is enforced per
+record (`author_id != approver_id`), so one account holding both roles still cannot
+self-approve.
+
+**Consequence — capacity:** the programme must staff at least **two** qualified accounts
+(any mix of `agronomist` and `pathologist`) before any advisory can be published. With one,
+publication is blocked. This is tracked under D3 and R-03, not resolved by relaxing the rule.
+
+**Owner:** Product lead + programme lead. **Recorded:** 2026-11-06.
+**Implemented in:** `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `04-expert-review.md`
+§2; `05-data-layer.md` §4.1; `07-advisory-and-alerts.md` §2–§3; `phase-plan.md` §5.2.
+
 ---
 
 ## 5. ADR log
@@ -352,6 +380,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Added `final/PRD.md` and `final/TRD.md`: consolidated product and technical requirements distilled from the operating docs, feature specs and phase plan. No gate, scope or decision changed. |
 | 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
 | 2026-11-06 | Made full-stack delivery explicit (backend API + Next.js web app + Flutter mobile app) and added `feature-specs/08-conversational-capture.md`: chat on web and mobile where a user sends an image and receives a structured, validator-checked assessment reply. Updated PRD, TRD, architecture, UI, phase plan, AGENTS and READMEs. Added ADR-007/008 and R-17–R-19. |
+| 2026-11-06 | **D13 accepted:** `agronomist` added as a fifth role (advisory author/approver, risk-band approval, read-only area; cannot verify cases). Updated the RBAC matrix, MFA list and acceptance criteria in `03-auth-and-roles.md`; role lists in `PRD.md`, `phase-plan.md` and `05-data-layer.md`; review-role table in `04-expert-review.md`; advisory author/approver rules in `07-advisory-and-alerts.md`. Publication now requires two qualified accounts (D3 capacity). |
 
 ---
 

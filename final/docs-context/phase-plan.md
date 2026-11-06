@@ -328,8 +328,9 @@ Phase 3 supplies the real model.
 ### 5.2 Identity, roles, consent and privacy
 
 - Implement phone-OTP registration for farmers; provisioned accounts for extension workers,
-  pathologists and admins.
-- Four roles only; deny by default; object-level access checks; MFA for pathologist/admin.
+  pathologists, agronomists and admins.
+- Five roles only; deny by default; object-level access checks; MFA for
+  pathologist/agronomist/admin.
 - Capture consent in plain language; record consent version and timestamp.
 - Add privacy-request handling, retention jobs and account deletion procedures.
 - Audit role changes, admin record views and exports with a recorded reason.

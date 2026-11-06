@@ -15,7 +15,7 @@ conflate) are hard; the performance rules are soft. A system that abstained on e
 and returned `insufficient_data` for every area would have satisfied every gate as written.
 
 This audit closes that gap structurally and converts the unowned gaps into blocking
-decisions D7–D12.
+decisions D7–D13.
 
 ---
 
@@ -35,6 +35,7 @@ decisions D7–D12.
 | 10 | On-device pre-check separated from on-device model inference | `02-reporting-and-capture.md` §11, D12 |
 | 11 | Flutter tooling marked provisional until ADR-006 is Accepted | `code-standards.md` §4 |
 | 12 | Entry-point scope wording marked pending D1/D2/D4 | `docs-context/AGENTS.md` §1 |
+| 13 | `agronomist` added as a fifth RBAC role (D13); advisory approval now performable | `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `07-advisory-and-alerts.md` §2–§3 |
 
 ---
 
@@ -114,7 +115,7 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 | ID | Contradiction | Evidence | Disposition |
 |---|---|---|---|
 | X-1 | On-device pre-check was a MUST while on-device inference was explicitly rejected, with no mechanism, threshold or budget specified | `02:105` vs `02:292`, `architecture-context.md:45`, `TRD.md:154` | D12 + interim rule: pre-check is advisory, server gate authoritative |
-| X-2 | "Four roles only" but an agronomist is required as advisory author, approver, forecast approver and D1 owner; `03:58` gates approval on an "agronomist sign-off role" that does not exist | `03:16,58`, `07:37,86`, `06:4` | **Open** — needs a role-model decision (see §5) |
+| X-2 | "Four roles only" but an agronomist is required as advisory author, approver, forecast approver and D1 owner; `03:58` gated approval on an "agronomist sign-off role" that did not exist | `03:16,58`, `07:37,86`, `06:4` | **Fixed by D13** — `agronomist` added as a fifth role; matrix, MFA, seed and acceptance criteria updated |
 | X-3 | `probable` ambiguity: the forecast filter is `verified_at IS NOT NULL`, and `probable` also sets `verified_at`, so probable cases enter as verified although R4 authorises only confirmed | `AGENTS.md:88`, `ai-workflow-rules.md:115`, `05:117`, `04:296` | D7 |
 | X-4 | ADR-005/006 were "Proposed" while Flutter and ONNX were enforced as standards | `progress-tracker.md:215`, `architecture-context.md:329-330`, `code-standards.md:120` | Code standards now marked provisional until ADR-006 is Accepted |
 | X-5 | Raw scores were returned to clients while three documents forbade exactly that | `TRD.md:523` vs `TRD.md:438`, `architecture-context.md:253`, `01:121` | `TRD.md` example replaced with band-only |
@@ -166,23 +167,20 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 These need a human decision, not an edit. They are recorded as open above; nothing here
 should be resolved by an agent picking a default.
 
-1. **The role model (X-2).** Whether "agronomist" is a fifth role, an attribute of
-   `pathologist`, or an external approver who never logs in. Every advisory approval path
-   depends on the answer, and `update.md:38` says expert capacity is the binding constraint.
-2. **Scheduled absence sampling (C-2).** Whether field capacity exists to collect verified
+1. **Scheduled absence sampling (C-2).** Whether field capacity exists to collect verified
    negatives. If not, the product must stop implying discrimination metrics.
-3. **Numeric floors (C-1, C-3).** Must come from measurement under D8, not from this audit.
+2. **Numeric floors (C-1, C-3).** Must come from measurement under D8, not from this audit.
    R6 forbids inventing them, and inventing them here would have created the very defect
    this audit exists to find.
-4. **Schedule and budget (X-9, X-10).** Both are currently unachievable as written and need
+3. **Schedule and budget (X-9, X-10).** Both are currently unachievable as written and need
    re-basing against the actual team and the actual season window.
-5. **Data controller (G-25, D10).** Determines consent wording, retention values and the
+4. **Data controller (G-25, D10).** Determines consent wording, retention values and the
    lawful basis for image collection.
-6. **The design authority and the chatbot folder (X-11 to X-13).** Two artifacts appeared
+5. **The design authority and the chatbot folder (X-11 to X-13).** Two artifacts appeared
    during this audit that the rules forbid or exclude. Neither can be reconciled by editing
    a spec: `DESIGN.md` must either go or be formally demoted, and `chatbot/` needs an ADR or
    deletion before someone scaffolds into it.
-7. **Whether to keep the forecast track in v1 at all.** Given C-2, C-5 and G-11, the honest
+6. **Whether to keep the forecast track in v1 at all.** Given C-2, C-5 and G-11, the honest
    options are: invest in absence sampling and a blinded label pipeline, or ship photo
    assessment only and move the area outlook to v2. That is a scope decision above this
    audit's authority.
