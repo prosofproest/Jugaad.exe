@@ -39,9 +39,12 @@ every phase are in `./phase-plan.md`; this section is the live status view.
 - [ ] **D4** Owning/paying institution identified.
 - [ ] **D5** Primary outcome metric pre-registered.
 - [ ] **D6** Legal position on advisory content confirmed.
+- [ ] **D7–D12** Scientific-integrity decisions recorded (see §4).
 - [ ] Crop calendar and epidemic window documented for the pilot area.
 
-**Gate 0:** D1–D6 answered and recorded in §4. No code that depends on them.
+**Gate 0:** D1–D12 answered and recorded in §4, each with a recorded date and one named
+accountable owner. Gate 0 carries a calendar target (proposed: **2026-11-20**, confirmed at
+the decision workshop) so that it cannot close by definition. No code that depends on them.
 
 ### Phase 1 — Data foundation `[ ]`
 
@@ -80,8 +83,10 @@ low-end device. No model required.
 - [ ] ONNX export, registry entry, versioned serving.
 - [ ] Result card with top-3, confidence band, quality flags, escalation.
 
-**Gate 3:** performance reported at the shipped abstention threshold on a field-only
-test set, with sample counts; abstention works on hard negatives.
+**Gate 3:** the D8 floors are **met**, not merely reported, at the shipped abstention
+threshold on the frozen field-only test set, with sample counts and confidence intervals;
+abstention behaviour is reported on hard negatives. A performance number that does not
+clear the pre-registered floor fails the gate.
 
 ### Phase 4 — Forecasting `[ ]`
 
@@ -95,8 +100,10 @@ test set, with sample counts; abstention works on hard negatives.
 - [ ] Temporal holdout evaluation; calibration report.
 - [ ] Alert trigger, dedupe, cooldown, delivery status.
 
-**Gate 4:** forecast is reproducible from a stored snapshot; no-score path verified;
-map never merges reports and predictions; thresholds approved by agronomist.
+**Gate 4:** the D7 event definition and label maturity rule are fixed and frozen before the
+test season; the D9 coverage, freshness and suppression values are recorded and approved;
+the forecast is reproducible from a stored snapshot; the no-score path is verified against
+those values; the map never merges reports and predictions.
 
 ### Phase 5 — Pilot `[ ]`
 
@@ -108,8 +115,10 @@ map never merges reports and predictions; thresholds approved by agronomist.
 - [ ] Lead-time measurement against baseline.
 - [ ] Weekly review cadence and issue log.
 
-**Gate 5:** silent-phase evidence reviewed; alert response workflow staffed; no unresolved
-safety issue. Pilot timed to the epidemic season.
+**Gate 5:** silent-phase evidence reviewed against the D5 pre-registered metric; alert
+response workflow staffed; every logged safety issue either closed or explicitly accepted in
+writing by the D6 owner ("unresolved" means neither, and blocks). Pilot timed to the
+epidemic season.
 
 ### Phase 6 — Rollout `[ ]`
 
@@ -148,6 +157,12 @@ safety issue. Pilot timed to the epidemic season.
 
 Record: decision, options, consequence, owner, date. Do not delete history.
 
+Every decision carries **one named accountable owner** and a **`Needs by` date tied to a
+phase gate**. A decision with neither cannot be counted as answered, and Gate 0 cannot
+close while any remain open. Where a decision needs a number that the repository is not
+entitled to invent (R6), the decision must still define *who sets the number, from what
+measurement, before which gate* — the rule for setting the value is itself the decision.
+
 ### D1 — Crop + targets + zone `[?]`
 
 | Option | Consequence |
@@ -158,7 +173,7 @@ Record: decision, options, consequence, owner, date. Do not delete history.
 
 Recommended default: **potato late blight**, one zone, plus healthy + abiotic look-alike +
 unknown. Final choice requires local economic and partner input.
-**Owner:** Product lead + agronomist. **Needed by:** Gate 0.
+**Owner:** Product lead + agronomist. **Needs by:** Gate 0 (target 2026-11-20).
 
 ### D2 — Nowcast or 7-day outlook `[?]`
 
@@ -168,7 +183,7 @@ unknown. Final choice requires local economic and partner input.
 | 7-day outlook | Needs validation against outcomes; risk of overclaiming in year one |
 
 Recommended default: **nowcast for v1**, add outlook when a season of verified outcomes
-exists. **Owner:** Agronomist + ML lead.
+exists. **Owner:** Agronomist + ML lead. **Needs by:** Gate 0.
 
 ### D3 — Verifier, capacity, SLA `[?]`
 
@@ -178,28 +193,100 @@ exists. **Owner:** Agronomist + ML lead.
 | Pathologist-first | Higher label quality; immediate backlog; not viable at volume |
 
 Recommended default: **extension-first**, pathologist escalation, published SLA and
-workload cap. **Owner:** Programme lead + partner.
+workload cap. **Owner:** Programme lead + partner. **Needs by:** Gate 0.
 
 ### D4 — Owning/paying institution `[?]`
 
 Options: government agriculture department, cooperative/FPO, NGO programme, crop insurer.
 Recommended default: **grant/NGO-funded pilot → cooperative or insurer operations**.
 Input-company funding for the advisory layer is rejected on trust grounds.
-**Owner:** Product lead.
+**Owner:** Product lead. **Needs by:** Gate 0.
 
 ### D5 — Primary outcome metric `[?]`
 
 Recommended default: **median lead time from first farmer report to verified expert
 confirmation**, versus the existing advisory baseline, pre-registered. Secondary:
 prioritisation accuracy, false-alert burden.
-**Owner:** Product lead + evaluator.
+**Owner:** Product lead + evaluator. **Needs by:** Gate 0.
 
 ### D6 — Legal position on advisory content `[?]`
 
 Options: non-chemical only (recommended), approved chemical content with legal sign-off
 (not recommended for v1), no advisory in v1 (weakens product).
 Recommended default: **non-chemical + escalation**, legal review before pilot.
-**Owner:** Programme lead + legal.
+**Owner:** Programme lead + legal. **Needs by:** Gate 0 (legal sign-off before Gate 5).
+
+### D7 — Forecast event, negative class and label eligibility `[?]`
+
+The forecast track currently has no observable negative class, and `probable` may or may not
+count as verified — two readings are both valid today.
+
+| Option | Consequence |
+|---|---|
+| Presence / first-verified-case event | No denominator needed; cannot report PR-AUC or Brier honestly; must be framed as positive-unlabelled |
+| Scheduled absence sampling (scouting rounds record verified negatives) | Enables real discrimination metrics; needs field capacity per D3 |
+
+Must also decide: whether `probable` is eligible for forecast features (recommended: yes,
+with an evidence tier, and `unverified` never eligible); the as-of label rule
+(`verified_at <= cutoff`, event date <= cutoff); and the label-maturity embargo before a
+season is frozen as test data.
+**Owner:** ML lead + agronomist + pathologist. **Needs by:** Gate 0; frozen before Gate 4.
+**Blocks:** `06-forecast-and-risk-map.md` §6, `04-expert-review.md` §16 Q2, `05-data-layer.md`
+`observation_verification`.
+
+### D8 — Abstention rule and numeric acceptance floors `[?]`
+
+Decision function (e.g. calibrated max-probability below τ, plus margin/entropy and an
+out-of-distribution distance), per-class τ, risk–coverage target, and the override policy
+with audit fields — **plus the numeric floors** for Gates 3–5: minimum per-class recall,
+maximum abstention rate, minimum share of area-days scored, and minimum lift over a
+climatology/naive baseline.
+
+R6 forbids inventing these numbers. The decision is therefore the *rule*: measure the
+Phase-3 baseline, then pre-register the floors in this section before the frozen test set is
+opened. Floors set after seeing test results are void.
+**Owner:** ML lead + product lead + evaluator. **Needs by:** before Gate 3 exit.
+**Blocks:** Gate 3, Gate 4, `ml-models.md` §abstention, `01-design-system.md` confidence bands.
+
+### D9 — Coverage, freshness and suppression values `[?]`
+
+Coverage formula with numerator, denominator and window (active reporters per area per
+window, report completeness, weather freshness, representativeness — **not** reporter count
+alone, which is gameable); the minimum value that permits a scored band and an alert; the
+weather freshness threshold; the aggregation unit and coordinate precision; and the small-
+count suppression threshold applied consistently to map, API and exports.
+**Owner:** Data engineer + product lead + legal. **Needs by:** Gate 4.
+
+### D10 — Retention, deletion and derived-data policy `[?]`
+
+Per-entity deletion matrix including `image_predictions`, `feature_snapshots`, the frozen
+test set, backups and trained weights; whether model weights are derived personal data;
+tombstone erasure applied on restore; on-device TTL, encryption at rest and wipe-on-logout
+for unsent images; and the named data controller (see also `03-auth-and-roles.md` §13 Q3).
+**Owner:** Programme lead + legal + engineering lead. **Needs by:** Gate 2 (capture starts
+there, so the policy must precede it).
+
+### D11 — Identity model for on-behalf capture and offline sessions `[?]`
+
+Separate `reporter_id` (actor) from `subject_user_id` (farmer) with on-behalf authorisation;
+object-level access rules; idempotency scope; and the offline session policy — maximum
+offline period, whether capture continues after the 15-minute access token expires, and how
+role revocation and logout-all reach a device that is offline for ≥ 7 days (required by
+`02-reporting-and-capture.md` §8).
+**Owner:** Backend lead + product lead. **Needs by:** Gate 2.
+
+### D12 — Client-side quality pre-check mechanism `[?]`
+
+FR-02-07 requires an on-device pre-check, while `architecture-context.md` §2 rejects
+on-device inference and `02-reporting-and-capture.md` §11 lists it as out of scope.
+Decide: deterministic heuristics (blur/exposure/resolution) with plant-presence as
+guidance only, or a small on-device model (which needs an ADR reversing the architecture
+stance). Record framework, size, thresholds, latency and battery budget, and state what an
+offline user sees between capture and sync.
+**Owner:** Mobile lead + ML lead. **Needs by:** Gate 2.
+**Interim rule until decided:** the client pre-check is advisory only. It must never block
+saving or submitting a report (R8), and the server quality gate remains authoritative for
+assessment (FR-02-12).
 
 ---
 
@@ -249,6 +336,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Aligned the full documentation set to the supplied 55-chapter blueprint. Added `data-foundation.md`, `ml-models.md`, `operations-and-pilot.md`, `roadmap-and-resources.md`, `appendices.md`, and the chapter map in `README.md`. Expanded overview, architecture, UI, code standards, workflow rules and feature specs. No scope decision changed; D1–D6 remain open. |
 | 2026-11-06 | Added `phase-plan.md`: a detailed per-phase work breakdown (workstreams, deliverables, exit gates, owners, dependencies and explicit exclusions for Phases 0–6). Linked it from the README, `AGENTS.md`, `project-overview.md` and `roadmap-and-resources.md`. No gate, scope or decision changed. |
 | 2026-11-06 | Added `final/PRD.md` and `final/TRD.md`: consolidated product and technical requirements distilled from the operating docs, feature specs and phase plan. No gate, scope or decision changed. |
+| 2026-11-06 | Loophole audit applied. Added decisions D7–D12 (forecast event/negative class, abstention rule + numeric floors, coverage/freshness/suppression values, retention/deletion, on-behalf identity + offline sessions, client pre-check mechanism). Gate 0 now needs a calendar target and named owners; Gates 3–5 now require floors to be **met**, not merely reported, and require D7/D9 values. Fixed internal contradictions: `ui-context.md` status tokens and calibration copy, `01-design-system.md` status token list, `TRD.md` raw-score example, `02-reporting-and-capture.md` on-device scope, `code-standards.md` ADR gating, `AGENTS.md` scope wording. Findings: `../audit/loopholes-2026-11-06.md`. |
 
 ---
 
