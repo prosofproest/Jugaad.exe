@@ -3,7 +3,7 @@
 **Product:** PS-03 — AI-Based Early Pest and Disease Outbreak Prediction Network
 **Document type:** Product Requirements Document
 **Version:** 1.1
-**Status:** Draft for review — full-stack build: backend API + web + mobile (initial scaffold exists)
+**Status:** Draft for review — full-stack build: backend API + web + mobile (Phase 2 §5.1 scaffold; mobile unverified)
 **Owner:** Product lead
 **Last updated:** 2026-11-06
 

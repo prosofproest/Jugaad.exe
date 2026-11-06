@@ -17,7 +17,9 @@ Short version:
 - **Spec before code.** Update `docs-context/progress-tracker.md` when scope,
   decisions or status change.
 
-Repository status as of 2026-11-06: documentation only. No application code exists yet.
+Repository status as of 2026-11-06: documentation plus a Phase 2 §5.1 engineering
+scaffold (FastAPI, Next.js web client, Flutter shell, compose and CI). No product feature
+is implemented; the web app builds and the mobile shell is unverified. Gate 1 is not met.
 
 The full 55-chapter blueprint and Appendices A–H are mapped to repository files in
 [README.md](README.md). Coverage is documentation, not scope approval: v1 scope is set by

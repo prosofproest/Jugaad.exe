@@ -1,6 +1,6 @@
 # Code standards
 
-**Applies to:** `backend/`, `web/`, `mobile/`, `ml/`, `database/`, `deploy/`.
+**Applies to:** `backend/`, `frontend/` (the web app; ADR-009), `mobile/`, `ml/`, `database/`, `deploy/`.
 **Principle:** optimise for the next person reading the code at 2 a.m. during a pilot,
 not for cleverness.
 **Last updated:** 2026-11-06

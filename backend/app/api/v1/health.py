@@ -4,7 +4,7 @@ Health reports the process state only. It must never imply that models,
 forecasts or data are valid.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from fastapi import APIRouter
 
@@ -20,7 +20,7 @@ def health_payload() -> dict[str, str]:
         "service": settings.app_name,
         "version": settings.version,
         "environment": settings.environment,
-        "time": datetime.now(timezone.utc).isoformat(),
+        "time": datetime.now(UTC).isoformat(),
     }
 
 

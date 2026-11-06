@@ -13,8 +13,26 @@ __pycache__/
 .venv/
 venv/
 .pytest_cache/
+.ruff_cache/
 *.egg-info/
 
-# Local secrets
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+coverage/
+*.tsbuildinfo
+next-env.d.ts
+
+# Flutter / Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+*.iml
+
+# Local secrets and env files
 .env
 .env.local
+.env.*.local

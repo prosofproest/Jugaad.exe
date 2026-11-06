@@ -10,7 +10,7 @@ explains that assessment is not available yet. It never emits a diagnosis or
 chemical advice.
 """
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from app.modules.conversations.models import (
@@ -35,7 +35,7 @@ class MessageNotFoundError(Exception):
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _id(prefix: str) -> str:
@@ -80,8 +80,7 @@ def _demo_reply(conversation_id: str, has_image: bool) -> Message:
     if has_image:
         reason_code = "demo_mode"
         reason_text = (
-            "Demo scaffold only: the image was received but no assessment model "
-            "is connected yet."
+            "Demo scaffold only: the image was received but no assessment model is connected yet."
         )
     else:
         reason_code = "no_image"
@@ -100,10 +99,7 @@ def _demo_reply(conversation_id: str, has_image: bool) -> Message:
         conversation_id=conversation_id,
         role="assistant",
         kind="abstained",
-        text=(
-            "Assistive photo assessment — not a diagnosis. "
-            + reason_text
-        ),
+        text=("Assistive photo assessment — not a diagnosis. " + reason_text),
         assessment=assessment,
         next_steps=["retake"],
         created_at=now,
@@ -111,9 +107,7 @@ def _demo_reply(conversation_id: str, has_image: bool) -> Message:
     )
 
 
-def send_message(
-    conversation_id: str, payload: MessageCreate, idempotency_key: str
-) -> SendResult:
+def send_message(conversation_id: str, payload: MessageCreate, idempotency_key: str) -> SendResult:
     get_conversation(conversation_id)
 
     existing = store.find_by_client_id(conversation_id, payload.client_message_id)
@@ -134,9 +128,7 @@ def send_message(
         client_message_id=payload.client_message_id,
         created_at=now,
     )
-    assistant_message = _demo_reply(
-        conversation_id, has_image=payload.image is not None
-    )
+    assistant_message = _demo_reply(conversation_id, has_image=payload.image is not None)
     store.append(
         conversation_id,
         [user_message, assistant_message],

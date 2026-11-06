@@ -22,6 +22,20 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/v1"
     cors_origins: list[str] = ["http://localhost:3000"]
 
+    # Logging: one JSON event per line, no payloads and no PII.
+    log_level: str = "INFO"
+
+    # Interactive API docs are for dev/staging only; production may disable them.
+    docs_enabled: bool = True
+
+    # SQLAlchemy URL. The pilot runs PostgreSQL 16 + PostGIS; tests that do not
+    # touch a database never open this connection.
+    database_url: str = "postgresql+psycopg://ps03:ps03@localhost:5432/ps03"
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in {"prod", "production"}
+
 
 @lru_cache
 def get_settings() -> Settings:

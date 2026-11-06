@@ -4,8 +4,8 @@
 Update this file in the same change as any scope, schema, API or decision change.
 
 **Last updated:** 2026-11-06
-**Current phase:** Phase 0 — Discovery (documentation complete, decisions open; initial
-full-stack scaffold present but not feature work)
+**Current phase:** Phase 0 — Discovery (documentation complete, decisions open; Phase 2 §5.1
+engineering foundation present under a recorded Gate-1 exception, no feature work)
 
 ---
 
@@ -65,6 +65,11 @@ handbook approved by a pathologist.
 
 ### Phase 2 — Platform MVP `[ ]`
 
+- [~] **§5.1 Engineering foundation** — backend/web/mobile scaffolds, CI,
+      Alembic baseline, local compose, dev/staging env templates, structured
+      logging, OpenAPI/error contract and `../TEST-MATRIX.md`. Gate 1 is **not
+      met**; foundation-only work proceeds under an explicit user instruction
+      recorded 2026-11-06 and adds no schema or feature behaviour.
 - [ ] Auth, roles, consent (`03-auth-and-roles.md`).
 - [ ] Mobile context + capture + quality feedback + offline queue (`02-...`).
 - [ ] Observation API with idempotency and presigned uploads.
@@ -154,10 +159,10 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[~]` | FastAPI health-scaffold exists; identity + observations next |
-| Mobile | `[~]` | Flutter chat/capture scaffold committed; unverified (Flutter not installed here) |
-| Web | `[~]` | Next.js chat/app shell scaffold committed; build/typecheck recorded |
-| Chat | `[~]` | Spec 08 + client/API scaffolds; real assessment waits on Phase 3 |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline, compose; identity + observations next (needs Gate 1 exception) |
+| Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
+| Web | `[~]` | Next.js shell in `frontend/`; typecheck, lint and build pass (2026-11-06) |
+| Chat | `[~]` | Spec 08 + in-memory demo chat API + web/mobile shells; real assessment waits on Phase 3 |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
 | MLOps | `[ ]` | Registry table design in data layer |
@@ -462,6 +467,7 @@ publication is blocked. This is tracked under D3 and R-03, not resolved by relax
 | ADR-006 | Flutter capture + SMS/WhatsApp delivery | Proposed | 2026-11-06 |
 | ADR-007 | Full-stack delivery: one API, web app and mobile app are all in scope | Accepted | 2026-11-06 |
 | ADR-008 | Chat is a `conversations` wrapper over photo assessment, not a new model or generative diagnosis | Accepted | 2026-11-06 |
+| ADR-009 | The Next.js web app lives in `frontend/` (source documents say `web/`); the folder name follows the existing repository layout | Accepted | 2026-11-06 |
 
 ---
 
@@ -507,6 +513,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | **D7 accepted:** forecast negatives come from a pre-registered sentinel panel, not from missing reports; `probable` is eligible with an evidence tier; as-of cutoffs, label-maturity embargo and blinded primary review are mandatory. Updated forecast task/evaluation/edge cases, review flow and requirements, sentinel tables, label-eligibility invariants in TRD/architecture/workflow rules, and Phase 4 plan. Discrimination/calibration are reported only on sentinel negatives; panel below the D8 minimum is marked underpowered. |
 | 2026-11-06 | **D8 accepted:** safety-first abstention function (per-class `τ_c`, margin, entropy, explicit OOD, quality/crop gates), temperature scaling on a dedicated calibration split, OOD evaluated on held-out classes, and no user-facing override of a model output. Image and forecast floors are pre-registered before the frozen test set is opened; floors set after opening are void. Updated `ml-models.md`, `phase-plan.md` §6.4–6.5 and Gate 3, design-system confidence/abstain states, reporting requirements and acceptance, `image_predictions` schema/constraints (`decision_thresholds`, `ood_score`, `calibration_version`), TRD invariants and forecast evaluation/acceptance. Floor values remain unrecorded pending measurement. |
 | 2026-11-06 | Reconciled the partner-added `database/` Phase-1 artifacts with D7/D8/D10/D13: forecast negatives come only from sentinel visits (image healthy/hard negatives are not forecast negatives); added the D8 prediction-decision table and D7 sentinel site/visit fields; verification rows now name the pathologist, not the agronomist; retention/controller references now point to D10. |
+| 2026-11-06 | Phase 2 §5.1 engineering foundation: FastAPI app factory with RFC 7807 problem details, request-id middleware and JSON logs; SQLAlchemy session + Alembic `0001_baseline`; Next.js web client in `frontend/` (typecheck, lint and build pass); Flutter shell in `mobile/` (committed, unverified — no SDK); compose with PostGIS, API and web images; env templates for dev/staging; CI for backend, web, mobile, compose and image builds; `TEST-MATRIX.md`. No feature work; Gate 1 remains unmet. Added ADR-009. |
 
 ---
 
@@ -516,8 +523,9 @@ L = likelihood, I = impact, both H/M/L.
 2. Draft the data acquisition plan (partner MoUs, archive access, collection targets).
 3. Draft the labelling handbook for the chosen crop and target list.
 4. Draft the pilot protocol (sites, silent phase, comparison design, pre-registered metric).
-5. Verify the committed backend/web/mobile scaffolds and keep them minimal; expand only
-   after Gate 0, starting with identity + observations + audit + `conversations`.
+5. Verify the committed mobile scaffold (`flutter analyze`, `flutter test`, an APK) and
+   build both container images; then expand only after Gate 0, starting with identity +
+   observations + audit + `conversations`.
 
 ---
 

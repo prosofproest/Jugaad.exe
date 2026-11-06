@@ -70,9 +70,7 @@ def send_message(
         raise HTTPException(status_code=404, detail="Conversation not found") from error
 
 
-@router.post(
-    "/{conversation_id}/messages/{message_id}/retry", response_model=Message
-)
+@router.post("/{conversation_id}/messages/{message_id}/retry", response_model=Message)
 def retry_message(conversation_id: str, message_id: str) -> Message:
     try:
         return service.retry_message(conversation_id, message_id)

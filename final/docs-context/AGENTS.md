@@ -5,7 +5,8 @@
 repository. It states what the system is, what must never be violated, and how work is
 planned, built, tested and documented.
 
-**Status:** documentation-only repository. No application code exists yet.
+**Status:** documentation plus an engineering scaffold (Phase 2 §5.1). No product
+feature is implemented; demo paths are labelled.
 **Last updated:** 2026-11-06
 
 ---
@@ -130,39 +131,56 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 ```
 /
 ├── AGENTS.md                     # pointer to docs-context/AGENTS.md
-├── components/                   # shared web UI components (Next.js portals)
+├── components/                   # shared web UI components (not created yet)
 ├── docs-context/                 # this folder: operating context for agents
 ├── feature-specs/                # feature-level specifications
-├── backend/                      # FastAPI modular monolith (planned)
-├── mobile/                       # Flutter capture app (planned)
-├── web/                          # Next.js expert portal + district dashboard (planned)
+├── backend/                      # FastAPI modular monolith (scaffold)
+├── mobile/                       # Flutter capture app (scaffold, unverified)
+├── frontend/                     # Next.js web app (scaffold; source docs say web/)
 ├── ml/                           # training, evaluation, export to ONNX (planned)
-├── database/                     # migrations, seeds, ERD notes (planned)
-└── deploy/                       # compose, IaC, runbooks (planned)
+├── database/                     # database workspace; schema authority is backend Alembic
+└── deploy/                       # compose, environment templates, runbooks (scaffold)
 ```
 
-Nothing under `backend/`, `mobile/`, `web/`, `ml/`, `database/` or `deploy/` exists yet.
-Do not create scaffolding that implies a decision has been made unless the decision is
-recorded in `progress-tracker.md`.
+`frontend/` is the web app: the folder predates this scaffold and the naming
+reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds no schema
+of its own — SQLAlchemy models and Alembic migrations in `backend/` are the
+single schema authority (ADR-002). Do not add a second ORM or manual DDL.
+
+Nothing beyond the Phase 2 §5.1 foundation exists in these folders. Do not create
+scaffolding that implies a decision has been made unless the decision is recorded
+in `progress-tracker.md`.
 
 ---
 
 ## 5. Commands
 
-There is no build yet. When the scaffold lands, this section must be replaced with real,
-verified commands. Planned shape (do not treat as working):
+Verified on 2026-11-06 (Windows 11; Python 3.14.5 in the venv, runtime target
+3.12; Node 24.14.0; Docker client 29.8.0; no Flutter SDK). POSIX paths are in
+each agent's `README.md`.
 
-| Task | Planned command |
-|---|---|
-| Backend dev | `make api-dev` (uvicorn, reload) |
-| Backend tests | `make api-test` (pytest) |
-| Migrations | `make db-migrate` (alembic upgrade head) |
-| Web dev | `make web-dev` (next dev) |
-| Web tests | `make web-test` (vitest + playwright) |
-| Mobile tests | `make mobile-test` (flutter test) |
-| Lint all | `make lint` |
+| Task | Command | Last result |
+|---|---|---|
+| Backend tests | `cd backend && .venv\Scripts\python -m pytest` | 16 passed |
+| Backend lint | `cd backend && .venv\Scripts\python -m ruff check app tests` | clean |
+| Backend format check | `cd backend && .venv\Scripts\python -m ruff format --check app tests` | clean |
+| Migration history | `cd backend && .venv\Scripts\python -m alembic history` | `0001_baseline` |
+| Review migration SQL offline | `cd backend && .venv\Scripts\python -m alembic upgrade head --sql` | SQL emitted |
+| Backend dev server | `cd backend && .venv\Scripts\python -m uvicorn app.main:app --reload --port 8000` | `/health` returned 200 |
+| Web install | `cd frontend && npm ci` | 346 packages |
+| Web typecheck | `cd frontend && npm run typecheck` | pass |
+| Web lint | `cd frontend && npm run lint` | pass |
+| Web build | `cd frontend && npm run build` | pass; 3 routes |
+| Compose parse | `docker compose --env-file deploy/.env.example -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml config --quiet` | pass |
+| Mobile analyze + test | `cd mobile && flutter pub get && flutter analyze && flutter test` | **NOT RUN — Flutter not installed**; CI job defined |
+| Container builds | `docker build -t ps03-api:ci backend` and `docker build -t ps03-web:ci frontend` | **NOT RUN — daemon unavailable**; CI builds |
 
-Never document a command you have not run in this repository.
+`alembic upgrade head` against a live database has not been run (no local
+PostGIS). The offline SQL path is verified; applying it is not.
+
+Never document a command you have not run in this repository. The two NOT RUN
+rows are marked as such on purpose and must be converted to evidence before the
+mobile app or containers are called working.
 
 ---
 
@@ -237,6 +255,7 @@ Refuse and escalate (do not implement) if asked to:
 | `progress-tracker.md` | Where we are, what is decided, what is next |
 | `phase-plan.md` | What work each phase contains, what it produces and when it may exit |
 | `ai-workflow-rules.md` | Detailed agent operating procedure and handoff format |
+| `../TEST-MATRIX.md` | Requirement ID → scenario → expected result → evidence for the current scaffold |
 | `data-foundation.md` | How data is collected, labelled, cleaned, split and governed |
 | `ml-models.md` | How the image and forecast models are formulated, trained, evaluated and combined |
 | `operations-and-pilot.md` | How the system is tested, piloted, deployed, monitored and staffed |

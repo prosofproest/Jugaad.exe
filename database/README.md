@@ -25,8 +25,9 @@ collection network (§4.2) (`final/docs-context/phase-plan.md`).
 | Hosting and technical controls | `final/TRD.md` §6, §13 |
 
 This folder is a working area for governance artifacts. It does **not** replace the
-authoritative documents above. Executable schema remains SQLAlchemy models + Alembic
-migrations in `backend/` when that module exists.
+authoritative documents above. The executable schema is owned by the SQLAlchemy models
+and Alembic migrations under `backend/app/db/` (ADR-002); `deploy/` applies it with
+`alembic upgrade head` before starting the API.
 
 ---
 
@@ -156,7 +157,6 @@ These support Gate 1 but are not themselves gate criteria in `phase-plan.md`.
   released until the pre-issue checklists are complete.
 - Protocol and matrix versions are recorded on every case; historical records are never
   rewritten to a newer version.
-- Because the current instruction limits changes to `database/`,
-  `final/docs-context/progress-tracker.md` has **not** been updated. That update is
-  pending and must accompany these artifacts when they are merged into the project
-  record.
+- The Phase-1 artifacts and this workspace are tracked in
+  `final/docs-context/progress-tracker.md`; update the tracker alongside any material
+  change to scope, status or evidence here.

@@ -1,0 +1,92 @@
+# Local development stack for PS-03 (Phase 2 §5.1).
+#
+# Usage:
+#   cp deploy/.env.example deploy/.env      # then edit POSTGRES_PASSWORD
+#   docker compose -f deploy/docker-compose.yml -f deploy/docker-compose.dev.yml up --build
+#
+# This file is the base for every environment. Staging/production reuse the
+# same images but inject environment variables from the platform secret store
+# instead of deploy/.env (see deploy/README.md).
+
+name: ps03
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-ps03}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in deploy/.env}
+      POSTGRES_DB: ${POSTGRES_DB:-ps03}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - ps03-db:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-ps03} -d ${POSTGRES_DB:-ps03}",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build:
+      context: ../backend
+    environment:
+      APP_ENVIRONMENT: ${APP_ENVIRONMENT:-dev}
+      APP_LOG_LEVEL: ${APP_LOG_LEVEL:-INFO}
+      APP_DOCS_ENABLED: ${APP_DOCS_ENABLED:-true}
+      APP_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-ps03}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-ps03}
+      # Comma-separated or JSON list; pydantic-settings accepts JSON.
+      APP_CORS_ORIGINS: '["${WEB_ORIGIN:-http://localhost:3000}"]'
+    command:
+      - sh
+      - -c
+      - alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health').read()\"",
+        ]
+      interval: 10s
+      timeout: 5s
+      start_period: 15s
+      retries: 6
+
+  web:
+    build:
+      context: ../frontend
+      args:
+        NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+    environment:
+      NEXT_PUBLIC_API_BASE_URL: ${NEXT_PUBLIC_API_BASE_URL:-http://localhost:8000}
+      # Server-side rendering happens inside the container network.
+      API_BASE_URL: http://api:8000
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/chat').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 6
+
+volumes:
+  ps03-db:
