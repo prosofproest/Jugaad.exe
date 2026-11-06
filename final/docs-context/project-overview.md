@@ -201,7 +201,7 @@ baseline is measured. No target numbers are committed in this document.
 | Level | Metrics |
 |---|---|
 | Image | Macro F1, per-class recall, calibration (ECE/reliability), abstention rate |
-| Forecast | PR-AUC, Brier score, calibration, lead-time distribution |
+| Forecast | PR-AUC, Brier score and calibration on sentinel-panel negatives (D7); lead-time distribution |
 | Operational | False alerts per area/time, report-to-review time, backlog, sync success |
 | User | Task completion, comprehension of uncertainty wording, repeat use, opt-out |
 | Equity | Performance and adoption by geography, device and user segment |

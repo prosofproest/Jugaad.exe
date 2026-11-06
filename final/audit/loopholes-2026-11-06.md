@@ -15,7 +15,7 @@ conflate) are hard; the performance rules are soft. A system that abstained on e
 and returned `insufficient_data` for every area would have satisfied every gate as written.
 
 This audit closes that gap structurally and converts the unowned gaps into blocking
-decisions D7–D12.
+decisions D7–D13.
 
 ---
 
@@ -35,6 +35,10 @@ decisions D7–D12.
 | 10 | On-device pre-check separated from on-device model inference | `02-reporting-and-capture.md` §11, D12 |
 | 11 | Flutter tooling marked provisional until ADR-006 is Accepted | `code-standards.md` §4 |
 | 12 | Entry-point scope wording marked pending D1/D2/D4 | `docs-context/AGENTS.md` §1 |
+| 13 | `agronomist` added as a fifth RBAC role (D13); advisory approval now performable | `03-auth-and-roles.md` §1–§4, §10; `PRD.md` §4.2; `07-advisory-and-alerts.md` §2–§3 |
+| 14 | D7 accepted: sentinel-panel absence sampling, evidence-tier labels, as-of cutoffs, blinded primary read and double-read subset | `progress-tracker.md` §4; `06-forecast-and-risk-map.md` §2/§9/§11; `04-expert-review.md` §3/§6; `05-data-layer.md` §4.4 |
+| 15 | D8 accepted: safety-first abstention function, temperature-scaled calibration on a dedicated split, explicit OOD on held-out classes, no output override, and pre-registered image/forecast floors | `progress-tracker.md` §4; `ml-models.md` §5.3/§6; `phase-plan.md` §6.4–6.5, Gate 3; `01-design-system.md` §3.4/§3.9; `02-reporting-and-capture.md` §4/§9; `05-data-layer.md` §4.3/§5/§13; `TRD.md` §6.3–6.4/§10/§18; `06-forecast-and-risk-map.md` §9/§12 |
+| 16 | Reconciled the partner-added Phase-1 database artifacts with accepted decisions: image healthy/hard negatives are not forecast negatives (D7 sentinel visits only); added D8 prediction-decision and D7 sentinel fields; verification owner corrected to pathologist (D13); retention/controller references corrected to D10 | `database/data-dictionary/data-dictionary-v1.md`; `database/collection/02-sampling-matrix.md`; `database/governance/05-retention-and-deletion.md`; `database/collection/04-secure-upload-and-retention.md`; `database/governance/01-dataset-register.md` |
 
 ---
 
@@ -48,10 +52,12 @@ decisions D7–D12.
 **Consequence:** a 100%-abstention classifier and a forecast engine that never scores would
 have passed Gates 3, 4 and 5.
 
-**Disposition:** D8 requires pre-registered numeric floors (per-class recall, max abstention,
-minimum share of area-days scored, lift over climatology) and Gate 3 now fails a number that
-does not clear them. R6 is respected: the numbers are set from the measured Phase-3
-baseline, before the frozen test set is opened — the *rule* is the decision.
+**Disposition:** **Fixed by D8 (accepted 2026-11-06).** D8 requires pre-registered numeric
+floors (per-class recall, max abstention, minimum share of area-days scored, lift over
+climatology) and Gate 3 now fails a number that does not clear them. R6 is respected: the
+numbers are set from the measured Phase-3 baseline, before the frozen test set is opened — the
+*rule* is the decision. The floor values remain unrecorded until that measurement; Gates 3
+and 4 cannot close until they are pre-registered and met.
 
 ### C-2 — The forecast track had no observable negative class
 `06:32` required "verified absence within coverage" as the negative label;
@@ -62,16 +68,25 @@ scored band with zero verified reports.
 **Consequence:** PR-AUC, Brier score and calibration had no legitimate denominator, and R3
 could be violated by the forecast spec itself.
 
-**Disposition:** D7. Either scheduled absence sampling exists, or the event is framed as
-presence/first-verified-case under a positive-unlabelled design with an explicit statement
-that discrimination metrics requiring negatives are not reported.
+**Disposition:** **Fixed by D7 (accepted 2026-11-06).** A pre-registered sentinel panel
+supplies verified negatives; discrimination and calibration are reported only on that panel,
+and a panel below the D8 minimum is reported as underpowered rather than used for a gate.
+Training may remain presence-only, but a positive-unlabelled design does not license
+negative-dependent metrics. No-report and no-visit are never negatives. The forecast track is
+retained in v1 subject to the panel and visit schedule being committed under D3.
 
 ### C-3 — Abstention had no decision function
 `ml-models.md:168` said only "set thresholds that allow the model to say it cannot assess".
 No τ, no margin or entropy rule, no per-class thresholds, no risk–coverage target, no
 override policy.
 
-**Disposition:** D8. R2 is untestable until the function and τ exist.
+**Disposition:** **Fixed by D8 (accepted 2026-11-06).** The decision function is per-class
+`τ_c` on the calibrated top candidate, a top-1/top-2 margin, normalised entropy, an explicit
+OOD threshold, quality-gate and unsupported-crop states. The operating posture is
+safety-first (recall floors before coverage, with a coverage floor to block an
+abstain-everything model). The override policy is fixed: no user-facing control changes a
+model output; manual review is separate and audited. The floor values are measured and
+pre-registered before the frozen test set is opened.
 
 ### C-4 — No open-set detection, so R2's core promise was unimplementable
 `unknown` was treated as a supervised class (`ml-models.md:21`) while `ml-models.md:31`
@@ -80,8 +95,10 @@ class only recognises unknowns present in training; a novel pathogen is out-of-d
 and scores confidently. `TRD.md:314` listed `out_of_domain` as an abstain reason that
 nothing produced.
 
-**Disposition:** D8 must define an out-of-distribution score and evaluate it on held-out
-classes (unknown-vs-known AUROC and false-accept rate at the shipped threshold).
+**Disposition:** **Fixed by D8 (accepted 2026-11-06).** A separate OOD score (embeddings or
+energy) is required and evaluated on held-out classes: unknown-vs-known AUROC and
+false-accept rate at the shipped threshold are gate metrics, not diagnostics. A supervised
+`unknown` class alone is explicitly rejected as open-set detection.
 
 ### C-5 — Labels leaked into the forecast evaluation
 `feature-specs/04-expert-review.md:121` and `PRD.md:266` required reviewers to see "model
@@ -92,8 +109,10 @@ measured either.
 **Consequence:** confirmation bias plus leakage inflates every reported metric; the verified
 layer then feeds the next forecast.
 
-**Disposition:** D7 must include a blinded primary read (candidates and forecast context
-hidden until the label is recorded) and a double-labelled subset with an agreement target.
+**Disposition:** **Fixed by D7 (accepted 2026-11-06).** The primary review records the label
+before candidates or forecast context are revealed, and a pre-defined double-read subset is
+labelled independently to report inter-rater agreement. Subset size and agreement threshold
+are set under D8.
 
 ### C-6 — Deletion could not be honoured
 `TRD.md:265` made predictions, reviews and audit "never soft-deleted"; `TRD.md:419` retained
@@ -114,8 +133,8 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 | ID | Contradiction | Evidence | Disposition |
 |---|---|---|---|
 | X-1 | On-device pre-check was a MUST while on-device inference was explicitly rejected, with no mechanism, threshold or budget specified | `02:105` vs `02:292`, `architecture-context.md:45`, `TRD.md:154` | D12 + interim rule: pre-check is advisory, server gate authoritative |
-| X-2 | "Four roles only" but an agronomist is required as advisory author, approver, forecast approver and D1 owner; `03:58` gates approval on an "agronomist sign-off role" that does not exist | `03:16,58`, `07:37,86`, `06:4` | **Open** — needs a role-model decision (see §5) |
-| X-3 | `probable` ambiguity: the forecast filter is `verified_at IS NOT NULL`, and `probable` also sets `verified_at`, so probable cases enter as verified although R4 authorises only confirmed | `AGENTS.md:88`, `ai-workflow-rules.md:115`, `05:117`, `04:296` | D7 |
+| X-2 | "Four roles only" but an agronomist is required as advisory author, approver, forecast approver and D1 owner; `03:58` gated approval on an "agronomist sign-off role" that did not exist | `03:16,58`, `07:37,86`, `06:4` | **Fixed by D13** — `agronomist` added as a fifth role; matrix, MFA, seed and acceptance criteria updated |
+| X-3 | `probable` ambiguity: the forecast filter is `verified_at IS NOT NULL`, and `probable` also sets `verified_at`, so probable cases enter as verified although R4 authorises only confirmed | `AGENTS.md:88`, `ai-workflow-rules.md:115`, `05:117`, `04:296` | **Fixed by D7** — eligibility is evidence tier (`confirmed`/`probable`) plus `verified_at <= cutoff` and event date `<= cutoff`; `probable` keeps its tier |
 | X-4 | ADR-005/006 were "Proposed" while Flutter and ONNX were enforced as standards | `progress-tracker.md:215`, `architecture-context.md:329-330`, `code-standards.md:120` | Code standards now marked provisional until ADR-006 is Accepted |
 | X-5 | Raw scores were returned to clients while three documents forbade exactly that | `TRD.md:523` vs `TRD.md:438`, `architecture-context.md:253`, `01:121` | `TRD.md` example replaced with band-only |
 | X-6 | Status token namespaces disagreed; `status.verified` existed only in the UI doc and matched no state in the system | `ui-context.md:118` vs `01:43,68` | Both reconciled to the ten-value list |
@@ -145,7 +164,7 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 | G-10 | 500–2,000 images across 6–9 classes and six subgroup dimensions cannot support per-class calibration or abstention claims | `update.md:273`, `ml-models.md:42,139` | ML lead |
 | G-11 | Day-one rules model has no historical backtest, minimum history, or comparison against climatology | `06:17,62,201` | ML lead |
 | G-12 | Spatial holdout is optional three times over despite distance-weighted neighbour features and spatial autocorrelation | `data-foundation.md:220`, `06:202`, `ml-models.md:221,270` | ML lead |
-| G-13 | No as-of label rule (`verified_at <= cutoff`) and no right-censoring handling for the most recent season | `data-foundation.md:214,306`, `06:201` | ML lead |
+| G-13 | No as-of label rule (`verified_at <= cutoff`) and no right-censoring handling for the most recent season | `data-foundation.md:214,306`, `06:201` | ML lead — **fixed by D7** |
 | G-14 | No numeric SLO, RTO or RPO anywhere, while `summary.md:145` claims "measurable SLOs" — an R6 violation inside the doc set | `TRD.md:949`, `PRD.md:372-384` | Eng lead |
 | G-15 | Single VM against an availability expectation for review during field hours | `architecture-context.md:21`, `04:249` | Eng lead |
 | G-16 | Three different definitions of done, none satisfiable by a documentation change | `AGENTS.md:169`, `ai-workflow-rules.md:73`, `code-standards.md:244` | Product lead |
@@ -156,7 +175,7 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 | G-21 | Appendix F test catalogue and Appendix H launch checklist have no requirement IDs, owners, evidence or signature fields, so traceability and "signed" cannot be verified | `appendices.md:164,236`, `phase-plan.md:814` | QA lead |
 | G-22 | Device, app-distribution and SMS/WhatsApp provisioning are unscheduled long-lead dependencies | `phase-plan.md:393,607,663`, `roadmap-and-resources.md:133` | Field ops |
 | G-23 | Drift monitoring names signals but sets no threshold, window, minimum sample or action | `operations-and-pilot.md:108,122` | ML lead |
-| G-24 | Shipped abstention threshold is not a column on `image_predictions`, so abstention cannot be reproduced or audited | `TRD.md:753`, `05:103` | Backend lead |
+| G-24 | Shipped abstention threshold is not a column on `image_predictions`, so abstention cannot be reproduced or audited | `TRD.md:753`, `05:103` | **Fixed by D8** — `decision_thresholds` (per-class `τ_c`, margin, entropy, `ood_max`), `ood_score` and `calibration_version` are stored per prediction, with check constraints |
 | G-25 | Retention undefined for the most sensitive data class; backups resurrect deleted rows; no on-device TTL or encryption requirement | `05:274,279`, `TRD.md:684` | D10 |
 
 ---
@@ -166,26 +185,19 @@ on restore, and on-device TTL/encryption/wipe-on-logout.
 These need a human decision, not an edit. They are recorded as open above; nothing here
 should be resolved by an agent picking a default.
 
-1. **The role model (X-2).** Whether "agronomist" is a fifth role, an attribute of
-   `pathologist`, or an external approver who never logs in. Every advisory approval path
-   depends on the answer, and `update.md:38` says expert capacity is the binding constraint.
-2. **Scheduled absence sampling (C-2).** Whether field capacity exists to collect verified
-   negatives. If not, the product must stop implying discrimination metrics.
-3. **Numeric floors (C-1, C-3).** Must come from measurement under D8, not from this audit.
-   R6 forbids inventing them, and inventing them here would have created the very defect
-   this audit exists to find.
-4. **Schedule and budget (X-9, X-10).** Both are currently unachievable as written and need
+1. **Numeric floor values (C-1, C-3, C-4).** The rule, strata and pre-registration procedure
+   are fixed by D8. The values themselves must come from measurement, not from this audit.
+   R6 forbids inventing them, and inventing them here would have created the very defect this
+   audit exists to find. Gate 3 and Gate 4 stay open until the relevant floors are recorded
+   and met.
+2. **Schedule and budget (X-9, X-10).** Both are currently unachievable as written and need
    re-basing against the actual team and the actual season window.
-5. **Data controller (G-25, D10).** Determines consent wording, retention values and the
+3. **Data controller (G-25, D10).** Determines consent wording, retention values and the
    lawful basis for image collection.
-6. **The design authority and the chatbot folder (X-11 to X-13).** Two artifacts appeared
+4. **The design authority and the chatbot folder (X-11 to X-13).** Two artifacts appeared
    during this audit that the rules forbid or exclude. Neither can be reconciled by editing
    a spec: `DESIGN.md` must either go or be formally demoted, and `chatbot/` needs an ADR or
    deletion before someone scaffolds into it.
-7. **Whether to keep the forecast track in v1 at all.** Given C-2, C-5 and G-11, the honest
-   options are: invest in absence sampling and a blinded label pipeline, or ship photo
-   assessment only and move the area outlook to v2. That is a scope decision above this
-   audit's authority.
 
 ---
 

@@ -150,7 +150,9 @@ Test blur, shadows, backgrounds, leaf age and capture distance.
 ### 5.3 Operational acceptance
 
 Set minimum class-level performance and abstention behaviour before alerts or advice rely
-on outputs. Report performance **at the shipped abstention threshold**.
+on outputs. The numeric floors and the pre-registration procedure are D8: measured on
+validation, recorded before the frozen test set is opened, and reported at the shipped
+threshold. Report performance **at the shipped abstention threshold**.
 
 **Implementation points**
 
@@ -163,20 +165,33 @@ on outputs. Report performance **at the shipped abstention threshold**.
 
 A model score is not automatically a reliable probability.
 
-- **Calibration:** compare predicted confidence with observed correctness on representative
-  validation data.
-- **Abstention:** set thresholds that allow the model to say it cannot assess the image.
+- **Calibration:** temperature scaling fitted on a dedicated calibration split, separate from
+  the validation split used for model selection. Isotonic only where sample size supports it;
+  ECE is a diagnostic, not a fitting method. If a separate split is not supportable,
+  calibration is not approved and only qualitative bands are shown (D8).
+- **Abstention:** a documented decision function — per-class threshold `τ_c` on the calibrated
+  top candidate, top-1/top-2 margin, entropy, and an out-of-distribution score. Any breach,
+  quality failure or unsupported crop returns an explicit abstention with a reason code. The
+  operating point is safety-first: recall floors before coverage (D8).
+- **Open-set behaviour:** a supervised `unknown` class is not sufficient. An explicit OOD
+  score is evaluated on held-out classes (unknown-vs-known AUROC and false-accept rate at the
+  shipped threshold).
 - **Visual explanations:** Grad-CAM and similar methods help inspect image regions but do
   not prove causal reasoning. Treat them as debugging aids.
 - **User communication:** explain likely visual match, uncertainty, image quality and next
   step in plain language.
-- **Audit:** store the score vector, threshold, model version and explanation metadata.
+- **Audit:** store the score vector, the threshold set (including `τ_c`, margin, entropy and
+  OOD), the calibration version/model version and explanation metadata.
 
 Rules:
 
 - No unsupported percentage confidence in the UI.
 - `not_calibrated` is displayed as a word, never a number.
 - The result card always includes "not a diagnosis".
+- No user-facing control changes a model output. An abstention stays abstained; a manual
+  review decision is separate and audited (D8).
+- The numeric floors and the rule for setting them are D8; nothing in this document invents
+  a floor value.
 
 ---
 
@@ -187,8 +202,8 @@ A forecast is only meaningful with a precise target.
 | Field | Definition |
 |---|---|
 | Prediction unit | Target condition × crop × geography × issue time × horizon |
-| Event | First verified case, incidence threshold, escalation, or another operational outcome — choose explicitly |
-| Negative | Verified absence within adequate coverage; never "no report" |
+| Event | First evidence-eligible case (D7); exact outcome per D1/D5 |
+| Negative | Verified absence from a pre-registered sentinel-panel visit; never "no report" or "no visit" |
 | Horizon | Aligned to decisions and input reliability (nowcast by default; 7-day outlook only when validated) |
 | Spatial unit | Smallest geography the inputs support without implying false precision |
 | Consumer | Extension worker and farmer in-app/email (SMS optional) |
@@ -209,7 +224,7 @@ Rules:
 | Weather windows | Rolling rainfall, temperature ranges, humidity summaries, consecutive wet days | Must exist at `issue_time`; store `source_timestamp` |
 | Crop | Crop type, growth stage, planting window, variety, irrigation context | From crop cycle or calendar |
 | Seasonal | Week of year, monsoon period, days since planting | Deterministic |
-| Historical pressure | Lagged verified cases, nearby verified reports, prior-season occurrence | Verified only |
+| Historical pressure | Lagged eligible labels, nearby verified reports, prior-season occurrence | Eligible labels only (D7) |
 | Coverage | Active reporters, field visits, data completeness | Required for the no-score gate |
 
 **Leakage rule:** every feature must be computable at `issue_time`. Store the feature
@@ -246,7 +261,9 @@ Rules:
 Risk bands derive from validated probabilities or a documented, expert-approved score.
 Arbitrary thresholds create false confidence.
 
-- Assess reliability diagrams, Brier score and log loss on temporal holdout data.
+- Assess reliability diagrams, Brier score and log loss on temporal holdout data. Report
+  discrimination and calibration only on sentinel-panel negatives; a presence-only training
+  set does not license these metrics (D7).
 - Balance false alarms against missed outbreaks; state the cost of each error type.
 - Bands (`low`, `moderate`, `high`, `urgent`, `insufficient_data`) have operational meanings
   and approved actions.
@@ -300,10 +317,21 @@ Rules:
 ## 13. Model acceptance gates
 
 - [ ] Field test set frozen before selection; report at the shipped abstention threshold.
+- [ ] D8 floors were pre-registered before the test set was opened, and every floor is met.
+- [ ] Decision thresholds (`τ_c`, margin, entropy, OOD) are stored per prediction and
+      reproduce the abstention decision.
+- [ ] OOD is evaluated on held-out classes; unknown-vs-known AUROC and false-accept rate are
+      reported at the shipped threshold.
+- [ ] Calibration uses a dedicated split (temperature scaling); `not_calibrated` is shown as a
+      word and never as a percentage.
+- [ ] No user-facing control changes a model output; manual review decisions are separate and
+      audited.
 - [ ] Per-class metrics, confusion matrix, sample counts and calibration reported.
 - [ ] Abstention rate reported beside every accuracy/F1 figure.
 - [ ] Feature snapshot persisted for every scored forecast; re-run reproduces the band.
-- [ ] Unverified reports excluded from forecast features (tested).
+- [ ] Forecast labels exclude `unverified`, `needs_visit`, `duplicate`, `unresolved` and
+      `rejected`; `confirmed` and `probable` (with evidence tier) obey the as-of cutoffs;
+      missing sentinel visits are not negatives (tested).
 - [ ] `probability` null unless calibration approved.
 - [ ] Model registry shows `approved` before serving.
 - [ ] No fabricated metric anywhere in reports or UI.

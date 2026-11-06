@@ -112,8 +112,10 @@ estimate.
   set `confirmed` directly.
 - A photo assessment row cannot exist with `status=assessed` unless a quality gate result
   is attached and passed.
-- Forecast feature queries must filter on `verified_at IS NOT NULL`. Add a test that
-  inserts an unverified report and asserts it is excluded.
+- Forecast label queries must filter on evidence tier (`confirmed`, `probable`), `verified_at
+  <= cutoff` and event date `<= cutoff`. Add tests that insert an `unverified` report, a
+  `needs_visit` report and a `probable` report and assert the first two are excluded and the
+  third is included with its evidence tier (D7).
 - Any export endpoint requires a role check and writes an audit event before returning.
 
 ---
