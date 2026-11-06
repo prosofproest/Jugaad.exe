@@ -40,7 +40,7 @@ color.text.{primary,secondary,disabled,inverse}
 color.border.{subtle,strong,focus}
 color.brand.{primary,primaryHover,onPrimary}
 color.risk.{low,moderate,high,urgent,insufficient}
-color.status.{queued,syncing,synced,pending,confirmed,probable,rejected,duplicate,needsVisit,unresolved}
+color.status.{queued,syncing,synced,pending_review,confirmed,probable,rejected,duplicate,needsVisit,unresolved}
 color.feedback.{error,warning,success,info}
 font.family.{sans,mono}
 font.size.{display,h1,h2,body,small,caption}

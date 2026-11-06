@@ -22,7 +22,9 @@ An explainable, offline-tolerant decision-support platform with two separate out
 Neither output is a laboratory confirmation and neither is a confirmed outbreak.
 The platform is deliberately narrow in v1: one crop, one agro-climatic zone, a small
 target list, a rules-based weather risk model, assistive image triage, extension-worker
-verification, and SMS/WhatsApp delivery. See `project-overview.md`.
+verification, and SMS/WhatsApp delivery. These are the intended shape, not settled scope —
+crop, targets, zone, horizon and channel are fixed by decisions D1, D2 and D4 in
+`progress-tracker.md` §4. See `project-overview.md`.
 
 ---
 

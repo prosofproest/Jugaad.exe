@@ -289,7 +289,9 @@ Never log image bytes, notes, phone numbers or coordinates. Include `request_id`
 
 - Multi-image diagnosis per case (v1 assesses one image at a time).
 - Video capture.
-- On-device inference.
+- On-device model inference. (The FR-02-07 pre-check is client-side and advisory only; its
+  mechanism is decided in `progress-tracker.md` D12. The server quality gate is
+  authoritative.)
 - Farmer-to-farmer sharing.
 - Yield or loss estimation.
 - Precise GPS field mapping.
