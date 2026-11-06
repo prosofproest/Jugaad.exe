@@ -23,7 +23,7 @@
 
 | Gate | Date | Verified by | Command / artefact | Result |
 |---|---|---|---|---|
-| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `docs/adr/0001-target-architecture.md`; `backend/requirements.lock`; `backend/.venv/Scripts/python -m pytest`; `ruff check app tests`; `ruff format --check app tests` | **Open** — ADR consolidated; lockfile added; 216 tests pass; ruff check/format clean. D1–D6 and D9–D12 open; fresh-clone install still being verified |
+| 0 | 2026-11-06 | Repository review (checklist reconciliation) | `docs/adr/0001-target-architecture.md`; `backend/requirements.lock`; fresh clone of `cad44cc` + `pip install -r requirements.txt` + `pytest`; `ruff check`; `ruff format --check` | **Open** — ADR consolidated; lockfile added; fresh-clone 216 tests pass; ruff clean. Only D1–D6 remain open |
 | 1 | 2026-11-06 | Repository review (checklist reconciliation) | `cd backend && .venv/Scripts/python -m pytest -q`; `cd frontend && npm run typecheck`, `npm run lint`, `npm run build` | **Open** — 216 backend tests pass; web typecheck, lint and build pass; no auth, readiness, domain tables or media |
 | 3 (slice) | 2026-11-06 | ML/backend implementation | `python -m pytest -q`; `python -m compileall -q app` | 103 passed; COMPILE_OK. No model, field data or field result. |
 | 5 (machinery slice) | 2026-11-06 | Backend implementation | `python -m pytest`; `python -m compileall -q app` | 187 passed; COMPILE_OK. Service-level advisory/alert tests only; no provider, auth routes, pilot or field result. |
@@ -34,7 +34,7 @@
 
 ## Progress snapshot (verified 2026-11-06)
 
-**Verdict:** NOT COMPLIANT. **Gates closed: 0 of 13.** **Gate boxes ticked: 55 / 217 (~25%).**
+**Verdict:** NOT COMPLIANT. **Gates closed: 0 of 13.** **Gate boxes ticked: 56 / 217 (~26%).**
 
 Box counts measure recorded evidence, not readiness. A gate stays open until its P0/P1
 items and exit criteria are all met, so 24% of boxes does **not** mean the product is 24%
@@ -42,7 +42,7 @@ operational — the safety-critical gates (0, 1, 2) are almost entirely open.
 
 | Gate | Ticked | Status | What the ticked items prove | What keeps the gate open |
 |---|---|---|---|---|
-| 0 | 25/32 | OPEN | Stack, roles, confidence semantics, guidance policy, forecast approach and docs reconciliation recorded; ADR file created; `dist/` ignored; backend lockfile added; venv rebuilt and suite/ruff clean | D1–D6 unresolved; fresh-clone install not yet recorded |
+| 0 | 26/32 | OPEN | Stack, roles, confidence semantics, guidance policy, forecast approach and docs reconciliation recorded; ADR file created; `dist/` ignored; backend lockfile added; venv rebuilt; suite and ruff clean; fresh-clone install/test verified | D1–D6 unresolved (the only six open boxes) |
 | 1 | 1/32 | OPEN | Health payload exposes no secrets | No authentication, authorization, domain schema, media pipeline or readiness probe |
 | 2 | 0/18 | OPEN | — | No farmer vertical slice: capture, offline sync, review and E2E are absent |
 | 3 | 12/42 | OPEN | Image-triage machinery only: policy, quality gate, D8 decision, calibration, OOD, registry, inference, append-only records, API, safe explanation, evaluation harness | No trained artefact, field data, frozen test set, forecast pipeline or approved operating point |
@@ -112,7 +112,7 @@ where the repository contains the artefact; nothing here closes a gate on its ow
 | W-13 | Test evidence refreshed: 216 backend tests pass, ruff clean; web typecheck, lint and production build pass (6 routes) | `cd backend && .venv/Scripts/python -m pytest -q` → 216 passed; `npm run typecheck`, `npm run lint`, `npm run build` → pass; `TEST-MATRIX.md` | Gate 10 (partial) |
 | W-14 | Phase-1 data-governance and collection artifacts drafted (dataset register, MoU/licence tracker, consent wording, DPIA, retention/deletion, quarantine, capture protocol, sampling matrix, training, progress tracking, data dictionary) | `database/governance/*`, `database/collection/*`, `database/data-dictionary/*` | Phase 1 (documentation only) |
 | W-15 | Gate 6 map-layer backend: closed layer enum, per-layer GeoJSON, caller-supplied policy with no D9 defaults, small-count suppression, boundary-version refusal and explicit empty/error states | `backend/app/modules/mapping/*`, `backend/app/api/v1/map.py`, `backend/tests/test_map_layers.py`, `backend/tests/test_map_api.py`; OpenAPI `/v1/map/layers/{layer}` | Gate 6 (4/8) |
-| W-16 | Gate 0 hygiene: consolidated ADR file, added `dist/` to `.gitignore`, generated the backend lockfile, rebuilt the venv, and made the backend lint/format checks clean again | `docs/adr/0001-target-architecture.md`; `.gitignore`; `backend/requirements.lock`; `backend/.venv`; ruff fixes across `backend/app` and `backend/tests` | 0.1, 0.4 (3 of 4) |
+| W-16 | Gate 0 hygiene: consolidated ADR file, added `dist/` to `.gitignore`, generated the backend lockfile, rebuilt the venv, made lint/format clean, and verified the documented quickstart from a fresh clone | `docs/adr/0001-target-architecture.md`; `.gitignore`; `backend/requirements.lock`; `backend/.venv`; ruff fixes across `backend/app` and `backend/tests`; fresh clone of `cad44cc` → 216 passed | 0.1, 0.4 (all four) |
 
 ---
 
@@ -173,9 +173,9 @@ Nothing else may start until this gate is closed. Two incompatible designs curre
 - [x] Delete or rebuild the broken `backend/.venv` — `.venv` now resolves to this repository and runs the suite; `pyvenv.cfg` points at `backend\.venv`
 - [x] Add a lockfile (`uv.lock`, `poetry.lock`, or `requirements.lock`)
   - **Evidence (2026-11-06):** `backend/requirements.lock` is a `pip freeze` of the rebuilt CPython 3.12 venv (39 lines), generated from `requirements.txt`. It is a resolved snapshot, not a hash-pinned lock; CI still installs from `requirements.txt`.
-- [ ] Confirm the documented quickstart works from a clean clone on the supported Python version
+- [x] Confirm the documented quickstart works from a clean clone on the supported Python version
   - **Done when:** `pip install -r requirements.txt && pytest` succeeds with zero manual steps.
-  - **Evidence (2026-11-06):** the rebuilt local venv runs **216 tests, 0 failures**; ruff check and format check are clean. A fresh clone install is being verified separately and this box stays open until that run is recorded.
+  - **Evidence (2026-11-06):** fresh `git clone --depth 1` of `cad44cc` into a temp directory, then CPython 3.12 `python -m venv .venv`, `pip install -r requirements.txt`, `pytest` → **216 tests, 0 failures, 0 errors**; `ruff check app tests` → passed; `ruff format --check app tests` → 80 files already formatted.
 
 **Gate 0 exit criteria:** one recorded architecture, D1–D6 closed, docs consistent, clean clone installs and tests pass.
 
