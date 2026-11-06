@@ -7,7 +7,6 @@ SQL or model internals.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 from http import HTTPStatus
 from typing import Any
 
@@ -22,16 +21,37 @@ PROBLEM_MEDIA_TYPE = "application/problem+json"
 _ERROR_BASE = "https://api.ps03.local/errors/"
 
 
-@dataclass
 class ApiError(Exception):
-    """A deliberately raised, client-safe error."""
+    """A deliberately raised, client-safe error.
 
-    code: str
-    title: str
-    status: int = 400
-    detail: str | None = None
-    retryable: bool = False
-    fields: list[dict[str, str]] = field(default_factory=list)
+    Two call shapes exist in the codebase and both are supported:
+
+    * keyword form — ``ApiError(code="forbidden", title="Forbidden", status=403)``
+    * positional form — ``ApiError(403, "forbidden", "Forbidden", detail="...")``
+    """
+
+    def __init__(
+        self,
+        status: int = 400,
+        code: str = "bad_request",
+        title: str | None = None,
+        *,
+        status_code: int | None = None,
+        detail: str | None = None,
+        retryable: bool = False,
+        fields: list[dict[str, str]] | None = None,
+    ) -> None:
+        super().__init__(detail or title or code)
+        self.status = status if status_code is None else status_code
+        self.code = code
+        self.title = title or code.replace("_", " ").title()
+        self.detail = detail
+        self.retryable = retryable
+        self.fields = fields or []
+
+    @property
+    def status_code(self) -> int:
+        return self.status
 
 
 def _status_code_for(code: str) -> str:
@@ -137,3 +157,7 @@ def register_error_handlers(app: FastAPI) -> None:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
+
+
+# Backwards-compatible name used by earlier call sites.
+install_error_handlers = register_error_handlers

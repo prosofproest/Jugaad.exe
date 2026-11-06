@@ -4,10 +4,15 @@ Values come from environment variables prefixed with ``APP_`` or from a local
 ``.env`` file. No secrets belong in source control.
 """
 
+from __future__ import annotations
+
 from functools import lru_cache
+from pathlib import Path
 
 from pydantic import BaseModel, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
 
 
 class ChatLabel(BaseModel):
@@ -101,9 +106,34 @@ class Settings(BaseSettings):
     # Interactive API docs are for dev/staging only; production may disable them.
     docs_enabled: bool = True
 
-    # SQLAlchemy URL. The pilot runs PostgreSQL 16 + PostGIS; tests that do not
-    # touch a database never open this connection.
-    database_url: str = "postgresql+psycopg://ps03:ps03@localhost:5432/ps03"
+    @property
+    def is_production(self) -> bool:
+        return self.environment.lower() in {"production", "prod"}
+
+    # Persistence. PostgreSQL 16 + PostGIS is the production target; SQLite
+    # keeps local development and the test suite runnable without services.
+    database_url: str = f"sqlite:///{(BACKEND_ROOT / 'var' / 'ps03.db').as_posix()}"
+    seed_reference_data: bool = True
+    seed_demo_users: bool = False
+
+    # Bootstrap admin (development only; must be supplied through the
+    # environment in any deployed setting).
+    bootstrap_admin_email: str | None = None
+    bootstrap_admin_password: str | None = None
+    bootstrap_admin_mfa_secret: str | None = None
+
+    # Tokens and sessions.
+    jwt_secret: str = "dev-only-change-me"
+    jwt_algorithm: str = "HS256"
+    access_token_minutes: int = 15
+    refresh_token_days: int = 30
+    mfa_challenge_minutes: int = 5
+
+    # OTP and authentication throttling.
+    otp_ttl_minutes: int = 5
+    otp_max_attempts: int = 5
+    expose_otp_in_dev: bool = True
+    auth_rate_limit_per_minute: int = 30
 
     # Identity (spec 03). The default secret is for local development only;
     # production startup refuses it. Tokens, OTPs and lockout limits are kept
@@ -131,9 +161,25 @@ class Settings(BaseSettings):
     auth_bootstrap_admin_password: str | None = None
     auth_bootstrap_admin_totp_secret: str | None = None
 
-    @property
-    def is_production(self) -> bool:
-        return self.environment.lower() in {"prod", "production"}
+    # Media storage.
+    storage_backend: str = "local"
+    storage_root: Path = BACKEND_ROOT / "var" / "storage"
+    upload_url_ttl_seconds: int = 900
+    signed_url_ttl_seconds: int = 300
+    min_image_dimension: int = 480
+    allowed_image_types: list[str] = ["image/jpeg", "image/png", "image/webp"]
+
+    # Versioned model inputs. Every prediction carries the version string it
+    # was produced with; nothing here represents a trained production model.
+    quality_gate_version: str = "demo-quality-gate-0.1"
+    image_model_version: str = "demo-image-classifier-0.1"
+    forecast_model_version: str = "demo-rules-forecast-0.1"
+
+    # Forecast and coverage thresholds (demo configuration pending sign-off).
+    forecast_horizon_days: int = 10
+    weather_stale_hours: int = 24
+    min_active_reporters: int = 3
+    small_count_threshold: int = 5
 
 
 @lru_cache

@@ -10,12 +10,14 @@ timezone-aware UTC in Python.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from uuid import uuid4
 
-from sqlalchemy import DateTime, MetaData, func
+from sqlalchemy import DateTime, MetaData, String, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import TypeDecorator
+
+UTC = timezone.utc
 
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
@@ -72,3 +74,7 @@ class TimestampMixin:
         server_default=func.now(),
         nullable=False,
     )
+
+
+class UUIDPrimaryKeyMixin:
+    id: Mapped[str] = mapped_column(String(64), primary_key=True, default=lambda: new_id("row"))

@@ -8,11 +8,12 @@ must produce a safe ``failed`` outcome, never a fabricated assessment.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import TimeoutError as FutureTimeout
 from dataclasses import dataclass
 from time import perf_counter
-from typing import Mapping, Protocol
+from typing import Protocol
 
 
 class InferenceFailure(Exception):
@@ -79,7 +80,9 @@ class InferenceRunner:
         self._timeout_s = timeout_s
         self._max_attempts = max_attempts
 
-    def run(self, adapter: InferenceAdapter, request: InferenceRequest) -> tuple[InferenceOutput, float]:
+    def run(
+        self, adapter: InferenceAdapter, request: InferenceRequest
+    ) -> tuple[InferenceOutput, float]:
         last_code = "inference_error"
         last_retryable = True
 

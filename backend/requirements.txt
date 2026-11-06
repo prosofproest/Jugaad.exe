@@ -10,6 +10,9 @@ python-multipart>=0.0.9,<1.0
 httpx>=0.27,<1.0
 numpy>=1.26,<3.0
 opencv-python-headless>=4.10,<6.0
+argon2-cffi>=23,<26
+PyJWT>=2,<3
+pyotp>=2.9,<3
 
 # Development and test tooling (installed in dev/CI only).
 pytest>=8.0,<9.0

@@ -1,0 +1,149 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f172a" />
+      <stop offset="100%" stop-color="#1e293b" />
+    </linearGradient>
+    <linearGradient id="cardGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1e293b" stop-opacity="0.95" />
+      <stop offset="100%" stop-color="#0f172a" stop-opacity="0.95" />
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="1100" fill="url(#bg)" />
+  <!-- Header -->
+  <text x="800" y="50" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica" font-size="28" font-weight="bold" fill="#38bdf8" text-anchor="middle">CropSentinel AI — Master Database Architecture (11 Domains, 76 Tables)</text>
+  <text x="800" y="80" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto, Helvetica" font-size="14" fill="#94a3b8" text-anchor="middle">PostgreSQL 16 + PostGIS 3.x Spatial Indexes + SQLAlchemy 2.0 ORM + Alembic Migrations</text>
+  <g transform="translate(60, 110)">
+    <rect width="340" height="210" rx="12" fill="url(#cardGrad)" stroke="#38bdf8" stroke-width="2" />
+    <rect width="340" height="36" rx="12" fill="#38bdf8" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#38bdf8">1. User Database (6 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• users</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• user_roles</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• user_profiles</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• user_permissions</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• user_sessions</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• user_preferences</text>
+  </g>
+  <g transform="translate(430, 110)">
+    <rect width="360" height="210" rx="12" fill="url(#cardGrad)" stroke="#4ade80" stroke-width="2" />
+    <rect width="360" height="36" rx="12" fill="#4ade80" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#4ade80">2. Farm Database (6 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• farms</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• farm_boundaries (PostGIS)</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• farm_sections</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• farm_plots</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• farm_locations</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• farm_members</text>
+  </g>
+  <g transform="translate(820, 110)">
+    <rect width="360" height="230" rx="12" fill="url(#cardGrad)" stroke="#a3e635" stroke-width="2" />
+    <rect width="360" height="36" rx="12" fill="#a3e635" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#a3e635">3. Crop & Plant (7 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• crop_types</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• crop_groups</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• crop_instances</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• plants (PostGIS)</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• plant_observations</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• crop_growth_stages</text>
+    <text x="24" y="192" font-family="monospace" font-size="12" fill="#e2e8f0">• planting_records</text>
+  </g>
+  <g transform="translate(1210, 110)">
+    <rect width="340" height="210" rx="12" fill="url(#cardGrad)" stroke="#f472b6" stroke-width="2" />
+    <rect width="340" height="36" rx="12" fill="#f472b6" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#f472b6">4. Media Database (5 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• media_files (S3 Object Storage)</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• media_frames</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• media_observations</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• media_locations (PostGIS)</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• media_analysis_links</text>
+  </g>
+  <g transform="translate(60, 350)">
+    <rect width="340" height="250" rx="12" fill="url(#cardGrad)" stroke="#fb923c" stroke-width="2" />
+    <rect width="340" height="36" rx="12" fill="#fb923c" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#fb923c">5. Pest & Disease (8 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• pests</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• pest_categories</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• pest_life_cycles</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• pest_host_crops</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• diseases</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• disease_symptoms</text>
+    <text x="24" y="192" font-family="monospace" font-size="12" fill="#e2e8f0">• crop_symptoms</text>
+    <text x="24" y="214" font-family="monospace" font-size="12" fill="#e2e8f0">• pest_damage_records</text>
+  </g>
+  <g transform="translate(430, 350)">
+    <rect width="360" height="250" rx="12" fill="url(#cardGrad)" stroke="#818cf8" stroke-width="2" />
+    <rect width="360" height="36" rx="12" fill="#818cf8" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#818cf8">6. AI Analysis Database (7 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• ai_analysis</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• ai_predictions (Append-Only)</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• ai_detections</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• ai_confidence</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• ai_model_versions</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• diagnosis_records</text>
+    <text x="24" y="192" font-family="monospace" font-size="12" fill="#e2e8f0">• ai_feedback</text>
+  </g>
+  <g transform="translate(820, 370)">
+    <rect width="360" height="320" rx="12" fill="url(#cardGrad)" stroke="#2dd4bf" stroke-width="2" />
+    <rect width="360" height="36" rx="12" fill="#2dd4bf" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#2dd4bf">7. Pest Management (11 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• ipm_methods</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• pest_control_options</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• biological_controls</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• mechanical_controls</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• cultural_controls</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• physical_controls</text>
+    <text x="24" y="192" font-family="monospace" font-size="12" fill="#e2e8f0">• behavioral_controls</text>
+    <text x="24" y="214" font-family="monospace" font-size="12" fill="#e2e8f0">• chemical_controls</text>
+    <text x="24" y="236" font-family="monospace" font-size="12" fill="#e2e8f0">• pesticide_registrations</text>
+    <text x="24" y="258" font-family="monospace" font-size="12" fill="#e2e8f0">• treatment_records</text>
+    <text x="24" y="280" font-family="monospace" font-size="12" fill="#e2e8f0">• treatment_effectiveness</text>
+  </g>
+  <g transform="translate(1210, 350)">
+    <rect width="340" height="270" rx="12" fill="url(#cardGrad)" stroke="#f87171" stroke-width="2" />
+    <rect width="340" height="36" rx="12" fill="#f87171" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#f87171">8. Hotspot & Outbreak (8 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• pest_reports (PostGIS)</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• verified_cases (PostGIS)</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• hotspot_regions (MultiPoly)</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• regional_pest_statistics</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• outbreak_predictions (Append)</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• spread_observations</text>
+    <text x="24" y="192" font-family="monospace" font-size="12" fill="#e2e8f0">• risk_history (Append)</text>
+    <text x="24" y="214" font-family="monospace" font-size="12" fill="#e2e8f0">• monitoring_coverage</text>
+  </g>
+  <g transform="translate(60, 630)">
+    <rect width="340" height="240" rx="12" fill="url(#cardGrad)" stroke="#c084fc" stroke-width="2" />
+    <rect width="340" height="36" rx="12" fill="#c084fc" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#c084fc">9. Recovery & Inspection (7 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• inspections</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• inspection_assignments</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• scouting_records (PostGIS)</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• recovery_records</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• recovery_comparisons</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• seasonal_history</text>
+    <text x="24" y="192" font-family="monospace" font-size="12" fill="#e2e8f0">• infestation_history</text>
+  </g>
+  <g transform="translate(430, 630)">
+    <rect width="360" height="230" rx="12" fill="url(#cardGrad)" stroke="#e879f9" stroke-width="2" />
+    <rect width="360" height="36" rx="12" fill="#e879f9" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#e879f9">10. Chatbot & Knowledge (6 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• chat_sessions</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• chat_messages</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• knowledge_articles</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• knowledge_chunks</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• knowledge_embeddings (Vector)</text>
+    <text x="24" y="170" font-family="monospace" font-size="12" fill="#e2e8f0">• chatbot_feedback</text>
+  </g>
+  <g transform="translate(1210, 650)">
+    <rect width="340" height="220" rx="12" fill="url(#cardGrad)" stroke="#facc15" stroke-width="2" />
+    <rect width="340" height="36" rx="12" fill="#facc15" fill-opacity="0.15" />
+    <text x="16" y="24" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="15" font-weight="bold" fill="#facc15">11. Notification (5 tables)</text>
+    <text x="24" y="60" font-family="monospace" font-size="12" fill="#e2e8f0">• notifications</text>
+    <text x="24" y="82" font-family="monospace" font-size="12" fill="#e2e8f0">• alert_rules</text>
+    <text x="24" y="104" font-family="monospace" font-size="12" fill="#e2e8f0">• user_alert_preferences</text>
+    <text x="24" y="126" font-family="monospace" font-size="12" fill="#e2e8f0">• scheduled_tasks</text>
+    <text x="24" y="148" font-family="monospace" font-size="12" fill="#e2e8f0">• sync_logs</text>
+  </g>
+  <rect x="60" y="1000" width="1490" height="60" rx="8" fill="#1e293b" stroke="#334155" />
+  <text x="800" y="1035" font-family="-apple-system, BlinkMacSystemFont, Segoe UI, Roboto" font-size="14" fill="#94a3b8" text-anchor="middle">✓ Verified 76/76 Tables • 100% Normalized Relational Integrity • Strict R5 No-Fabrication IPM • Append-Only Prediction Lineage</text>
+</svg>

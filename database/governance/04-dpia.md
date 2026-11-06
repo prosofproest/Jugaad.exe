@@ -127,6 +127,8 @@ implemented and verified.
 | DP-16 | Uncontrolled export leaks PII | M | H | Role check; purpose; row limit; no PII columns; audit | TBD | Admin owner |
 | DP-17 | Retroactive boundary or taxonomy change misattributes records | M | M | Version boundaries; keep original code and version; no silent rewrite | TBD | Data engineer |
 | DP-18 | Unverified reports treated as confirmed | H | H | Verification projection; forecast filters verified only; tests | TBD | ML lead + reviews |
+| DP-19 | Archive images contain people, faces, documents or farm identifiers without the project's consent | M | H | Signed permission record; privacy review before ingest; PII detection; quarantine `pii_detected`; no archive images in farmer-facing output | TBD | Legal/privacy + data engineer |
+| DP-20 | Archive data used outside its permission or mistaken for fresh field evidence | M | H | Permission-scope fields; archive/field separation rule; no archive records in field versions or frozen test set; provenance audit; separate reporting | TBD | Data engineer + legal/privacy |
 
 ---
 
@@ -206,6 +208,9 @@ draft alone.
 12. Re-assess residual risk after controls are implemented and tested.
 13. Record the consultation outcome and any residual risk accepted by the accountable
     owner.
+14. Confirm the lawful basis and handling rule for personal data inside any archive,
+    including reviewer identity and any people visible in archive images.
+15. Confirm archive retention, deletion and return/destruction obligations before ingest.
 
 ---
 
@@ -214,3 +219,4 @@ draft alone.
 | Date | Change | Owner |
 |---|---|---|
 | 2026-11-06 | Initial draft created; no sign-off | Draft — legal/privacy (TBD) |
+| 2026-11-06 | Added archive-specific risks DP-19/DP-20 and archive open items; still unsigned | Draft — legal/privacy (TBD) |

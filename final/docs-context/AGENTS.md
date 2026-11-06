@@ -153,15 +153,15 @@ schema, API contract, model behaviour or risk semantics updates the spec and
 ```
 
 `frontend/` is the web app: the folder predates this scaffold and the naming
-reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds no schema
-of its own — SQLAlchemy models and Alembic migrations in `backend/` are the
+reconciliation is ADR-009 in `progress-tracker.md`. `database/` holds reference
+artifacts, governance registers, Alembic migrations plan, storage rules, and backup
+design — SQLAlchemy models and Alembic migrations in `backend/` are the
 single schema authority (ADR-002). Do not add a second ORM or manual DDL.
 
 Nothing beyond the Phase 2 §5.1 foundation, the persisted demo chat slice
-(§5.7), the demo-labelled video-reading machinery (spec 09) and the in-memory
-§5.2 identity backend slice exists in these folders. Do not create scaffolding
-that implies a decision has been made unless the decision is recorded in
-`progress-tracker.md`.
+(§5.7), the in-memory §5.2 identity backend slice, the demo-labelled video-reading machinery (spec 09),
+and the Phase 1 weather/boundaries/historical ingestion components exists in these folders.
+Do not create scaffolding that implies a decision has been made unless the decision is recorded in `progress-tracker.md`.
 
 ---
 

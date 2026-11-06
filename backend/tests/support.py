@@ -10,7 +10,7 @@ from __future__ import annotations
 import hashlib
 import json
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from app.modules.assessments.inference import InferenceOutput
@@ -22,7 +22,7 @@ from app.modules.assessments.store import InMemoryPredictionStore
 
 FIXTURES = Path(__file__).parent / "fixtures"
 POLICY_PATH = FIXTURES / "synthetic_policy.json"
-FIXED_TIME = datetime(2026, 11, 6, 6, 0, 0, tzinfo=timezone.utc)
+FIXED_TIME = datetime(2026, 11, 6, 6, 0, 0, tzinfo=UTC)
 
 
 def make_policy() -> TriagePolicy:

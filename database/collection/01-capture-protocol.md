@@ -199,7 +199,8 @@ not a substitute for it.
 
 - Severity uses the **crop-specific visual criteria** agreed with the agronomist.
   A generic percentage scale is **not** used unless it has been validated for that crop and
-  symptom (`final/docs-context/data-foundation.md` §4.4).
+  symptom (`final/docs-context/data-foundation.md` §4.4). The criteria and class cards are
+  defined in `../labelling/01-labelling-handbook.md` §7.
 - The scale itself is **`TBD — D1`**. Proposed ordinal bands, pending validation:
   `SEV-0` none / healthy, `SEV-1` first signs, `SEV-2` clear symptoms, `SEV-3` advanced,
   `SEV-4` severe / necrotic / dieback.

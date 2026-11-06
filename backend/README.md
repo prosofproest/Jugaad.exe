@@ -40,10 +40,10 @@ Run from `backend/` (Windows paths shown; POSIX uses `.venv/bin/python`):
 | Task | Command |
 |---|---|
 | Create venv | `python -m venv .venv` |
-| Install | `.venv\Scripts\python -m pip install -r requirements.txt` |
-| Tests | `.venv\Scripts\python -m pytest` — **353 passed** |
-| Lint | `.venv\Scripts\python -m ruff check app tests` — clean for the identity slice; pre-existing failures remain in older modules |
-| Format check | `.venv\Scripts\python -m ruff format --check app tests` — clean for the identity slice; pre-existing differences remain in older modules |
+| Install | `.venv\Scripts\python -m pip install -r requirements.txt` (POSIX: `.venv/bin/pip install -r requirements.txt`) |
+| Tests | `.venv\Scripts\python -m pytest` |
+| Lint | `.venv\Scripts\python -m ruff check app tests` |
+| Format check | `.venv\Scripts\python -m ruff format --check app tests` |
 | Migration history | `.venv\Scripts\python -m alembic history` |
 | Review migration SQL offline | `.venv\Scripts\python -m alembic upgrade head --sql` |
 | Apply migrations | `.venv\Scripts\python -m alembic upgrade head` (needs a live database) |

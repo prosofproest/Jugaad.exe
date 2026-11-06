@@ -12,8 +12,8 @@ threshold or a result.
 from __future__ import annotations
 
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 from app.modules.assessments.calibration import CalibrationError, softmax
 

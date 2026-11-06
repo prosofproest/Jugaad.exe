@@ -13,8 +13,8 @@ correct prediction.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
-from typing import Mapping, Sequence
 
 from app.modules.assessments.calibration import (
     CalibrationDiagnostics,
@@ -108,11 +108,7 @@ def evaluate_classifier(
         tp = true_positive[label]
         precision = tp / predicted_positive[label] if predicted_positive[label] else 0.0
         recall = tp / support[label] if support[label] else 0.0
-        f1 = (
-            2 * precision * recall / (precision + recall)
-            if (precision + recall) > 0
-            else 0.0
-        )
+        f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0
         per_class[label] = PerClassMetrics(
             support=support[label],
             precision=precision,
@@ -121,11 +117,7 @@ def evaluate_classifier(
         )
 
     represented = [metrics for metrics in per_class.values() if metrics.support > 0]
-    macro_f1 = (
-        sum(metrics.f1 for metrics in represented) / len(represented)
-        if represented
-        else 0.0
-    )
+    macro_f1 = sum(metrics.f1 for metrics in represented) / len(represented) if represented else 0.0
 
     max_k = min(max(top_k, default=1), len(labels))
     top_k_accuracy: dict[int, float] = {}
@@ -135,9 +127,9 @@ def evaluate_classifier(
             continue
         hits = 0
         for sample in assessed:
-            ranking = sorted(
-                labels, key=lambda label: sample.probabilities[label], reverse=True
-            )[:k]
+            ranking = sorted(labels, key=lambda label: sample.probabilities[label], reverse=True)[
+                :k
+            ]
             if sample.true_label in ranking:
                 hits += 1
         top_k_accuracy[k] = hits / len(assessed)
@@ -147,10 +139,7 @@ def evaluate_classifier(
         if not assessed:
             raise CalibrationError("calibration metrics require assessed samples")
         calibration = calibration_diagnostics(
-            [
-                [sample.probabilities[label] for label in labels]
-                for sample in assessed
-            ],
+            [[sample.probabilities[label] for label in labels] for sample in assessed],
             [labels.index(sample.true_label) for sample in assessed],
             n_bins=calibration_bins,
         )

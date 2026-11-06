@@ -85,6 +85,11 @@ supply them, and an unvisited field is never treated as absent.
 
 ## 4. Matrix tiers
 
+> **Archive data never fills a field cell.** Plant-clinic and university archive records
+> are a separate dataset family (`ARC-###`). They may support training where permission
+> allows, but they do not count toward any field `n_min`, quota or Tier A cell, and they are
+> never part of the field validation or frozen field test set.
+
 A full cross-product of every dimension is infeasible and statistically wasteful. Cells are
 tiered by what the project must be able to claim.
 

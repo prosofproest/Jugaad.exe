@@ -13,7 +13,9 @@
 > **D2** (nowcast vs outlook). They are marked `TBD — D1/D2`. They must not be filled with
 > plausible-looking values. Forecast label eligibility and sentinel negatives follow **D7**;
 > abstention, calibration and OOD fields follow **D8**; retention and controller fields
-> follow **D10**.
+> follow **D10**. Archive provenance and label-mapping fields follow
+> `../archive/01-archive-acquisition.md` and `../archive/03-archive-provenance.md`; the
+> mapping target taxonomy remains blocked on **D1**.
 
 ---
 
@@ -199,8 +201,8 @@ separate audited record.
 
 | Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
 |---|---|---|---|---|---|---|---|
-| `target_code` | text | Supported targets + `healthy` + `abiotic_look_alike` + `unknown` + `mixed_symptoms` + `insufficient_evidence` — `TBD — D1` | Label handbook | Agronomist | Unlabelled; never force a class | adjudicated_label | No |
-| `label_origin` | text | `suspected`, `expert_confirmed`, `lab_confirmed` | Review | Agronomist | Unknown provenance; not usable as a training label | adjudicated_label | No |
+| `target_code` | text | Supported targets + `healthy` + `abiotic_look_alike` + `unknown` + `mixed_symptoms` + `insufficient_evidence` — `TBD — D1` | Label handbook | Pathologist (Agronomist advises) | Unlabelled; never force a class | adjudicated_label | No |
+| `label_origin` | text | `suspected`, `expert_confirmed`, `lab_confirmed` | Review | Pathologist | Unknown provenance; not usable as a training label | adjudicated_label | No |
 | `verification_tier` | text | `confirmed`, `probable`, `unverified`, `rejected`, `duplicate`, `needs_visit`, `unresolved` | Review | Pathologist | Unverified; never treat as confirmed. Forecast eligibility is `confirmed` or `probable` with tier, inside the D7 as-of cutoffs | adjudicated_label | No |
 | `review_decision` | text | `confirmed`, `probable`, `rejected`, `duplicate`, `needs_visit`, `unresolved` | Review | Pathologist | No decision | adjudicated_label | No |
 | `reviewer_id` | uuid | — | Identity | Pathologist | Unknown reviewer; label not auditable | adjudicated_label | Yes |
@@ -216,6 +218,31 @@ separate audited record.
 | `split_group_id` | text | Stable group identifier | Data pipeline | ML lead | Unknown; exclude from evaluation | derivation | No |
 | `is_frozen_test` | boolean | `true` / `false` | Data pipeline | ML lead | Unknown; must be `false` unless explicitly frozen | config | No |
 | `frozen_at` | timestamptz | UTC | Data pipeline | ML lead | Not frozen | config | No |
+
+### 7.1 Labelling provenance, class kind and abstention
+
+These fields implement `../labelling/01-labelling-handbook.md` and
+`../labelling/04-abstention-and-hard-negatives.md`.
+
+| Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
+|---|---|---|---|---|---|---|---|
+| `label_id` | uuid | — | System | Data engineer | Label not auditable | adjudicated_label | No |
+| `class_kind` | text | `pathogen_identity`, `symptom_pattern`, `pest_damage`, `non_condition` | Label handbook | Pathologist | Class meaning unknown; not usable | config | No |
+| `handbook_version` | text | Approved handbook version | Label handbook | Pathologist | Unknown rules; label not reproducible | config | No |
+| `taxonomy_version` | text | Pinned taxonomy — `TBD — D1` | Label handbook | Pathologist | Mapping blocked; not usable | config | No |
+| `label_status` | text | `active`, `superseded`, `adjudicated`, `ambiguous` | Review | Pathologist | Unknown; treat as not usable | adjudicated_label | No |
+| `severity_basis` | text | Crop-specific scale and version — `TBD — D1` | Label handbook | Agronomist | Severity not comparable | config | No |
+| `hard_negative` | boolean | `true` / `false` | Review/sampling | ML lead | Unknown; do not assume positive | config | No |
+| `hard_negative_code` | text | `HN-HEALTHY`, `HN-ABIOTIC`, `HN-OTHER-CONDITION`, `HN-OTHER-CROP`, `HN-NON-PLANT`, `HN-POOR-IMAGE`, `HN-LOOK-ALIKE`, `HN-ARCHIVE-NEAR` | Review/sampling | Pathologist | Not a retained hard negative | config | No |
+| `abstention_role` | text | `insufficient_evidence`, `unknown`, `mixed`, `out_of_domain`, `hard_negative`, `none` | Review | ML lead | Not designated for abstention training | config | No |
+| `ambiguity_reason` | text | Disagreement code from the calibration taxonomy | Review | Pathologist | Not recorded | adjudicated_label | No |
+| `adjudication_id` | uuid | — | Review | Pathologist | No adjudication | adjudicated_label | No |
+| `supersedes_label_id` | uuid | Previous label | Review | Data engineer | First label | derivation | No |
+| `retain_for_abstention` | boolean | `true` / `false`; must not be `false` until approved deletion | Review/sampling | ML lead | Unknown; retain | config | No |
+
+**Rules:** labels are append-only; a correction supersedes rather than edits; a hard negative
+keeps its true label and is never used as a positive target or a forecast negative; archive
+labels are mapped separately (`../archive/02-label-reconciliation.md`).
 
 ---
 
@@ -337,7 +364,63 @@ visit is never a negative.
 
 ---
 
-## 12. Dataset governance and splits
+## 12. Archive provenance and label mapping
+
+Archive records are a separate dataset family (`ARC-###` under `DS-002`) and never share a
+field dataset version, split manifest or frozen field test set. `original_label` is verbatim
+and never overwritten; `mapped_label` is a separate, pathologist-approved field
+(`../archive/02-label-reconciliation.md`).
+
+### 12.1 Archive record and provenance
+
+| Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
+|---|---|---|---|---|---|---|---|
+| `archive_source_id` | text | `ARC-###` from the dataset register | Register | Data engineer | Not attributable; quarantine | external | No |
+| `archive_batch_id` | text | Stable batch identifier | Manifest | Data engineer | Custody broken | external | No |
+| `archive_batch_version` | text | Monotonic version | Manifest | Data engineer | Version unknown | config | No |
+| `archive_record_id` | text | Archive's own stable identifier | Archive | Data engineer | Cannot re-check source; quarantine | external | No |
+| `source_link` | text | URL or accession reference | Archive | Data engineer | `provenance_missing` | external | Potentially |
+| `source_link_status` | text | `live`, `dead`, `restricted`, `not_public` | Custody check | Data engineer | Unverified | external | No |
+| `source_link_checked_at` | timestamptz | UTC | Custody check | Data engineer | Link status unknown | external | No |
+| `original_label` | text | Verbatim archive label, original language | Archive | Pathologist | `original_label_missing`; do not infer | external | No |
+| `original_label_code` | text | Archive's own class code | Archive | Pathologist | No code available | external | No |
+| `original_language` | text | ISO 639 code or `unknown` | Archive | Pathologist | Translation risk; flag | external | No |
+| `label_scheme` | text | Archive labelling scheme name | Archive | Pathologist | Scheme unknown; mapping blocked | external | No |
+| `label_scheme_version` | text | Scheme version or date | Archive | Pathologist | Version unverified | external | No |
+| `archive_reviewer_ref` | text | Archive reviewer reference, minimised | Archive | Data engineer | Reviewer unknown | external | Yes |
+| `archive_review_date` | date | ISO date | Archive | Pathologist | Date unknown | external | No |
+| `original_metadata` | jsonb | Archive metadata as received, unedited | Archive | Data engineer | Metadata not preserved | external | Potentially |
+| `manifest_id` | text | Batch manifest | Custody | Data engineer | Custody broken | config | No |
+| `content_hash` | text | SHA-256 of original bytes | System | Data engineer | Integrity unverified | derivation | No |
+| `received_at` | timestamptz | UTC | System | Data engineer | Receipt undated | external | No |
+| `permission_id` | text | Linked permission record | Legal | Legal/privacy | `permission_missing`; not usable | config | No |
+| `provenance_status` | text | `complete`, `partial`, `missing`, `disputed` | Custody | Data engineer | Treat as `missing` | derivation | No |
+| `provenance_notes` | text | No PII; states what is missing | Custody | Data engineer | No explanation | derivation | No |
+
+### 12.2 Archive label mapping
+
+| Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
+|---|---|---|---|---|---|---|---|
+| `mapping_id` | uuid | — | System | Data engineer | Not mapped | derivation | No |
+| `taxonomy_version` | text | Pinned project taxonomy — `TBD — D1` | Config | Pathologist | `taxonomy_version_missing`; mapping blocked | config | No |
+| `normalised_label` | text | Spacing/spelling only; meaning preserved | Reconciliation | Pathologist | Not normalised | derivation | No |
+| `mapped_label` | text | Project class — `TBD — D1`; `null` when unmappable | Reconciliation | Pathologist | Unmapped; never force a class | adjudicated_label | No |
+| `mapping_status` | text | `exact`, `broad`, `narrow`, `partial`, `unmappable`, `conflict`, `pending`, `not_applicable` | Reconciliation | Pathologist | `pending`; not usable | adjudicated_label | No |
+| `mapping_rationale` | text | Evidence and direction of error; no PII | Review | Pathologist | Not justified; not approved | adjudicated_label | No |
+| `mapping_confidence` | numeric/text | Scale `TBD`; never auto-approves | Review | Pathologist | Unknown | adjudicated_label | No |
+| `mapped_by` | uuid | — | Identity | Data engineer | Proposer unknown | adjudicated_label | Yes |
+| `mapped_at` | timestamptz | UTC | System | Data engineer | Undated | adjudicated_label | No |
+| `reviewed_by` | uuid | Pathologist account ID | Identity | Pathologist | Mapping not approved | adjudicated_label | Yes |
+| `reviewed_at` | timestamptz | UTC | System | Pathologist | Mapping not approved | adjudicated_label | No |
+| `supersedes_mapping_id` | uuid | Previous mapping version | System | Data engineer | First mapping | derivation | No |
+
+**Archive rules:** an `exact` map is the only clean default; `unmappable` and `conflict`
+records are quarantined and preserved; `pending` or `conflict` records are never used as
+labels; an archive label is never treated as a field label.
+
+---
+
+## 13. Dataset governance and splits
 
 | Field | Type | Unit / allowed values | Source | Owner | Missing meaning | Origin | PII |
 |---|---|---|---|---|---|---|---|
@@ -354,7 +437,7 @@ visit is never a negative.
 
 ---
 
-## 13. Unresolved fields — do not invent values
+## 14. Unresolved fields — do not invent values
 
 | Field / decision | Blocked on | Owner |
 |---|---|---|
@@ -374,10 +457,17 @@ visit is never a negative.
 | Notification channel allowlist | Pilot partner | Product lead |
 | Device class, lighting, background, framing categories | Capture protocol | Field ops |
 | Imputation policy details | Data foundation review | Data engineer + agronomist |
+| Archive taxonomy mapping and synonym table | D1 + signed archive permission | Pathologist (Agronomist advises only) |
+| Archive label-scheme versions | Each archive's permission record | Pathologist + data engineer |
+| Archive reviewer identity handling | Legal/privacy review | Legal/privacy |
+| Crop-specific class cards and taxonomy | D1 | Pathologist + agronomist |
+| Crop-specific severity anchors | D1 + agronomist validation | Agronomist + pathologist |
+| Double-read subset size and agreement threshold | D8 | Pathologist + ML lead |
+| Handbook approval and revision cadence | Pathologist sign-off | Pathologist |
 
 ---
 
-## 14. Prohibited data practices
+## 15. Prohibited data practices
 
 - No real farmer data in tests, fixtures, demos or screenshots.
 - No forced class for an unlabelled or ambiguous image.
@@ -388,11 +478,20 @@ visit is never a negative.
 - No precise location in dashboards, exports or logs.
 - No fabricated metrics, dataset sizes, partner names or thresholds.
 - No chemical names, doses, mixtures or intervals in advisory content.
+- No archive label copied into a project label without reconciliation.
+- No archive original label overwritten by a mapped label.
+- No unmappable archive record forced into a class, merged or deleted.
+- No archive record entering a field dataset version, split manifest or frozen test set.
+- No hard negative or ambiguous image deleted outside the approved deletion process.
+- No hard negative used as a positive target or a forecast negative.
+- No label copied from a model output.
 
 ---
 
-## 15. Change log
+## 16. Change log
 
 | Date | Change | Owner |
 |---|---|---|
 | 2026-11-06 | Data dictionary v1 drafted; field contract only; D1/D2-dependent values left TBD | Draft — data engineer (TBD) |
+| 2026-11-06 | Added archive provenance and label-mapping fields; archive separation and D1-blocked taxonomy noted | Draft — data engineer (TBD) |
+| 2026-11-06 | Added labelling provenance, class-kind, hard-negative and abstention fields; D8/D1 gaps recorded | Draft — data engineer (TBD) |

@@ -17,9 +17,7 @@ from app.modules.advisories.models import ActionType, ApprovedAdvisoryView
 from app.modules.advisories.validator import find_prohibited_matches
 from app.modules.alerts.models import Channel, ForecastSnapshot, RenderedMessage
 
-NOT_CONFIRMATION_SENTENCE = (
-    "This is an early warning, not confirmation of disease in your field."
-)
+NOT_CONFIRMATION_SENTENCE = "This is an early warning, not confirmation of disease in your field."
 
 UPDATED_PREFIX = "UPDATED. "
 

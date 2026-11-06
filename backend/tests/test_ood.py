@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.modules.assessments.calibration import CalibrationError
 from app.modules.assessments.ood import (
     evaluate_ood,

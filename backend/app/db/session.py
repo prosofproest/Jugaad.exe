@@ -1,48 +1,96 @@
-"""Database engine and session dependency.
+"""Database engine, session factory and development bootstrap.
 
-The engine is created lazily so that tests and tools that do not touch a
-database never open a connection.
+Production uses PostgreSQL 16 + PostGIS. Local development and the test suite
+run on SQLite with the same SQLAlchemy models so the safety invariants live in
+one place. ``init_db`` is only used for local dev and tests; Alembic remains the
+schema authority for deployed environments.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
-from functools import lru_cache
+from pathlib import Path
 
-from sqlalchemy import Engine, create_engine
+from sqlalchemy import create_engine, event
+from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.core.config import get_settings
 
+_engine: Engine | None = None
+_SessionLocal: sessionmaker[Session] | None = None
 
-@lru_cache
+
+def _configure_sqlite(engine: Engine) -> None:
+    @event.listens_for(engine, "connect")
+    def _set_sqlite_pragma(dbapi_connection, _connection_record):  # type: ignore[no-untyped-def]
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.close()
+
+
+def create_engine_for_url(url: str) -> Engine:
+    kwargs: dict[str, object] = {"future": True, "pool_pre_ping": True}
+    if url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+    engine = create_engine(url, **kwargs)
+    if url.startswith("sqlite"):
+        _configure_sqlite(engine)
+    return engine
+
+
 def get_engine() -> Engine:
-    settings = get_settings()
-    return create_engine(
-        settings.database_url,
-        pool_pre_ping=True,
-        future=True,
-    )
+    global _engine
+    if _engine is None:
+        settings = get_settings()
+        if settings.database_url.startswith("sqlite:///"):
+            raw_path = settings.database_url.removeprefix("sqlite:///")
+            Path(raw_path).parent.mkdir(parents=True, exist_ok=True)
+        _engine = create_engine_for_url(settings.database_url)
+    return _engine
 
 
-@lru_cache
 def get_session_factory() -> sessionmaker[Session]:
-    return sessionmaker(bind=get_engine(), expire_on_commit=False, future=True)
+    global _SessionLocal
+    if _SessionLocal is None:
+        _SessionLocal = sessionmaker(
+            bind=get_engine(), autoflush=False, autocommit=False, expire_on_commit=False
+        )
+    return _SessionLocal
 
 
 def get_session() -> Iterator[Session]:
-    """FastAPI dependency: one transaction-scoped session per request.
-
-    The request commits when it returns and rolls back if it raises, so a
-    multi-row turn (user message + assistant reply + event) is atomic.
-    """
-
+    """FastAPI dependency: one transaction-scoped session per request."""
     session = get_session_factory()()
     try:
         yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
     finally:
         session.close()
+
+
+# Alias for compatibility
+get_db = get_session
+
+
+def reset_engine() -> None:
+    """Drop cached engine/session factory (used after settings change in tests)."""
+    global _engine, _SessionLocal
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _SessionLocal = None
+
+
+def init_db(*, seed: bool = True) -> None:
+    """Create all tables for local dev/test and seed reference data."""
+    from app.db.base import Base
+    from app.db import models  # noqa: F401  (registers mappers)
+
+    Base.metadata.create_all(bind=get_engine())
+    if seed:
+        from app.db.seed import seed_reference_data
+
+        with get_session_factory()() as session:
+            seed_reference_data(session)
+            session.commit()

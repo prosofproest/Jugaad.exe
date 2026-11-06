@@ -142,9 +142,7 @@ class AdvisoryRegistry:
         if approver_role not in QUALIFIED_ROLES:
             raise AdvisoryWorkflowError("approver_not_qualified")
         qualified = {
-            account_id
-            for account_id, role in qualified_accounts.items()
-            if role in QUALIFIED_ROLES
+            account_id for account_id, role in qualified_accounts.items() if role in QUALIFIED_ROLES
         }
         if len(qualified) < 2:
             raise AdvisoryWorkflowError("insufficient_qualified_accounts")

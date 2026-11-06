@@ -1,8 +1,6 @@
-"""FastAPI application entry point.
+"""PS-03 Decision Support Backend Application Entrypoint.
 
-Modular monolith: one deployable app, explicit internal module boundaries.
-See ``final/docs-context/architecture-context.md`` for the invariants and
-``final/TRD.md`` §4 for module ownership.
+See ``final/docs-context/architecture-context.md`` §1–§4 for architectural boundaries.
 """
 
 from __future__ import annotations
@@ -68,6 +66,12 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Construct identity now so production misconfiguration and the one-time
     # admin bootstrap fail at startup rather than on the first request.
     get_identity_service()
+    # Local development and tests use SQLite, where the schema can be created
+    # without a migration step. Deployed environments are Alembic's job.
+    if settings.database_url.startswith("sqlite") and settings.seed_reference_data:
+        from app.db.session import init_db
+
+        init_db(seed=True)
     yield
 
 
@@ -95,7 +99,7 @@ def create_app() -> FastAPI:
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE"],
         allow_headers=["Authorization", "Content-Type", "Idempotency-Key", "X-Request-ID"],
     )
 
