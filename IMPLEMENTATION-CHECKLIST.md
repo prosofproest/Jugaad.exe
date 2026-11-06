@@ -373,16 +373,43 @@ field evidence.
 
 ## Gate 6 — GIS risk map (P1)
 
-- [ ] Map endpoint serving real geometry (vector tiles or GeoJSON)
-- [ ] Separate layers: verified reports, unverified reports, modelled risk, coverage, boundaries
-- [ ] Report and prediction layers never merged
-- [ ] Small-count suppression
-- [ ] Boundary version recorded per map response
-- [ ] Frontend renders the map from the API, not from hardcoded GeoJSON
-- [ ] Empty/loading/error states for the map
-- [ ] Map test proves data comes from the API
+- [ ] Map endpoint serving real geometry (vector tiles or GeoJSON). GeoJSON layer
+      endpoint exists and is tested, but no production geometry store or boundary dataset
+      is wired, so it serves synthetic fixtures only.
+- [x] Separate layers: verified reports, unverified reports, modelled risk, coverage,
+      boundaries
+  - **Evidence:** `tests/test_map_layers.py::test_layers_are_separate_and_carry_their_own_properties`,
+    `tests/test_map_api.py::test_configured_verified_layer_serves_persisted_features`.
+    Layer name is a closed enum; `GET /v1/map/layers/{layer}` serves one layer at a time.
+- [x] Report and prediction layers never merged
+  - **Evidence:** `tests/test_map_layers.py::test_layers_are_separate_and_carry_their_own_properties`
+    (no `band` on report layers, no `verification_status` on model layers),
+    `tests/test_map_api.py::test_merged_risk_layer_is_rejected_before_the_service`
+    (`risk` is a `422`, never a merged collection).
+- [x] Small-count suppression
+  - **Evidence:** `tests/test_map_layers.py::test_small_counts_are_suppressed_without_faking_a_zero`,
+    `::test_coverage_detail_suppresses_small_counts_field_by_field`. The threshold is
+    caller-supplied `MapPolicy.small_count_threshold`; no default is encoded because D9
+    is unresolved.
+- [x] Boundary version recorded per map response
+  - **Evidence:** `tests/test_map_layers.py::test_boundary_version_is_recorded_on_every_layer`,
+    `::test_boundary_version_mismatch_refuses_the_layer`;
+    `tests/test_map_api.py::test_boundary_version_mismatch_fails_closed`.
+- [ ] Frontend renders the map from the API, not from hardcoded GeoJSON. No map client
+      exists.
+- [ ] Empty/loading/error states for the map. Backend empty and error states are tested
+      (`tests/test_map_layers.py::test_empty_verified_layer_never_implies_disease_absence`,
+      `tests/test_map_api.py::test_unconfigured_deployment_returns_an_explicit_problem`);
+      no client loading/error UI exists.
+- [ ] Map test proves data comes from the API. No browser/client test framework exists.
 
 **Gate 6 exit criteria:** the map displays real persisted data and changes when the data changes.
+
+**Met at service/API level** for layer separation, suppression, boundary-version
+recording and empty-state wording. Not met as a Gate 6 exit: there is no production
+geometry repository, boundary dataset, approved D9 suppression/aggregation values, map
+client or end-to-end test. The route returns `map_not_configured` until a deployment
+injects persisted geometry and an approved `MapPolicy`.
 
 ---
 
