@@ -237,6 +237,7 @@ def send_message(
             height=upload_row.height,
             quality_result=upload_row.quality_result,
             quality_flags=tuple(upload_row.quality_flags or []),
+            storage_path=upload_row.storage_path,
         )
         if upload_row is not None
         else None

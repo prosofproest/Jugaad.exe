@@ -6,7 +6,7 @@ Update this file in the same change as any scope, schema, API or decision change
 **Last updated:** 2026-11-06
 **Current phase:** Phase 0 — Discovery (documentation complete, decisions open; Phase 2 §5.1
 engineering foundation, the persisted demo chat slice and the §5.2 identity backend slice present under a recorded Gate-1
-exception; no real model or durable identity store; mobile analyze/test verified locally)
+exception; no live model key configured and no durable identity store; mobile analyze/test verified locally)
 
 ---
 
@@ -174,10 +174,10 @@ epidemic season.
 | Decisions | `[?]` | Resolve D1–D6 with local experts |
 | Data acquisition | `[ ]` | Identify archive partners; draft MoU |
 | Labelling | `[ ]` | Draft handbook after D1 |
-| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo engine, review requests); §5.2 identity slice in memory. Next: durable identity persistence, route auth and real inference (needs the Gate 1 exception and D1/D8) |
+| Backend | `[~]` | Health, problem-details errors, JSON logging, Alembic baseline + `0002_chat_persistence`, compose; persisted demo chat (uploads, demo quality gate, demo engine, optional OpenAI-compatible adapter, review requests); §5.2 identity slice in memory. Next: configure and validate a live provider (needs the Gate 1 exception, D1/D8 and the key), durable identity persistence and route auth |
 | Mobile | `[~]` | Flutter shell committed; **unverified** — no SDK locally; CI analyze/test job defined |
 | Web | `[~]` | Next.js desktop shell in `frontend/` with persistent section sidebar, dashboard and honest locked/not-available routes; typecheck, lint, build and live smoke pass (2026-11-06) |
-| Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo engine → review); mobile shell only. Real assessment waits on Phase 3 and D8 |
+| Chat | `[~]` | Spec 08 + persisted demo chat backend and web surface (upload → quality gate → demo/OpenAI-compatible engine → review); mobile shell only. Real assessment waits on Phase 3, D8 and a live key |
 | Image ML | `[ ]` | Baseline on public data for pipeline only |
 | Forecast | `[ ]` | Implement rules baseline after D1/D2 |
 | MLOps | `[ ]` | Registry table design in data layer |
@@ -538,6 +538,7 @@ L = likelihood, I = impact, both H/M/L.
 | 2026-11-06 | Persisted chat slice (Phase 2 §5.7): Alembic `0002_chat_persistence` (`conversations`, `messages`, `message_events`, `image_uploads`, `chat_review_requests`); `POST/GET /v1/uploads` with a JPEG/PNG/WebP allow-list, 10 MB ceiling, real decode, SHA-256 and a versioned demo quality gate; pluggable `AssessmentEngine` seam with a deterministic, labelled `DemoAssessmentEngine` (`demo-chat-0.1`) and fail-closed unknown configuration; idempotent turns; `POST …/messages/{id}/review`; web composer now uploads first and references `upload_id`, renders the stored preview, quality flags and review status. 14 new chat tests; full suite 294 passed. Live smoke (uvicorn + SQLite + `next start`) passed upload → assessed demo reply → persisted review → preview byte-match → 415 rejection. PostgreSQL/Alembic apply was not run (Docker daemon unavailable); real inference is still blocked on the API key and governance. |
 | 2026-11-06 | Reconciled a force-pushed `main`: a collaborator's line (`697944d`, diverged at `611aa48`) added a parallel backend, Phase-0 docs and ADRs. Merged it while keeping this line's tested backend for overlapping paths (`app/api`, `app/core`, `app/db`, conversations, identity). The collaborator's new Phase-0 documents, ADRs, `backend/backend/*` vertical slice and non-conflicting files are retained; its superseded `app/*` implementations remain in history but are not wired. Removed the committed `backend/var/ps03.db` artifact. Backend suite re-run after the merge: 294 passed. |
 | 2026-11-06 | Added the chat content-safety gate (CHAT-10, R5/R18): the deterministic, fail-closed `chat-safety-0.1` validator checks the reply text, assessment reason and candidate display names before storage. A blocked reply is stored as `failed` with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and `request_review`; a `validator_rejected` message event records the validator version and rule categories without the unsafe text. 19 validator unit tests and 3 API safety-gate tests; full backend suite 316 passed. A live API smoke on a fresh SQLite database re-ran upload → assessed `demo-chat-0.1` reply → persisted review → idempotent replay → preview byte-match → `415` rejection with the validator in the path. |
+| 2026-11-06 | Added the optional OpenAI-compatible vision engine behind the `AssessmentEngine` seam (`APP_CHAT_ENGINE=openai_compatible`): the adapter posts a downscaled JPEG plus `APP_CHAT_LABELS` to `{APP_CHAT_BASE_URL}/chat/completions`, accepts JSON-only candidates, drops unknown labels and renders reply text from fixed templates. Missing key/model/labels, timeouts, HTTP failures and malformed output are explicit `failed` states; a model abstention is `abstained`/`model_abstained`. `is_demo` stays true until `APP_CHAT_LABELS_APPROVED=true`, so no D1/D2 taxonomy is invented in code. `httpx` moved to runtime dependencies; compose passes the chat variables and mounts a media volume. 19 engine tests and 1 API wiring test; full suite 336 passed. Verified with a mock transport and a live uvicorn run against a local OpenAI-compatible HTTP stub: upload → `assessed`, `is_demo=false`, `model_version=stub-vision-1`, one approved candidate, template text, persisted review and 2 messages. No real vendor call was made. |
 
 ---
 

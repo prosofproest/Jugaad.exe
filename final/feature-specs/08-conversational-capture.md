@@ -243,6 +243,16 @@ Rules:
   with `reason_code`/`error_code` `unsafe_content_blocked`, no candidates and
   `next_steps` set to `["request_review"]`. A `validator_rejected` `message_events` row
   records the validator version and rule categories; the unsafe text is never stored.
+- The assessment engine is a pluggable seam. `APP_CHAT_ENGINE=demo` serves the
+  deterministic labelled engine; `APP_CHAT_ENGINE=openai_compatible` calls a vision
+  model through an OpenAI-compatible chat-completions endpoint. The model may only
+  choose from the configured `APP_CHAT_LABELS`; the server renders the reply from fixed
+  templates, so the provider never supplies user-facing advice. Missing key/model/labels
+  and malformed output become `failed` states (`model_not_configured`,
+  `invalid_model_response`, `model_unavailable`, `model_timeout`); a model abstention
+  becomes `abstained`/`model_abstained`. `is_demo` stays true until the label set is the
+  approved D1/D2 taxonomy and `APP_CHAT_LABELS_APPROVED=true`; no taxonomy is invented in
+  code.
 
 ---
 

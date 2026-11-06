@@ -177,3 +177,24 @@ def resolve_stored_path(settings: Settings, storage_path: str) -> Path:
     if root not in candidate.parents and candidate != root:
         raise MediaValidationError("upload_not_found", "Upload not found.", status=404)
     return candidate
+
+
+def encode_for_model(
+    settings: Settings, storage_path: str | None, *, max_side: int
+) -> tuple[bytes, str]:
+    """Read a stored image and return a bounded JPEG for a vision provider.
+
+    Downscaling keeps the request small without changing the stored original.
+    Raises ``FileNotFoundError``/``OSError`` when the stored file is unreadable
+    and ``MediaValidationError`` when the path escapes ``media_root``.
+    """
+
+    if not storage_path:
+        raise FileNotFoundError("upload has no stored image")
+    source = resolve_stored_path(settings, storage_path)
+    with Image.open(source) as opened:
+        image = opened.convert("RGB")
+        image.thumbnail((max_side, max_side))
+        buffer = io.BytesIO()
+        image.save(buffer, format="JPEG", quality=85)
+    return buffer.getvalue(), "image/jpeg"
