@@ -8,8 +8,9 @@ never maps an unknown image onto the nearest supported class.
 from __future__ import annotations
 
 import math
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import Literal, Mapping
+from typing import Literal
 
 from app.modules.assessments.policy import TriagePolicy
 

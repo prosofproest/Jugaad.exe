@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.modules.assessments.decision import DecisionError, decide, normalised_entropy
 
 from tests.support import make_policy

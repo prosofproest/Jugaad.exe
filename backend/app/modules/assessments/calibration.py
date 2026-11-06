@@ -11,8 +11,8 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Sequence
 
 _EPSILON = 1e-12
 
@@ -73,7 +73,9 @@ class TemperatureCalibration:
         return softmax(scaled)
 
 
-def _negative_log_likelihood(logits: Sequence[Sequence[float]], labels: Sequence[int], temperature: float) -> float:
+def _negative_log_likelihood(
+    logits: Sequence[Sequence[float]], labels: Sequence[int], temperature: float
+) -> float:
     total = 0.0
     for row, label in zip(logits, labels, strict=True):
         probs = softmax([value / temperature for value in row])

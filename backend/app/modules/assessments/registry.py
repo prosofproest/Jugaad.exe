@@ -48,7 +48,7 @@ class RegistryEntry(BaseModel):
     approved_at: datetime | None = None
 
     @model_validator(mode="after")
-    def _consistency(self) -> "RegistryEntry":
+    def _consistency(self) -> RegistryEntry:
         if self.calibration_approved and not self.calibration_version:
             raise ValueError("calibration_approved requires calibration_version")
         if self.metrics is not None and self.metric_provenance is None:
@@ -67,7 +67,7 @@ class ModelRegistry(BaseModel):
     models: list[RegistryEntry] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def _unique_versions(self) -> "ModelRegistry":
+    def _unique_versions(self) -> ModelRegistry:
         versions = [entry.model_version for entry in self.models]
         if len(set(versions)) != len(versions):
             raise ValueError("model_version must be unique")

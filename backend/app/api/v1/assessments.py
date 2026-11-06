@@ -7,7 +7,7 @@ even when no model is configured, so clients receive an explicit safe
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Header, HTTPException, Query
@@ -50,7 +50,7 @@ class UnconfiguredAssessmentService:
             quality_gate_version=None,
             decision_thresholds=None,
             ood_score=None,
-            generated_at=datetime.now(timezone.utc),
+            generated_at=datetime.now(UTC),
             is_demo=False,
             next_steps=["request_review"],
             not_a_diagnosis=True,

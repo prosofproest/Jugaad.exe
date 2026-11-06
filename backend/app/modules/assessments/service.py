@@ -15,9 +15,9 @@ A failure at any step produces a safe outcome with no invented result.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable
 from uuid import uuid4
 
 from app.modules.assessments.calibration import TemperatureCalibration, softmax
@@ -55,7 +55,7 @@ class AssessmentFailure(Exception):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _abstained_decision(reason: str) -> Decision:
@@ -294,9 +294,7 @@ class AssessmentService:
     def _decision_thresholds(self, *, calibrated: bool) -> dict:
         return {
             "score_kind": "calibrated_probability" if calibrated else "raw_score",
-            "tau_c": {
-                definition.label: definition.tau_c for definition in self._policy.classes
-            },
+            "tau_c": {definition.label: definition.tau_c for definition in self._policy.classes},
             "margin": self._policy.decision.margin,
             "entropy": self._policy.decision.entropy,
             "ood_max": self._policy.decision.ood_max,

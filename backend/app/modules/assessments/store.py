@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime
 from threading import Lock
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from app.modules.assessments.schemas import CandidateOut
 
@@ -88,7 +88,9 @@ class InMemoryPredictionStore:
         with self._lock:
             return self._rows.get(prediction_id)
 
-    def list(self, *, limit: int = 20, cursor: str | None = None) -> tuple[list[PredictionRecord], str | None]:
+    def list(
+        self, *, limit: int = 20, cursor: str | None = None
+    ) -> tuple[list[PredictionRecord], str | None]:
         if limit < 1 or limit > 100:
             raise ValueError("limit must be between 1 and 100")
         offset = 0

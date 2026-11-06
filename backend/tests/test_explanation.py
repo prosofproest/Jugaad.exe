@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import pytest
-
 from app.modules.assessments.decision import Decision, decide
 from app.modules.assessments.explanation import NOT_A_DIAGNOSIS, explain, validate_safe_text
 from app.modules.assessments.quality import ImageMetrics, evaluate_quality
@@ -75,9 +74,7 @@ def test_quality_failure_text_names_the_specific_flag() -> None:
         POLICY.quality,
     )
 
-    explanation = explain(
-        abstained("quality_gate_failed"), POLICY, quality=quality
-    )
+    explanation = explain(abstained("quality_gate_failed"), POLICY, quality=quality)
 
     assert "too blurry" in explanation.text
     assert explanation.next_steps == ("retake",)

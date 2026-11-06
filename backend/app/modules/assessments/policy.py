@@ -43,7 +43,7 @@ class ConfidenceBandThresholds(BaseModel):
     medium_min: float = Field(ge=0, le=1)
 
     @model_validator(mode="after")
-    def _ordered(self) -> "ConfidenceBandThresholds":
+    def _ordered(self) -> ConfidenceBandThresholds:
         if self.high_min <= self.medium_min:
             raise ValueError("high_min must be greater than medium_min")
         return self
@@ -62,7 +62,7 @@ class QualityThresholds(BaseModel):
     min_plant_presence: float = Field(ge=0, le=1)
 
     @model_validator(mode="after")
-    def _luma_range(self) -> "QualityThresholds":
+    def _luma_range(self) -> QualityThresholds:
         if self.min_mean_luma >= self.max_mean_luma:
             raise ValueError("min_mean_luma must be lower than max_mean_luma")
         return self
@@ -86,7 +86,7 @@ class TriagePolicy(BaseModel):
     max_candidates: int = Field(default=3, ge=1, le=3)
 
     @model_validator(mode="after")
-    def _unique(self) -> "TriagePolicy":
+    def _unique(self) -> TriagePolicy:
         labels = [item.label for item in self.classes]
         if len(set(labels)) != len(labels):
             raise ValueError("class labels must be unique")

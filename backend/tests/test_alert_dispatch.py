@@ -71,8 +71,7 @@ def test_high_risk_generates_exactly_one_alert_with_recorded_delivery() -> None:
     assert all(delivery.sent_at == NOW for delivery in alert.deliveries)
     assert all(delivery.delivered_at == NOW for delivery in alert.deliveries)
     assert all(
-        delivery.message_text.endswith(NOT_CONFIRMATION_SENTENCE)
-        for delivery in alert.deliveries
+        delivery.message_text.endswith(NOT_CONFIRMATION_SENTENCE) for delivery in alert.deliveries
     )
     assert len(provider.sent) == 3
     assert service.get_alert(alert.alert_id) is not None
@@ -124,9 +123,7 @@ def test_downgrade_does_not_generate_a_new_alert() -> None:
     assert result.triggered is False
     assert result.reason == "downgrade"
     assert len(service.history()) == 1
-    assert any(
-        event.event_type == "alert.downgrade_suppressed" for event in service.audit_events()
-    )
+    assert any(event.event_type == "alert.downgrade_suppressed" for event in service.audit_events())
 
 
 def test_escalation_generates_a_new_marked_updated_alert() -> None:
@@ -136,9 +133,7 @@ def test_escalation_generates_a_new_marked_updated_alert() -> None:
     policy = make_policy()
 
     service.dispatch(forecast=make_forecast(band="high"), policy=policy, language="en")
-    result = service.dispatch(
-        forecast=make_forecast(band="urgent"), policy=policy, language="en"
-    )
+    result = service.dispatch(forecast=make_forecast(band="urgent"), policy=policy, language="en")
 
     assert result.triggered is True
     assert result.alert.updated is True  # type: ignore[union-attr]
@@ -160,12 +155,8 @@ def test_cooldown_suppresses_repeats_but_allows_after_expiry() -> None:
     assert len(provider.sent) == 3
 
     clock.advance(hours=1)
-    early_repeat = make_forecast(
-        window_from=NOW + _days(14), window_to=NOW + _days(21)
-    )
-    suppressed = service.dispatch(
-        forecast=early_repeat, policy=policy, language="en"
-    )
+    early_repeat = make_forecast(window_from=NOW + _days(14), window_to=NOW + _days(21))
+    suppressed = service.dispatch(forecast=early_repeat, policy=policy, language="en")
 
     assert suppressed.reason == "suppressed"
     assert suppressed.alert.suppressed is True  # type: ignore[union-attr]
@@ -176,9 +167,7 @@ def test_cooldown_suppresses_repeats_but_allows_after_expiry() -> None:
     assert len(provider.sent) == 3
 
     clock.advance(hours=25)
-    late_repeat = make_forecast(
-        window_from=NOW + _days(28), window_to=NOW + _days(35)
-    )
+    late_repeat = make_forecast(window_from=NOW + _days(28), window_to=NOW + _days(35))
     delivered = service.dispatch(forecast=late_repeat, policy=policy, language="en")
 
     assert delivered.reason == "triggered"
@@ -344,9 +333,7 @@ def test_suppressed_delivery_cannot_receive_feedback() -> None:
     service, clock = _service(provider=RecordingProvider())
     _two_users(service)
     policy = make_policy()
-    service.dispatch(
-        forecast=make_forecast(window_to=NOW), policy=policy, language="en"
-    )
+    service.dispatch(forecast=make_forecast(window_to=NOW), policy=policy, language="en")
     clock.advance(hours=1)
     suppressed = service.dispatch(
         forecast=make_forecast(window_from=NOW + _days(14), window_to=NOW + _days(21)),
