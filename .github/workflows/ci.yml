@@ -107,8 +107,9 @@ jobs:
         run: flutter analyze
       - name: Test
         run: flutter test
-      # Platform runners (android/, ios/) are generated locally with
-      # `flutter create .` until a device build is part of the plan.
+      # Platform runners (android/, ios/) are committed. Device builds are not
+      # part of CI yet: no emulator/device build step runs here, and the APK and
+      # emulator smoke evidence is recorded in mobile/README.md and TEST-MATRIX.md.
 
   compose:
     name: Deploy (compose config and image builds)
